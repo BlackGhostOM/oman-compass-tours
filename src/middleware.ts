@@ -20,11 +20,14 @@ export default convexAuthNextjsMiddleware(
     const { pathname } = request.nextUrl;
     const locale = localeFromPath(pathname);
 
-    if (isProtectedRoute(request) && !(await convexAuth.isAuthenticated())) {
+    // Only redirect page navigations; Server Action POSTs must pass through
+    // (a redirect response would break the action's fetch).
+    const isNavigation = request.method === "GET";
+    if (isNavigation && isProtectedRoute(request) && !(await convexAuth.isAuthenticated())) {
       const redirectTo = encodeURIComponent(pathname + request.nextUrl.search);
       return nextjsMiddlewareRedirect(request, `/${locale}/sign-in?redirect=${redirectTo}`);
     }
-    if (isAuthRoute(request) && (await convexAuth.isAuthenticated())) {
+    if (isNavigation && isAuthRoute(request) && (await convexAuth.isAuthenticated())) {
       return nextjsMiddlewareRedirect(request, `/${locale}/account`);
     }
     return intlMiddleware(request);
@@ -33,6 +36,6 @@ export default convexAuthNextjsMiddleware(
 );
 
 export const config = {
-  // Skip Next internals, API routes, and static files (anything with an extension)
-  matcher: ["/((?!api|_next|_vercel|.*\\..*).*)"],
+  // Skip Next internals, API routes (except the Convex Auth proxy at /api/auth) and static files
+  matcher: ["/((?!api(?!/auth)|_next|_vercel|.*\\..*).*)"],
 };

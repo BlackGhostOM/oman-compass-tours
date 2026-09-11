@@ -14,6 +14,7 @@ import { ItineraryAccordion } from "@/components/tours/itinerary-accordion";
 import { FaqAccordion } from "@/components/tours/faq-accordion";
 import { BookPanel, MobileBookBar } from "@/components/tours/book-panel";
 import { ShareButtons } from "@/components/tours/share-buttons";
+import { WishlistButton } from "@/components/account/wishlist-button";
 import { RatingStars } from "@/components/tours/rating-stars";
 import { ReviewCard } from "@/components/tours/review-card";
 import { TourCard } from "@/components/tours/tour-card";
@@ -146,7 +147,10 @@ export default async function TourPage({ params }: Props) {
                 <span className="inline-flex items-center gap-1.5"><Languages className="size-4 text-gold-500" /> {tour.guideLanguages.map((l) => (l === "ar" ? "العربية" : "English")).join(" · ")}</span>
               </div>
             </div>
-            <ShareButtons title={title} path={path} />
+            <div className="flex items-center gap-3">
+              <WishlistButton tourId={tour._id} className="bg-navy-950 text-sand-50" />
+              <ShareButtons title={title} path={path} />
+            </div>
           </div>
 
           <MediaGallery className="mt-6" items={tour.gallery.length ? tour.gallery : tour.coverImage ? [tour.coverImage] : []} title={title} />

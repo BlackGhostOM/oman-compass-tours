@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as account from "../account.js";
 import type * as auth from "../auth.js";
 import type * as availability from "../availability.js";
 import type * as blog from "../blog.js";
@@ -16,6 +17,7 @@ import type * as bookings from "../bookings.js";
 import type * as catalog from "../catalog.js";
 import type * as content from "../content.js";
 import type * as crons from "../crons.js";
+import type * as files from "../files.js";
 import type * as fx from "../fx.js";
 import type * as gateways_paypal from "../gateways/paypal.js";
 import type * as gateways_provider from "../gateways/provider.js";
@@ -54,6 +56,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  account: typeof account;
   auth: typeof auth;
   availability: typeof availability;
   blog: typeof blog;
@@ -62,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   catalog: typeof catalog;
   content: typeof content;
   crons: typeof crons;
+  files: typeof files;
   fx: typeof fx;
   "gateways/paypal": typeof gateways_paypal;
   "gateways/provider": typeof gateways_provider;
