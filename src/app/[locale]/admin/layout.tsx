@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { getTranslations, setRequestLocale } from "next-intl/server";
+import { NextIntlClientProvider } from "next-intl";
+import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
 import { AdminShell } from "@/components/admin/admin-shell";
 
 export const dynamic = "force-dynamic";
@@ -13,5 +14,11 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 export default async function AdminLayout({ children, params }: { children: React.ReactNode; params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  return <AdminShell>{children}</AdminShell>;
+  // The root layout omits the dashboard namespaces; provide the full catalogue here.
+  const messages = await getMessages();
+  return (
+    <NextIntlClientProvider messages={messages}>
+      <AdminShell>{children}</AdminShell>
+    </NextIntlClientProvider>
+  );
 }

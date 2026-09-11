@@ -21,7 +21,7 @@ type Review = {
 export async function ReviewsSection({ reviews, stats }: { reviews: Review[]; stats: { count: number; average: number } | null }) {
   const t = await getTranslations("home.reviews");
   return (
-    <section className="surface-sand py-20 sm:py-24">
+    <section className="cv-auto surface-sand py-20 sm:py-24">
       <div className="container-brand">
         <SectionHeading eyebrow={t("eyebrow")} title={t("title")} description={t("description")} />
 

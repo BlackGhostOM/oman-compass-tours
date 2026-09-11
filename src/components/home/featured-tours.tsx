@@ -13,7 +13,7 @@ export function FeaturedTours({ tours }: { tours: TourCardData[] }) {
   const locale = useLocale();
   if (tours.length === 0) return null;
   return (
-    <section id="featured" className="relative surface-sand py-20 sm:py-24">
+    <section id="featured" className="cv-auto relative surface-sand py-20 sm:py-24">
       <div className="container-brand">
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <SectionHeading eyebrow={t("eyebrow")} title={t("title")} description={t("description")} align="start" />

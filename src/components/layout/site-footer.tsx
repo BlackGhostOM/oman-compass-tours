@@ -18,7 +18,7 @@ export async function SiteFooter() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="relative overflow-hidden surface-dark">
+    <footer className="cv-auto relative overflow-hidden surface-dark">
       <div className="hairline" />
       <div
         aria-hidden="true"
@@ -153,15 +153,15 @@ export async function SiteFooter() {
           <p>
             © {year} {locale === "ar" ? site.nameAr : site.name}. {t("rights")}
           </p>
-          <ul className="flex flex-wrap gap-x-5 gap-y-1">
+          <ul className="flex flex-wrap gap-x-4">
             {policyLinks.map((l) => (
               <li key={l.key}>
-                <Link href={l.href} className="hover:text-gold-400">
+                <Link href={l.href} className="inline-block py-2 hover:text-gold-400">
                   {tp(`titles.${l.key}`)}
                 </Link>
               </li>
             ))}
-            <li><CookieSettingsButton className="hover:text-gold-400" /></li>
+            <li><CookieSettingsButton className="inline-block py-2 hover:text-gold-400" /></li>
           </ul>
         </div>
       </div>

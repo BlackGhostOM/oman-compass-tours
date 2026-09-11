@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import { hasLocale, NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
+import { pick } from "@/lib/messages";
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import { Direction } from "radix-ui";
 import { Analytics } from "@vercel/analytics/next";
@@ -71,7 +72,8 @@ export default async function LocaleLayout({
   setRequestLocale(locale);
 
   const dir = dirFor(locale);
-  const messages = await getMessages();
+  // The admin namespace is large and only used under /admin, whose layout provides the full catalogue.
+  const messages = pick(await getMessages(), (key) => key !== "admin");
 
   return (
     <ConvexAuthNextjsServerProvider>

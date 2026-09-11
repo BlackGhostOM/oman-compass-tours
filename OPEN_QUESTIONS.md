@@ -28,4 +28,5 @@ Decisions that need the owner's input. Each one has a **default already applied*
 
 - **Dev-only hydration warning.** In `next dev`, React logs a `useId` mismatch on the header language dropdown. It comes from the Next.js dev overlay changing the sibling count at the document root; production builds do not log it (verified in the Lighthouse run). No user-facing effect.
 - **Stripe hosted checkout test** in `tests/booking.spec.ts` is skipped unless `STRIPE_SECRET_KEY` is set on the Convex deployment; the webhook-confirmation test always runs with a locally signed payload.
+- **Mobile Lighthouse performance** sits at 75–87 (desktop 97–99). The remaining cost is React hydration of the Convex/next-intl client on the simulated slow phone; the next levers are real, optimised hero photography (placeholders are gradient JPEGs) and moving the reels/reviews carousels to server components.
 

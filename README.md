@@ -169,6 +169,21 @@ npm run lint
 PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test --project=chromium
 ```
 
+Lighthouse 12 on the production build (`next build && next start`, Playwright's
+headless Chromium, 2026-09-12):
+
+| Page | Desktop perf / a11y / best practices / SEO | Mobile perf / a11y / BP / SEO |
+| --- | --- | --- |
+| `/en` (home) | 99 / 100 / 100 / 100 | 87 / 100 / 100 / 100 |
+| `/ar` (home) | 97 / 100 / 100 / 100 | 75 / 100 / 100 / 100 |
+| `/en/tours` | 99 / 100 / 100 / 100 | 84 / 100 / 100 / 100 |
+| `/en/about`, `/en/contact`, tour detail | 99 / 100 / 96–100 / 92–100 | — |
+
+SEO 92 on tour and contact pages is only the canonical URL pointing at the
+production domain while auditing `localhost`. Mobile performance is bounded by
+hydration time on the throttled CPU profile; the heavy dashboards are excluded
+from the public bundle and below-the-fold sections use `content-visibility`.
+
 The Playwright suite (`tests/`) covers language switching, tour search and
 filters, the booking wizard with reserve-now-pay-later, a signed Stripe webhook
 confirming a booking and unlocking the voucher, customer sign-in and voucher

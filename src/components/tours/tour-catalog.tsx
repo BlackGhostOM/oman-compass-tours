@@ -246,9 +246,9 @@ export function TourCatalog({
           </div>
         </div>
 
-        <p className="mt-4 text-sm text-ink-500" aria-live="polite">
+        <h2 className="mt-4 font-body text-sm font-normal text-ink-500" aria-live="polite">
           {list === undefined ? t("loading") : t("results", { count: list.length })}
-        </p>
+        </h2>
 
         {list === undefined ? (
           <div className="mt-4 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">

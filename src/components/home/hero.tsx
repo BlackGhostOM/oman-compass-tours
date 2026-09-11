@@ -46,8 +46,8 @@ export async function Hero({
 
       <div className="container-brand relative z-10 flex flex-col items-center pt-32 pb-24 text-center">
         <Image src="/brand/logo-mark.png" alt="" width={522} height={522} priority className="size-24 rounded-full ring-1 ring-gold-500/40 sm:size-28" />
-        <p className="eyebrow mt-8 animate-fade-up">{t("eyebrow")}</p>
-        <h1 className="heading-brand mt-4 max-w-4xl animate-fade-up font-heading text-4xl leading-[1.1] text-sand-50 [animation-delay:80ms] sm:text-5xl lg:text-6xl">
+        <p className="eyebrow eyebrow-light mt-8 animate-rise">{t("eyebrow")}</p>
+        <h1 className="heading-brand mt-4 max-w-4xl animate-rise font-heading text-4xl leading-[1.1] text-sand-50 [animation-delay:80ms] sm:text-5xl lg:text-6xl">
           {title}
         </h1>
         <p className="mt-6 max-w-2xl animate-fade-up font-editorial text-xl text-sand-100/85 [animation-delay:160ms] sm:text-2xl">

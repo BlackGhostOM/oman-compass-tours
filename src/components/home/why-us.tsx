@@ -13,7 +13,7 @@ const items = [
 export async function WhyUs() {
   const t = await getTranslations("home.why");
   return (
-    <section className="relative overflow-hidden surface-dark py-20 sm:py-24">
+    <section className="cv-auto relative overflow-hidden surface-dark py-20 sm:py-24">
       <CompassWatermark opacity={0.04} className="translate-x-1/3" />
       <div className="container-brand relative">
         <SectionHeading eyebrow={t("eyebrow")} title={t("title")} description={t("description")} tone="dark" />

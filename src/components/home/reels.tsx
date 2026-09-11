@@ -83,7 +83,7 @@ export function ReelsSection({ items }: { items: ReelItem[] }) {
   const t = useTranslations("home.reels");
   if (items.length === 0) return null;
   return (
-    <section className="surface-dark py-20 sm:py-24">
+    <section className="cv-auto surface-dark py-20 sm:py-24">
       <div className="container-brand">
         <SectionHeading eyebrow={t("eyebrow")} title={t("title")} description={t("description")} tone="dark" />
         <div className="scrollbar-none mt-12 flex snap-x gap-4 overflow-x-auto pb-4 lg:grid lg:grid-cols-4 lg:overflow-visible">

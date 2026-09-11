@@ -177,6 +177,8 @@ html[lang="ar"] {
 
   --shadow-gold: 0 10px 30px -10px color-mix(in oklch, var(--gold-500) 45%, transparent);
   --animate-fade-up: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* Transform-only entrance for LCP text: opacity animations delay the LCP paint on slow devices */
+  --animate-rise: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-slow-zoom: slow-zoom 24s ease-in-out infinite alternate;
   --animate-spin-slow: spin 90s linear infinite;
 }
@@ -191,6 +193,24 @@ html[lang="ar"] {
     transform: translateY(0);
   }
 }
+@keyframes rise {
+  from {
+    transform: translateY(16px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-up,
+  .animate-rise,
+  .animate-slow-zoom,
+  .animate-spin-slow {
+    animation: none !important;
+  }
+}
+
 @keyframes slow-zoom {
   from {
     transform: scale(1);
@@ -276,6 +296,11 @@ html[lang="ar"] {
   .dark .eyebrow,
   .eyebrow-light {
     @apply text-gold-400;
+  }
+  /* Below-the-fold sections skip layout and paint until they approach the viewport */
+  .cv-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 720px;
   }
   /* Cookie banner: hidden until the inline boot script marks consent as pending */
   .consent-banner {

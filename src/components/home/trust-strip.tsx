@@ -6,7 +6,7 @@ import { PaymentLogos } from "@/components/shared/payment-logos";
 export async function TrustStrip() {
   const t = await getTranslations("home.trust");
   return (
-    <section className="surface-dark border-y border-navy-800">
+    <section className="cv-auto surface-dark border-y border-navy-800">
       <div className="container-brand grid gap-8 py-10 md:grid-cols-3">
         <div className="flex gap-4">
           <ShieldCheck className="size-8 shrink-0 text-gold-500" />
