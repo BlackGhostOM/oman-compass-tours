@@ -1,35 +1,70 @@
-import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Link } from "@/i18n/navigation";
-import { Button } from "@/components/ui/button";
-import { CompassWatermark } from "@/components/brand/compass-rose";
-import { Logo } from "@/components/brand/logo";
+import { setRequestLocale } from "next-intl/server";
+import { api } from "../../../../convex/_generated/api";
+import { fetchPublic } from "@/lib/convex-server";
+import { site } from "@/lib/site";
+import { Hero } from "@/components/home/hero";
+import { FeaturedTours } from "@/components/home/featured-tours";
+import { WhyUs } from "@/components/home/why-us";
+import { DestinationsGrid } from "@/components/home/destinations-grid";
+import { ReelsSection } from "@/components/home/reels";
+import { ReviewsSection } from "@/components/home/reviews-section";
+import { TrustStrip } from "@/components/home/trust-strip";
+import { JsonLd } from "@/components/shared/json-ld";
+
+export const revalidate = 300;
 
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const t = await getTranslations("home.hero");
+
+  const [content, featured, destinations, reviews, stats] = await Promise.all([
+    fetchPublic(api.content.home, {}),
+    fetchPublic(api.tours.featured, { limit: 8 }),
+    fetchPublic(api.catalog.destinations, {}),
+    fetchPublic(api.reviews.featured, { limit: 6 }),
+    fetchPublic(api.reviews.stats, {}),
+  ]);
+
+  const reels = [1, 2, 3, 4].map((i) => ({
+    posterUrl: `/media/placeholders/reel-${i}.jpg`,
+    alt: { en: "Oman Compass Tours reel", ar: "مقطع من جولات بوصلة عُمان" },
+  }));
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "TravelAgency",
+    name: site.name,
+    url: `${site.url}/${locale}`,
+    logo: `${site.url}/brand/logo.png`,
+    image: `${site.url}/og-default.jpg`,
+    telephone: site.phoneE164,
+    email: site.email,
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: "Office 07, Building 3888, Way 2555, Bawshar",
+      addressLocality: "Muscat",
+      addressCountry: "OM",
+    },
+    geo: { "@type": "GeoCoordinates", latitude: site.geo.lat, longitude: site.geo.lng },
+    openingHoursSpecification: [
+      { "@type": "OpeningHoursSpecification", dayOfWeek: "Monday", opens: "07:30", closes: "19:00" },
+      { "@type": "OpeningHoursSpecification", dayOfWeek: ["Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], opens: "07:30", closes: "19:30" },
+    ],
+    aggregateRating: { "@type": "AggregateRating", ratingValue: site.tripadvisor.rating, reviewCount: site.tripadvisor.reviewCount, bestRating: 5 },
+    sameAs: Object.values(site.social),
+    priceRange: "OMR 45 – OMR 790",
+  };
 
   return (
-    <section className="relative flex min-h-dvh items-center overflow-hidden surface-dark">
-      <CompassWatermark opacity={0.06} />
-      <div className="container-brand relative z-10 flex flex-col items-center py-32 text-center">
-        <div className="w-40 sm:w-56">
-          <Logo variant="full" priority />
-        </div>
-        <p className="eyebrow mt-8">{t("eyebrow")}</p>
-        <h1 className="heading-brand mt-4 max-w-3xl font-heading text-4xl leading-tight text-sand-50 sm:text-5xl lg:text-6xl">
-          {t("title")}
-        </h1>
-        <p className="mt-6 max-w-2xl font-editorial text-xl text-sand-100/80 sm:text-2xl">{t("subtitle")}</p>
-        <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-          <Button asChild size="lg" className="bg-gold-gradient px-8 font-semibold text-navy-950 shadow-gold hover:brightness-110">
-            <Link href="/tours">{t("exploreTours")}</Link>
-          </Button>
-          <Button asChild size="lg" variant="outline" className="border-gold-500/60 bg-transparent px-8 text-sand-50 hover:bg-navy-900 hover:text-gold-400">
-            <Link href="/plan-my-trip">{t("planMyTrip")}</Link>
-          </Button>
-        </div>
-      </div>
-    </section>
+    <>
+      <JsonLd data={jsonLd} />
+      <Hero banner={content?.hero ?? null} videoUrl={content?.heroVideoUrl ?? null} posterUrl={content?.heroPosterUrl ?? "/media/placeholders/hero.jpg"} />
+      <FeaturedTours tours={featured ?? []} />
+      <WhyUs />
+      <DestinationsGrid destinations={destinations ?? []} />
+      <ReelsSection items={reels} />
+      <ReviewsSection reviews={reviews ?? []} stats={stats} />
+      <TrustStrip />
+    </>
   );
 }

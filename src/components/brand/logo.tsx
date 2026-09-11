@@ -48,7 +48,7 @@ export function Logo({
         className={cn("size-11 rounded-full ring-1 ring-gold-500/30 transition group-hover:ring-gold-500/70", markClassName)}
       />
       {variant === "lockup" && (
-        <span className="hidden flex-col leading-none whitespace-nowrap sm:flex">
+        <span className="hidden flex-col leading-none whitespace-nowrap sm:flex lg:hidden xl:flex">
           <span className="font-heading text-[0.95rem] font-semibold tracking-[0.14em] text-gold-400 sm:text-base">
             {locale === "ar" ? "بوصلة عُمان للسياحة" : "OMAN COMPASS TOURS"}
           </span>

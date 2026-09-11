@@ -1,0 +1,45 @@
+{
+  "$schema": "./tours-import-schema.json",
+  "_notes": [
+    "Import from Admin → Products → Import. Each object creates or updates a tour by `code`.",
+    "Prices are in OMR (major units). Lists use arrays here and pipe-separated values in the CSV template.",
+    "category_key must match an existing category key (city_tours, day_trips, multi_day, desert_4x4, mountain_wadi, cultural, food_family, boat, hiking_camping, photography, transfers, custom).",
+    "destination_keys must match existing destination keys (muscat, nizwa, wahiba, jebel_akhdar, salalah, musandam, sur, wadi_shab)."
+  ],
+  "tours": [
+    {
+      "code": "OCT-011",
+      "kind": "tour",
+      "title": { "en": "Daymaniyat Islands Snorkeling Trip", "ar": "رحلة غطس إلى جزر الديمانيات" },
+      "slug": { "en": "daymaniyat-islands-snorkeling", "ar": "غطس-جزر-الديمانيات" },
+      "summary": { "en": "Boat trip to the Daymaniyat nature reserve with snorkeling over coral reefs and turtles.", "ar": "رحلة بحرية إلى محمية الديمانيات الطبيعية مع الغطس فوق الشعاب المرجانية والسلاحف." },
+      "description": { "en": "Full description…", "ar": "الوصف الكامل…" },
+      "category_key": "boat",
+      "destination_keys": ["muscat"],
+      "duration_label": { "en": "5 hours", "ar": "5 ساعات" },
+      "duration_minutes": 300,
+      "duration_days": 1,
+      "start_times": ["08:00"],
+      "pricing_model": "per_person",
+      "price_adult_omr": 45,
+      "price_child_omr": 25,
+      "child_age_max": 11,
+      "min_group": 2,
+      "max_group": 12,
+      "capacity_per_slot": 12,
+      "deposit_percent": 100,
+      "free_cancellation_hours": 24,
+      "pickup_included": true,
+      "guide_languages": ["en", "ar"],
+      "difficulty": "easy",
+      "highlights": [{ "en": "Coral reefs", "ar": "الشعاب المرجانية" }, { "en": "Sea turtles", "ar": "السلاحف البحرية" }],
+      "itinerary": [{ "time": "08:00", "title": { "en": "Pickup", "ar": "الاستلام" }, "body": { "en": "From your hotel.", "ar": "من فندقك." } }],
+      "inclusions": [{ "en": "Boat", "ar": "القارب" }, { "en": "Snorkel gear", "ar": "معدات الغطس" }],
+      "exclusions": [{ "en": "Lunch", "ar": "الغداء" }],
+      "faqs": [{ "question": { "en": "Is it suitable for children?", "ar": "هل تناسب الأطفال؟" }, "answer": { "en": "Yes, from 6 years.", "ar": "نعم، من عمر 6 سنوات." } }],
+      "tags": ["snorkeling", "boat", "family"],
+      "cover_image_url": "https://example.com/photo.jpg",
+      "status": "draft"
+    }
+  ]
+}

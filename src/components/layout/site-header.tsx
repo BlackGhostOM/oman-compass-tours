@@ -53,7 +53,7 @@ export function SiteHeader() {
       <div className="container-brand flex h-[4.5rem] items-center justify-between gap-4">
         <Logo priority markClassName="size-10" />
 
-        <nav aria-label={t("primary")} className="hidden items-center gap-1 lg:flex">
+        <nav aria-label={t("primary")} className="hidden items-center gap-0.5 lg:flex">
           {primaryNav.map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
@@ -61,7 +61,7 @@ export function SiteHeader() {
                 key={item.key}
                 href={item.href}
                 className={cn(
-                  "relative rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap text-sand-100/85 transition hover:text-gold-400",
+                  "relative rounded-md px-2.5 py-2 text-[13px] font-medium whitespace-nowrap text-sand-100/85 transition hover:text-gold-400 xl:px-3 xl:text-sm",
                   "after:absolute after:inset-x-3 after:-bottom-0.5 after:h-px after:origin-start after:scale-x-0 after:bg-gold-500 after:transition-transform hover:after:scale-x-100",
                   active && "text-gold-400 after:scale-x-100",
                 )}
@@ -76,7 +76,7 @@ export function SiteHeader() {
         <div className="flex items-center gap-1.5">
           <a
             href={`tel:${site.phoneE164}`}
-            className="hidden items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-sand-100/80 transition hover:text-gold-400 xl:flex"
+            className="hidden items-center gap-1.5 rounded-md px-2 py-1.5 text-sm whitespace-nowrap text-sand-100/80 transition hover:text-gold-400 2xl:flex"
             dir="ltr"
           >
             <Phone className="size-4 text-gold-500" />
