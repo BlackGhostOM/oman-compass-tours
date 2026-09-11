@@ -112,22 +112,38 @@ Amounts are stored in baisa (OMR × 1000); USD/EUR/GBP are display conversions.
 Refunds are issued from the booking page and reconciled through the same
 webhooks.
 
-## 4. Deploy to Vercel
+## 4. Deploy (Convex + Vercel)
 
-1. Create a Convex production deployment: `npx convex deploy` (or connect the
-   repo in the Convex dashboard) and set every secret from section 2.
-2. In Vercel, import the repository and set the build command to
-   `npx convex deploy --cmd 'npm run build'` with `CONVEX_DEPLOY_KEY` from the
-   Convex dashboard. Add the `NEXT_PUBLIC_*` variables.
-3. Set `SITE_URL` on Convex to the production domain and add the domain to
-   Google OAuth, Stripe, Thawani and PayPal dashboards; register the webhooks
-   above.
-4. `vercel.json` sets the region (`fra1`) and security headers are emitted from
-   `next.config.ts` (CSP, HSTS, frame and referrer policies).
+The live setup uses two deployments that are updated independently:
 
-Crons (`convex/crons.ts`) run automatically: hold expiry every 15 minutes,
-booking lifecycle hourly, reminders and abandoned-draft follow-ups, FX refresh
-daily.
+| Piece | Where | How to update |
+| --- | --- | --- |
+| Backend (database, auth, crons, webhooks) | Convex production deployment `fantastic-sturgeon-674` | `npx convex deploy -y` from a machine logged in with `npx convex login` |
+| Website | Vercel project `oman-compass-tours` (team "Black"), linked to GitHub `BlackGhostOM/oman-compass-tours` | every push to `main` builds and deploys automatically |
+
+`.env.production` (committed) carries only the public `NEXT_PUBLIC_*` URLs of the
+production backend; Vercel builds with plain `npm run build`. Secrets never go
+into the repository: set them on Convex with `npx convex env set --prod NAME value`
+(section 2). To switch to the fully automated flow where a Vercel build also
+pushes backend changes, set the build command to
+`npx convex deploy --cmd 'npm run build'` and add `CONVEX_DEPLOY_KEY` (Convex
+dashboard → Settings → Deploy Keys) as a Vercel environment variable.
+
+Checklist after the first deploy:
+
+1. Set `SITE_URL` on Convex production to the final domain and add the domain in
+   Vercel (Project → Settings → Domains); update `NEXT_PUBLIC_SITE_URL` in
+   `.env.production`.
+2. Register the webhooks from section 3 on
+   `https://fantastic-sturgeon-674.convex.site/webhooks/<provider>` once payment
+   keys are added.
+3. Add the production domain to Google OAuth, Stripe, Thawani and PayPal.
+4. `vercel.json` sets the region (`fra1`); security headers (CSP, HSTS, frame
+   and referrer policies) come from `next.config.ts`.
+
+Crons (`convex/crons.ts`) run automatically on the production deployment: hold
+expiry every 15 minutes, booking lifecycle hourly, reminders and abandoned-draft
+follow-ups, FX refresh daily.
 
 ## 5. Everyday operations
 
