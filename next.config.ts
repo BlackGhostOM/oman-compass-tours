@@ -45,6 +45,13 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // The floating dev badge sits exactly where the support button lives; runtime errors still overlay.
   devIndicators: false,
+  // react-pdf loads its standard fonts and our Tajawal files at runtime; make sure the serverless
+  // bundles for the PDF routes ship them (Vercel's file tracing cannot see dynamic requires).
+  serverExternalPackages: ["@react-pdf/renderer", "pdfkit"],
+  outputFileTracingIncludes: {
+    "/api/voucher/[token]": ["./node_modules/pdfkit/js/**", "./public/fonts/**"],
+    "/api/invoice/[token]": ["./node_modules/pdfkit/js/**", "./public/fonts/**"],
+  },
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
