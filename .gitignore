@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# public build-time values only (NEXT_PUBLIC_*); secrets live in Convex/Vercel env settings
+!.env.production
 
 # vercel
 .vercel

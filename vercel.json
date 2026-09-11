@@ -1,15 +1,41 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "regions": ["fra1"],
-  "buildCommand": "npx convex deploy --cmd 'npm run build'",
+  "regions": [
+    "fra1"
+  ],
+  "buildCommand": "npm run build",
   "crons": [],
   "redirects": [
-    { "source": "/", "destination": "/en", "permanent": false },
-    { "source": "/tours", "destination": "/en/tours", "permanent": false },
-    { "source": "/services", "destination": "/en/services", "permanent": false },
-    { "source": "/about", "destination": "/en/about", "permanent": false },
-    { "source": "/contact", "destination": "/en/contact", "permanent": false },
-    { "source": "/policies", "destination": "/en/policies", "permanent": false }
+    {
+      "source": "/",
+      "destination": "/en",
+      "permanent": false
+    },
+    {
+      "source": "/tours",
+      "destination": "/en/tours",
+      "permanent": false
+    },
+    {
+      "source": "/services",
+      "destination": "/en/services",
+      "permanent": false
+    },
+    {
+      "source": "/about",
+      "destination": "/en/about",
+      "permanent": false
+    },
+    {
+      "source": "/contact",
+      "destination": "/en/contact",
+      "permanent": false
+    },
+    {
+      "source": "/policies",
+      "destination": "/en/policies",
+      "permanent": false
+    }
   ]
 }
