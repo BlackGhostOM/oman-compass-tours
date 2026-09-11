@@ -3,7 +3,11 @@
     "defaultTitle": "Oman Compass Tours · Private & Luxury Tours in Oman",
     "defaultDescription": "Licensed Omani tour operator in Muscat with 10+ years of experience. Private 4WD tours, desert adventures, wadis, mountains, cultural experiences and transfers. Rated 5.0 on Tripadvisor."
   },
-  "language": { "switch": "Change language", "en": "English", "ar": "Arabic" },
+  "language": {
+    "switch": "Change language",
+    "en": "English",
+    "ar": "Arabic"
+  },
   "nav": {
     "primary": "Primary navigation",
     "home": "Home",
@@ -120,10 +124,22 @@
       "title": "Why Oman Compass Tours",
       "description": "Ten years of guiding, one promise: you see the real Oman, safely and at your own pace.",
       "items": {
-        "licensed": { "title": "Licensed operator", "body": "Fully licensed by the Ministry of Heritage & Tourism (no. 1440944), insured vehicles and certified guides." },
-        "guides": { "title": "Local expert guides", "body": "Born-and-raised Omani guides who know the wadis, the villages and the families behind every stop." },
-        "private": { "title": "Private & customisable", "body": "Every departure is yours alone. Change the pace, add a stop, skip a stop — the itinerary follows you." },
-        "support": { "title": "24/7 support", "body": "WhatsApp, phone and live chat before, during and after your trip, in English and Arabic." }
+        "licensed": {
+          "title": "Licensed operator",
+          "body": "Fully licensed by the Ministry of Heritage & Tourism (no. 1440944), insured vehicles and certified guides."
+        },
+        "guides": {
+          "title": "Local expert guides",
+          "body": "Born-and-raised Omani guides who know the wadis, the villages and the families behind every stop."
+        },
+        "private": {
+          "title": "Private & customisable",
+          "body": "Every departure is yours alone. Change the pace, add a stop, skip a stop — the itinerary follows you."
+        },
+        "support": {
+          "title": "24/7 support",
+          "body": "WhatsApp, phone and live chat before, during and after your trip, in English and Arabic."
+        }
       }
     },
     "destinations": {
@@ -173,7 +189,11 @@
     "destination": "Destination",
     "allDestinations": "All destinations",
     "duration": "Duration",
-    "durations": { "half": "Half day", "full": "Full day", "multi": "Multi-day" },
+    "durations": {
+      "half": "Half day",
+      "full": "Full day",
+      "multi": "Multi-day"
+    },
     "maxPrice": "Max price (OMR)",
     "any": "Any",
     "guideLanguage": "Guide language",
@@ -182,7 +202,13 @@
     "clearFilters": "Clear filters",
     "searchPlaceholder": "Search tours (e.g. wadi, desert, Nizwa)",
     "sortBy": "Sort by",
-    "sort": { "popular": "Most popular", "rating": "Top rated", "price_asc": "Price: low to high", "price_desc": "Price: high to low", "duration": "Duration" },
+    "sort": {
+      "popular": "Most popular",
+      "rating": "Top rated",
+      "price_asc": "Price: low to high",
+      "price_desc": "Price: high to low",
+      "duration": "Duration"
+    },
     "loading": "Loading tours…",
     "results": "{count, plural, =0 {No tours found} one {# tour} other {# tours}}",
     "noResults": "No tours match these filters. Try clearing a filter or tell us what you are looking for on the Plan My Trip page."
@@ -228,7 +254,10 @@
     "prev": "Previous",
     "next": "Next"
   },
-  "reviews": { "ratingLabel": "Rated {rating} out of 5", "replyFrom": "Reply from Oman Compass Tours" },
+  "reviews": {
+    "ratingLabel": "Rated {rating} out of 5",
+    "replyFrom": "Reply from Oman Compass Tours"
+  },
   "services": {
     "metaTitle": "Private Transfers, Car with Driver & Custom Itineraries",
     "metaDescription": "Airport and hotel transfers in private 4WDs, car with driver by the day, custom itineraries and group travel across Oman.",
@@ -237,13 +266,32 @@
     "description": "Beyond our tours: private transfers, a car with driver for the day, and fully custom itineraries designed around you.",
     "bookable": "Bookable services",
     "items": {
-      "transfers": { "title": "Private transfers", "body": "Airport, hotel and inter-city transfers in modern 4WDs with flight tracking and meet & greet.", "cta": "See transfers" },
-      "carWithDriver": { "title": "Car with driver", "body": "A professional Omani driver and vehicle at your disposal by the half-day, day or week.", "cta": "Request a quote" },
-      "custom": { "title": "Custom itineraries", "body": "Tell us your dates, interests and budget; we design a private programme and handle every booking.", "cta": "Plan my trip" },
-      "groups": { "title": "Groups & corporate", "body": "Buses, multiple 4WDs and guides for families, incentive groups and conferences.", "cta": "Talk to us" }
+      "transfers": {
+        "title": "Private transfers",
+        "body": "Airport, hotel and inter-city transfers in modern 4WDs with flight tracking and meet & greet.",
+        "cta": "See transfers"
+      },
+      "carWithDriver": {
+        "title": "Car with driver",
+        "body": "A professional Omani driver and vehicle at your disposal by the half-day, day or week.",
+        "cta": "Request a quote"
+      },
+      "custom": {
+        "title": "Custom itineraries",
+        "body": "Tell us your dates, interests and budget; we design a private programme and handle every booking.",
+        "cta": "Plan my trip"
+      },
+      "groups": {
+        "title": "Groups & corporate",
+        "body": "Buses, multiple 4WDs and guides for families, incentive groups and conferences.",
+        "cta": "Talk to us"
+      }
     }
   },
-  "destination": { "eyebrow": "Destination", "toursIn": "Tours in {name}" },
+  "destination": {
+    "eyebrow": "Destination",
+    "toursIn": "Tours in {name}"
+  },
   "about": {
     "metaTitle": "About Oman Compass Tours",
     "metaDescription": "Omani-owned, licensed by the Ministry of Heritage & Tourism, rated 5.0 on Tripadvisor. Meet the team and fleet behind our private tours.",
@@ -262,10 +310,22 @@
     "valuesEyebrow": "What guides us",
     "valuesTitle": "Our values",
     "values": {
-      "authenticity": { "title": "Authenticity", "body": "Real villages, real families, real food — never staged." },
-      "safety": { "title": "Safety", "body": "Certified drivers, maintained 4WDs and weather-aware planning in every wadi." },
-      "hospitality": { "title": "Hospitality", "body": "You are our guest before you are our customer." },
-      "sustainability": { "title": "Respect", "body": "Small groups, local partners and strict animal-welfare standards." }
+      "authenticity": {
+        "title": "Authenticity",
+        "body": "Real villages, real families, real food — never staged."
+      },
+      "safety": {
+        "title": "Safety",
+        "body": "Certified drivers, maintained 4WDs and weather-aware planning in every wadi."
+      },
+      "hospitality": {
+        "title": "Hospitality",
+        "body": "You are our guest before you are our customer."
+      },
+      "sustainability": {
+        "title": "Respect",
+        "body": "Small groups, local partners and strict animal-welfare standards."
+      }
     },
     "teamEyebrow": "The people",
     "teamTitle": "Meet the team",
@@ -273,15 +333,30 @@
     "fleetEyebrow": "How we travel",
     "fleetTitle": "Our fleet",
     "fleet": {
-      "4wd": { "title": "Private 4WD vehicles", "body": "Modern, air-conditioned Toyota Land Cruisers and Prados for up to 6 guests — essential for Jabal Akhdar and the desert." },
-      "bus": { "title": "Buses & minibuses", "body": "Comfortable buses for groups, conferences and multi-day departures, with professional drivers." }
+      "4wd": {
+        "title": "Private 4WD vehicles",
+        "body": "Modern, air-conditioned Toyota Land Cruisers and Prados for up to 6 guests — essential for Jabal Akhdar and the desert."
+      },
+      "bus": {
+        "title": "Buses & minibuses",
+        "body": "Comfortable buses for groups, conferences and multi-day departures, with professional drivers."
+      }
     },
     "licenceEyebrow": "Credentials",
     "licenceTitle": "Licences & partners",
     "licence": {
-      "mht": { "title": "Ministry of Heritage & Tourism", "body": "Licensed tour operator no. {number}, Sultanate of Oman." },
-      "animal": { "title": "Animal welfare", "body": "We do not offer activities that harm animals; camel encounters are with licensed families and riding is optional." },
-      "partners": { "title": "Partners", "body": "Tripadvisor, Viator, and hand-picked hotels, camps and dhow operators across the Sultanate." }
+      "mht": {
+        "title": "Ministry of Heritage & Tourism",
+        "body": "Licensed tour operator no. {number}, Sultanate of Oman."
+      },
+      "animal": {
+        "title": "Animal welfare",
+        "body": "We do not offer activities that harm animals; camel encounters are with licensed families and riding is optional."
+      },
+      "partners": {
+        "title": "Partners",
+        "body": "Tripadvisor, Viator, and hand-picked hotels, camps and dhow operators across the Sultanate."
+      }
     },
     "profileTitle": "Company profile",
     "profileBody": "Download our profile with licences, fleet and references (PDF).",
@@ -290,11 +365,26 @@
     "timelineEyebrow": "Milestones",
     "timelineTitle": "Our journey",
     "timeline": {
-      "2014": { "title": "First tours from Muscat", "body": "Private city tours and wadi trips for friends of friends." },
-      "2017": { "title": "Licensed operator", "body": "Ministry licence no. 1440944 and our first 4WD fleet." },
-      "2020": { "title": "Multi-day packages", "body": "Desert camps, Jabal Akhdar overnights and the 8-day Complete Oman." },
-      "2023": { "title": "Tripadvisor Travellers' favourite", "body": "5.0 rating and #1 among Muscat experiences." },
-      "2026": { "title": "Online booking platform", "body": "Instant booking, secure payment and bilingual support — this website." }
+      "2014": {
+        "title": "First tours from Muscat",
+        "body": "Private city tours and wadi trips for friends of friends."
+      },
+      "2017": {
+        "title": "Licensed operator",
+        "body": "Ministry licence no. 1440944 and our first 4WD fleet."
+      },
+      "2020": {
+        "title": "Multi-day packages",
+        "body": "Desert camps, Jabal Akhdar overnights and the 8-day Complete Oman."
+      },
+      "2023": {
+        "title": "Tripadvisor Travellers' favourite",
+        "body": "5.0 rating and #1 among Muscat experiences."
+      },
+      "2026": {
+        "title": "Online booking platform",
+        "body": "Instant booking, secure payment and bilingual support — this website."
+      }
     }
   },
   "contact": {
@@ -328,7 +418,12 @@
       "doneTitle": "Thank you — message received",
       "doneBody": "A member of our team will reply by email or WhatsApp within one business hour.",
       "privacy": "By sending, you agree to our Privacy Policy.",
-      "errors": { "name": "Please enter your name.", "email": "Please enter a valid email address.", "phone": "Please enter a valid phone number.", "message": "Please write a short message." }
+      "errors": {
+        "name": "Please enter your name.",
+        "email": "Please enter a valid email address.",
+        "phone": "Please enter a valid phone number.",
+        "message": "Please write a short message."
+      }
     }
   },
   "bookingMethods": {
@@ -338,11 +433,36 @@
     "title": "Five ways to book",
     "description": "Choose the channel that suits you. Every booking, however it is made, receives a voucher and the same free-cancellation terms.",
     "methods": {
-      "online": { "title": "Online", "body": "Pick a date, pay securely and receive your voucher instantly.", "hours": "24/7", "cta": "Browse tours" },
-      "whatsapp": { "title": "WhatsApp", "body": "Chat with a real person, get a quote and a secure payment link.", "hours": "07:30–19:30 Oman time · replies within minutes", "cta": "Open WhatsApp" },
-      "phone": { "title": "Phone", "body": "Call us to book or ask anything about your trip.", "hours": "Mon 07:30–19:00 · Tue–Sun 07:30–19:30", "cta": "Call +968 9225 5028" },
-      "email": { "title": "Email", "body": "Ideal for detailed itineraries and group requests.", "hours": "Reply within one business day", "cta": "Email us" },
-      "office": { "title": "At the office", "body": "Visit us in Bawshar, Muscat — coffee is on us.", "hours": "Office hours", "cta": "Get directions" }
+      "online": {
+        "title": "Online",
+        "body": "Pick a date, pay securely and receive your voucher instantly.",
+        "hours": "24/7",
+        "cta": "Browse tours"
+      },
+      "whatsapp": {
+        "title": "WhatsApp",
+        "body": "Chat with a real person, get a quote and a secure payment link.",
+        "hours": "07:30–19:30 Oman time · replies within minutes",
+        "cta": "Open WhatsApp"
+      },
+      "phone": {
+        "title": "Phone",
+        "body": "Call us to book or ask anything about your trip.",
+        "hours": "Mon 07:30–19:00 · Tue–Sun 07:30–19:30",
+        "cta": "Call +968 9225 5028"
+      },
+      "email": {
+        "title": "Email",
+        "body": "Ideal for detailed itineraries and group requests.",
+        "hours": "Reply within one business day",
+        "cta": "Email us"
+      },
+      "office": {
+        "title": "At the office",
+        "body": "Visit us in Bawshar, Muscat — coffee is on us.",
+        "hours": "Office hours",
+        "cta": "Get directions"
+      }
     },
     "compareTitle": "Compare booking methods",
     "feature": "Feature",
@@ -384,7 +504,12 @@
     "empty": "New stories are on their way.",
     "readingTime": "{minutes} min read",
     "more": "More from the journal",
-    "categories": { "planning": "Planning", "guides": "Guides", "culture": "Culture", "news": "News" }
+    "categories": {
+      "planning": "Planning",
+      "guides": "Guides",
+      "culture": "Culture",
+      "news": "News"
+    }
   },
   "planner": {
     "metaTitle": "Plan My Trip — Custom Oman Itinerary",
@@ -393,10 +518,22 @@
     "title": "Plan my trip",
     "description": "Share a few details and a travel designer will send you a private itinerary with prices within one business day.",
     "steps": {
-      "tell": { "title": "Tell us", "body": "Dates, travellers, interests and budget." },
-      "design": { "title": "We design", "body": "A day-by-day private itinerary with hotels and prices." },
-      "refine": { "title": "Refine together", "body": "Adjust anything over WhatsApp or email." },
-      "go": { "title": "Confirm & go", "body": "Secure payment, vouchers and 24/7 support." }
+      "tell": {
+        "title": "Tell us",
+        "body": "Dates, travellers, interests and budget."
+      },
+      "design": {
+        "title": "We design",
+        "body": "A day-by-day private itinerary with hotels and prices."
+      },
+      "refine": {
+        "title": "Refine together",
+        "body": "Adjust anything over WhatsApp or email."
+      },
+      "go": {
+        "title": "Confirm & go",
+        "body": "Secure payment, vouchers and 24/7 support."
+      }
     },
     "step1": "Your trip",
     "step2": "Your details",
@@ -404,9 +541,24 @@
     "endDate": "Departure date",
     "travellers": "Travellers",
     "budget": "Budget level",
-    "budgets": { "economy": "Value", "comfort": "Comfort", "luxury": "Luxury" },
+    "budgets": {
+      "economy": "Value",
+      "comfort": "Comfort",
+      "luxury": "Luxury"
+    },
     "interests": "Interests",
-    "interestOptions": { "desert": "Desert", "wadis": "Wadis & swimming", "mountains": "Mountains", "culture": "Culture & heritage", "food": "Food", "sea": "Sea & dolphins", "photography": "Photography", "family": "Family friendly", "luxury": "Luxury stays", "hiking": "Hiking" },
+    "interestOptions": {
+      "desert": "Desert",
+      "wadis": "Wadis & swimming",
+      "mountains": "Mountains",
+      "culture": "Culture & heritage",
+      "food": "Food",
+      "sea": "Sea & dolphins",
+      "photography": "Photography",
+      "family": "Family friendly",
+      "luxury": "Luxury stays",
+      "hiking": "Hiking"
+    },
     "name": "Full name",
     "email": "Email",
     "phone": "Phone / WhatsApp",
@@ -430,5 +582,223 @@
       "body": "The link may be outdated or the page may have moved. Let us guide you back.",
       "home": "Back to home"
     }
+  },
+  "booking": {
+    "metaTitle": "Book",
+    "eyebrow": "Secure booking",
+    "backToTour": "← Back to tour details",
+    "draftRestored": "We restored your saved booking.",
+    "autosave": "Your progress is saved automatically so you can come back later.",
+    "steps": {
+      "label": "Booking steps",
+      "dates": "Date & guests",
+      "traveller": "Traveller details",
+      "review": "Review",
+      "payment": "Payment"
+    },
+    "summary": {
+      "date": "Date",
+      "guests": "Guests",
+      "infants": "{count, plural, one {# infant} other {# infants}}",
+      "unavailable": "Select a date to see the price.",
+      "free": "Free",
+      "total": "Total",
+      "depositNow": "Deposit now ({percent}%)",
+      "balanceLater": "Balance 7 days before departure",
+      "soldOut": "Not enough availability for this group ({remaining} left). Please choose another date or time."
+    },
+    "dates": {
+      "title": "Choose your date, time and guests",
+      "subtitle": "Every departure is private to your party.",
+      "legend": "Greyed-out dates are unavailable.",
+      "startTime": "Start time",
+      "spotsLeft": "{count} left",
+      "guests": "Guests",
+      "adults": "Adults",
+      "adultsHint": "12 years and above",
+      "children": "Children",
+      "childrenHint": "Ages {min}–{max}",
+      "infants": "Infants",
+      "infantsHint": "0–{max} years · free",
+      "perGroupNote": "Private-group price covers up to {max} guests in one vehicle.",
+      "minGroup": "This tour requires at least {min} guests.",
+      "addOns": "Add-ons",
+      "addOnsHint": "Optional extras, added to your total.",
+      "free": "Free",
+      "perBooking": "per booking",
+      "coupon": "Coupon code (optional)",
+      "couponApplied": "Coupon applied: −{amount}",
+      "couponErrors": {
+        "not_found": "This code is not valid.",
+        "inactive": "This code is no longer active.",
+        "expired": "This code has expired.",
+        "not_started": "This code is not active yet.",
+        "usage_limit": "This code has reached its usage limit.",
+        "min_subtotal": "Your order does not meet the minimum for this code.",
+        "min_group": "This code needs a larger group.",
+        "early_bird": "This code only applies when booking further in advance.",
+        "tour_not_eligible": "This code does not apply to this tour."
+      }
+    },
+    "traveller": {
+      "title": "Lead traveller",
+      "subtitle": "We use these details for your voucher and for your guide to reach you on the day.",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "nationality": "Nationality",
+      "select": "Select…",
+      "phone": "Mobile / WhatsApp",
+      "phoneHint": "Your guide will message you on WhatsApp before pickup.",
+      "email": "Email",
+      "emailHint": "Voucher and receipts are sent here.",
+      "hotel": "Hotel",
+      "hotelPlaceholder": "e.g. Al Bustan Palace",
+      "pickup": "Pickup location",
+      "pickupPlaceholder": "Lobby, apartment address, or Google Maps link",
+      "requests": "Special requests",
+      "requestsPlaceholder": "Dietary needs, mobility, celebrations, photography wishes…"
+    },
+    "review": {
+      "title": "Review your booking",
+      "subtitle": "Check the details and accept our policies to continue.",
+      "date": "Date",
+      "time": "Start time",
+      "lead": "Lead traveller",
+      "contact": "Contact",
+      "pickup": "Pickup",
+      "requests": "Special requests",
+      "policyHeadline": "Flexible booking",
+      "deposit": "{percent}% deposit to confirm, balance 7 days before departure",
+      "acceptPolicies": "I have read and accept the <links></links>.",
+      "acceptWaiver": "I accept the <link>Travel Safety & Liability Waiver</link> on behalf of everyone in my party.",
+      "versionNote": "The versions in force today are recorded with your booking.",
+      "toPayment": "Continue to payment"
+    },
+    "payment": {
+      "title": "Payment",
+      "subtitle": "Choose how you would like to secure your booking.",
+      "payNow": "Pay {amount} now",
+      "payDeposit": "Pay {amount} deposit now",
+      "payNowHint": "Instant confirmation, voucher by email.",
+      "payLater": "Reserve now, pay later",
+      "payLaterHint": "We hold your place for {hours} hours while you arrange payment.",
+      "noneConfigured": "Online payment is temporarily unavailable — choose 'Reserve now, pay later' or contact us on WhatsApp.",
+      "secure": "Payments are processed on the provider's secure page. Your card details never reach our servers.",
+      "processing": "Creating your booking…",
+      "reserveCta": "Reserve my place",
+      "payCta": "Continue to secure payment"
+    },
+    "errors": {
+      "UNKNOWN": "We could not create the booking. Please try again or contact us on WhatsApp.",
+      "SOLD_OUT": "This date or time just sold out. Please choose another.",
+      "DATE_IN_PAST": "Please choose a future date.",
+      "INVALID_ARGUMENT": "Please check the traveller details.",
+      "BELOW_MIN_GROUP": "This tour requires a larger group.",
+      "ABOVE_MAX_GROUP": "This tour cannot take a group this large — contact us for a second vehicle.",
+      "POLICIES_NOT_ACCEPTED": "Please accept the policies to continue.",
+      "COUPON_INVALID": "The coupon code is not valid for this booking.",
+      "RATE_LIMITED": "Too many attempts. Please wait a moment.",
+      "PAY_LATER_NOT_ALLOWED": "This tour must be paid at booking.",
+      "TOUR_NOT_FOUND": "This tour is no longer available."
+    }
+  },
+  "checkout": {
+    "metaTitle": "Secure checkout",
+    "eyebrow": "Checkout",
+    "title": "Complete your payment",
+    "subtitle": "Booking {reference}",
+    "notFound": "We could not find this booking.",
+    "browseTours": "Browse tours",
+    "alreadyConfirmed": "This booking is already confirmed.",
+    "viewBooking": "View booking",
+    "cancelled": "This booking was cancelled or the hold expired.",
+    "rebook": "Book again",
+    "paymentCancelled": "The payment was cancelled. You can try again or choose another method.",
+    "holdUntil": "Your place is held for about {hours} more hour(s).",
+    "depositOption": "Pay the deposit",
+    "fullOption": "Pay in full",
+    "secure": "You will be redirected to the provider's PCI-compliant page. We never see or store card numbers.",
+    "redirecting": "Redirecting to secure payment…",
+    "payCta": "Pay with {provider}",
+    "summary": "Summary",
+    "total": "Total",
+    "paid": "Paid",
+    "payingNow": "Paying now",
+    "errors": {
+      "notConfigured": "This payment method is not available right now. Please choose another or contact us.",
+      "provider": "The payment provider returned an error:",
+      "generic": "Something went wrong starting the payment. Please try again."
+    },
+    "providers": {
+      "displayCurrency": "Show prices in",
+      "ratesNote": "Conversions are indicative. The exact charge is shown below before you pay.",
+      "method": "Payment method",
+      "notConfigured": "Currently unavailable",
+      "youWillBeCharged": "You will be charged",
+      "settlementNote": "{provider} settles in {currency}; your bank converts at its own rate.",
+      "thawani": {
+        "name": "Thawani",
+        "body": "Omani & GCC cards, charged in OMR."
+      },
+      "stripe": {
+        "name": "Card",
+        "body": "Visa, Mastercard, Amex, Apple Pay, Google Pay."
+      },
+      "paypal": {
+        "name": "PayPal",
+        "body": "Pay with your PayPal balance or linked cards."
+      }
+    },
+    "status": {
+      "metaTitle": "Payment status",
+      "notFound": "We could not find this booking.",
+      "confirmedTitle": "Payment confirmed",
+      "confirmedBody": "Your booking is confirmed. Taking you to your voucher…",
+      "waitingTitle": "Confirming your payment…",
+      "waitingBody": "We are waiting for the payment provider to confirm. This usually takes a few seconds.",
+      "slow": "Taking longer than usual? Your booking will confirm automatically once the provider notifies us — you can safely close this page.",
+      "viewBooking": "View booking",
+      "failed": "The payment did not go through. You can try again from the checkout page."
+    }
+  },
+  "confirmation": {
+    "metaTitle": "Booking",
+    "notFound": "We could not find this booking.",
+    "confirmedTitle": "You are booked!",
+    "bookingTitle": "Your booking",
+    "holdTitle": "Your place is reserved",
+    "confirmedBody": "A confirmation with your voucher has been sent to {email}.",
+    "holdBody": "Complete payment within {hours} hour(s) to confirm. We have emailed you the details.",
+    "countdown": "{d}d {h}h {m}m until your tour",
+    "payPrompt": "Pay {amount} to confirm your booking.",
+    "payNow": "Pay now",
+    "voucher": "Voucher (PDF)",
+    "addToCalendar": "Add to calendar",
+    "sendWhatsapp": "Send to WhatsApp",
+    "lead": "Lead traveller",
+    "pickup": "Pickup / meeting point",
+    "guests": "Guests",
+    "adult": "adult",
+    "child": "child",
+    "infant": "infant",
+    "total": "Total",
+    "paid": "Paid",
+    "balance": "Balance due",
+    "cancellationNote": "Free cancellation up to {hours} hours before the start time. Manage your booking from My Account or contact us.",
+    "nonRefundableNote": "This booking is non-refundable.",
+    "createAccountTitle": "Keep everything in one place",
+    "createAccountBody": "Create an account to see vouchers, manage bookings and earn loyalty points.",
+    "createAccount": "Create my account",
+    "helpTitle": "Need help?",
+    "helpBody": "Our team is available 7 days a week."
+  },
+  "bookingStatus": {
+    "inquiry": "Reserved — awaiting payment",
+    "pending_payment": "Awaiting payment",
+    "confirmed": "Confirmed",
+    "in_progress": "In progress",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+    "refunded": "Refunded"
   }
 }
