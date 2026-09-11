@@ -38,7 +38,7 @@ export function Logo({
   }
 
   return (
-    <Link href="/" className={cn("group inline-flex items-center gap-3", className)}>
+    <Link href="/" className={cn("group inline-flex shrink-0 items-center gap-3", className)}>
       <span className="sr-only">{label}</span>
       <Image
         src="/brand/logo-mark.png"
