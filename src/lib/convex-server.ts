@@ -17,7 +17,8 @@ export async function fetchPublic<Q extends FunctionReference<"query", "public">
   try {
     return await convexFetchQuery(query, ...args);
   } catch (err) {
-    console.error("[convex] fetchQuery failed:", (err as Error).message);
+    const cause = (err as { cause?: { code?: string; message?: string } }).cause;
+    console.error("[convex] fetchQuery failed:", (err as Error).message, cause?.code ?? cause?.message ?? "", "url:", url);
     return null;
   }
 }
