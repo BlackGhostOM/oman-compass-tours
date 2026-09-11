@@ -108,7 +108,7 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ i
             <div><dt className="inline text-muted-foreground">{t("email")}: </dt><dd className="inline">{b.traveller.email}</dd></div>
             <div><dt className="inline text-muted-foreground">{t("pickup")}: </dt><dd className="inline">{b.traveller.pickupLocation ?? b.traveller.hotel ?? "—"}</dd></div>
             {b.traveller.specialRequests && <div><dt className="text-muted-foreground">{t("requests")}</dt><dd className="whitespace-pre-wrap">{b.traveller.specialRequests}</dd></div>}
-            {b.customer && <div className="pt-2"><Link href={`/admin/customers/${b.customer._id}`} className="text-gold-600 hover:underline">{t("openCustomer")}</Link> · {b.customer.loyaltyPoints} pts</div>}
+            {b.customer && <div className="pt-2"><Link href={`/admin/customers/${b.customer._id}`} className="text-gold-700 hover:underline">{t("openCustomer")}</Link> · {b.customer.loyaltyPoints} pts</div>}
           </dl>
           <div className="mt-4 space-y-2">
             <p className="text-xs font-medium text-muted-foreground">{t("quickReplies")}</p>
@@ -181,7 +181,7 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ i
                 <Input placeholder={`OMR (${(outstanding / 1000).toFixed(3)})`} value={linkAmount} onChange={(e) => setLinkAmount(e.target.value)} />
                 <Button size="sm" disabled={busy === "link"} onClick={() => run("link", async () => { const r = await issueLink({ id: b._id, amountOmr: Number(linkAmount) || outstanding / 1000 }); await navigator.clipboard.writeText(r.url).catch(() => {}); await sendLinkEmail({ bookingId: b._id, url: r.url, amountOmr: Number(linkAmount) || outstanding / 1000 }); }, t("linkSent"))}><Link2 className="size-4" /> {t("issue")}</Button>
               </div>
-              {b.paymentLinks.length > 0 && <ul className="mt-2 space-y-1 text-xs text-muted-foreground">{b.paymentLinks.map((l) => <li key={l._id} className="flex items-center gap-2"><Money baisa={l.amountOmr} /> · {l.usedAt ? t("used") : l.expiresAt < Date.now() ? t("expired") : t("active")} <button type="button" className="text-gold-600" onClick={() => navigator.clipboard.writeText(`${site.url}/${b.locale}/pay/${l.token}`)}><Copy className="size-3" /></button></li>)}</ul>}
+              {b.paymentLinks.length > 0 && <ul className="mt-2 space-y-1 text-xs text-muted-foreground">{b.paymentLinks.map((l) => <li key={l._id} className="flex items-center gap-2"><Money baisa={l.amountOmr} /> · {l.usedAt ? t("used") : l.expiresAt < Date.now() ? t("expired") : t("active")} <button type="button" className="text-gold-700" onClick={() => navigator.clipboard.writeText(`${site.url}/${b.locale}/pay/${l.token}`)}><Copy className="size-3" /></button></li>)}</ul>}
             </div>
           </div>
         </Panel>

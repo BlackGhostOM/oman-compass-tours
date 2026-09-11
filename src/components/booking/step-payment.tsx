@@ -53,7 +53,7 @@ export function StepPayment({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <button type="button" onClick={() => setMode("now")} aria-pressed={mode === "now"} className={cn("flex items-start gap-3 rounded-xl border p-4 text-start transition", mode === "now" ? "border-gold-500 bg-gold-500/10 ring-2 ring-gold-500/30" : "border-sand-200 bg-white hover:border-gold-500/60")}>
-          <CreditCard className="mt-0.5 size-5 text-gold-600" />
+          <CreditCard className="mt-0.5 size-5 text-gold-700" />
           <span>
             <span className="block font-heading text-base text-navy-950">{quote && quote.depositDue < quote.total ? t("payDeposit", { amount: formatOmr(amount, locale, { compact: true }) }) : t("payNow", { amount: formatOmr(amount, locale, { compact: true }) })}</span>
             <span className="block text-xs text-ink-500">{t("payNowHint")}</span>
@@ -61,7 +61,7 @@ export function StepPayment({
         </button>
         {tour.allowReserveNowPayLater && (
           <button type="button" onClick={() => setMode("later")} aria-pressed={mode === "later"} className={cn("flex items-start gap-3 rounded-xl border p-4 text-start transition", mode === "later" ? "border-gold-500 bg-gold-500/10 ring-2 ring-gold-500/30" : "border-sand-200 bg-white hover:border-gold-500/60")}>
-            <Clock className="mt-0.5 size-5 text-gold-600" />
+            <Clock className="mt-0.5 size-5 text-gold-700" />
             <span>
               <span className="block font-heading text-base text-navy-950">{t("payLater")}</span>
               <span className="block text-xs text-ink-500">{t("payLaterHint", { hours: tour.holdHours })}</span>

@@ -49,7 +49,7 @@ export default function PrivacyPage() {
       <div>
         <p className="eyebrow">{t("eyebrow")}</p>
         <h2 className="mt-1 font-heading text-2xl text-foreground">{t("title")}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{t.rich("subtitle", { link: (c) => <Link href="/policies/privacy" className="text-gold-600 underline-offset-4 hover:underline">{c}</Link> })}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{t.rich("subtitle", { link: (c) => <Link href="/policies/privacy" className="text-gold-700 underline-offset-4 hover:underline">{c}</Link> })}</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

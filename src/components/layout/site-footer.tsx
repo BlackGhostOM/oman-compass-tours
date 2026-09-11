@@ -5,6 +5,7 @@ import { site } from "@/lib/site";
 import { Logo } from "@/components/brand/logo";
 import { CompassRose } from "@/components/brand/compass-rose";
 import { footerCompany, footerExplore, policyLinks } from "@/components/layout/nav-links";
+import { CookieSettingsButton } from "@/components/analytics/cookie-settings-button";
 import { NewsletterForm } from "@/components/shared/newsletter-form";
 import { PaymentLogos } from "@/components/shared/payment-logos";
 import { SocialLinks } from "@/components/shared/social-links";
@@ -160,6 +161,7 @@ export async function SiteFooter() {
                 </Link>
               </li>
             ))}
+            <li><CookieSettingsButton className="hover:text-gold-400" /></li>
           </ul>
         </div>
       </div>

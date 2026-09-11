@@ -55,7 +55,7 @@ export function StepReview({ tour, state, update, quote, onBack, onNext }: { tou
                 <span>
                   {policyLinks.filter((p) => p.key !== "waiver").map((p, i, arr) => (
                     <span key={p.key}>
-                      <Link href={`/policies/${p.key}`} target="_blank" className="text-gold-600 underline underline-offset-4">{pick(p.title, locale)}</Link>
+                      <Link href={`/policies/${p.key}`} target="_blank" className="text-gold-700 underline underline-offset-4">{pick(p.title, locale)}</Link>
                       {i < arr.length - 1 ? ", " : ""}
                     </span>
                   ))}
@@ -67,7 +67,7 @@ export function StepReview({ tour, state, update, quote, onBack, onNext }: { tou
         <div className="flex items-start gap-3">
           <Checkbox id="accept-waiver" checked={state.acceptedWaiver} onCheckedChange={(v) => update({ acceptedWaiver: v === true })} className="mt-0.5" />
           <Label htmlFor="accept-waiver" className="text-sm leading-relaxed text-ink-900">
-            {t.rich("acceptWaiver", { link: (chunks) => <Link href="/policies/waiver" target="_blank" className="text-gold-600 underline underline-offset-4">{chunks}</Link> })}
+            {t.rich("acceptWaiver", { link: (chunks) => <Link href="/policies/waiver" target="_blank" className="text-gold-700 underline underline-offset-4">{chunks}</Link> })}
           </Label>
         </div>
         <p className="text-xs text-ink-500">{t("versionNote")}</p>

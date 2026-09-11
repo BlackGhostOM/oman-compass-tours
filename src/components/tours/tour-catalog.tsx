@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { FunctionReturnType } from "convex/server";
 import { Slider } from "@/components/ui/slider";
 
 type Filters = {
@@ -39,11 +40,14 @@ export function TourCatalog({
   initialCategory,
   initialDestination,
   hideCategoryFilter = false,
+  initialTours,
 }: {
   kind?: "tour" | "service";
   initialCategory?: string;
   initialDestination?: string;
   hideCategoryFilter?: boolean;
+  /** Server-rendered result set for the unfiltered view, so the first paint already shows cards (no layout shift). */
+  initialTours?: FunctionReturnType<typeof api.tours.list>;
 }) {
   const locale = useLocale();
   const t = useTranslations("catalog");
@@ -89,6 +93,8 @@ export function TourCatalog({
     search: filters.q,
     sort: filters.sort,
   });
+  // Until the live query resolves, fall back to the server-rendered list for the default (unfiltered) view.
+  const list = tours ?? (params.toString() === "" ? initialTours : undefined);
   const categories = useQuery(api.catalog.categories);
   const destinations = useQuery(api.catalog.destinations);
 
@@ -99,9 +105,9 @@ export function TourCatalog({
     <div className="space-y-6">
       {!hideCategoryFilter && (
         <div className="space-y-2">
-          <Label>{t("category")}</Label>
+          <Label htmlFor="filter-category">{t("category")}</Label>
           <Select value={filters.category ?? "all"} onValueChange={(v) => setFilters({ category: v === "all" ? undefined : v })}>
-            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+            <SelectTrigger id="filter-category" aria-label={t("category")} className="w-full"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{t("allCategories")}</SelectItem>
               {categories?.map((c) => (
@@ -112,9 +118,9 @@ export function TourCatalog({
         </div>
       )}
       <div className="space-y-2">
-        <Label>{t("destination")}</Label>
+        <Label htmlFor="filter-destination">{t("destination")}</Label>
         <Select value={filters.destination ?? "all"} onValueChange={(v) => setFilters({ destination: v === "all" ? undefined : v })}>
-          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+          <SelectTrigger id="filter-destination" aria-label={t("destination")} className="w-full"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t("allDestinations")}</SelectItem>
             {destinations?.map((d) => (
@@ -156,9 +162,9 @@ export function TourCatalog({
         />
       </div>
       <div className="space-y-2">
-        <Label>{t("guideLanguage")}</Label>
+        <Label htmlFor="filter-guideLanguage">{t("guideLanguage")}</Label>
         <Select value={filters.language ?? "any"} onValueChange={(v) => setFilters({ language: v === "any" ? undefined : v })}>
-          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+          <SelectTrigger id="filter-guideLanguage" aria-label={t("guideLanguage")} className="w-full"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="any">{t("any")}</SelectItem>
             <SelectItem value="en">English</SelectItem>
@@ -167,9 +173,9 @@ export function TourCatalog({
         </Select>
       </div>
       <div className="space-y-2">
-        <Label>{t("groupSize")}</Label>
+        <Label htmlFor="filter-groupSize">{t("groupSize")}</Label>
         <Select value={filters.group ? String(filters.group) : "any"} onValueChange={(v) => setFilters({ group: v === "any" ? undefined : Number(v) })}>
-          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+          <SelectTrigger id="filter-groupSize" aria-label={t("groupSize")} className="w-full"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="any">{t("any")}</SelectItem>
             {[2, 4, 6, 8, 12].map((n) => (
@@ -241,26 +247,31 @@ export function TourCatalog({
         </div>
 
         <p className="mt-4 text-sm text-ink-500" aria-live="polite">
-          {tours === undefined ? t("loading") : t("results", { count: tours.length })}
+          {list === undefined ? t("loading") : t("results", { count: list.length })}
         </p>
 
-        {tours === undefined ? (
+        {list === undefined ? (
           <div className="mt-4 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="space-y-3">
-                <Skeleton className="aspect-[4/3] rounded-xl" />
-                <Skeleton className="h-5 w-3/4" />
-                <Skeleton className="h-4 w-full" />
+            {/* Same count and height as a typical result set so the footer does not jump when data arrives */}
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div key={i} className="space-y-3 rounded-xl border border-sand-200 bg-white p-0">
+                <Skeleton className="aspect-[4/3] rounded-t-xl" />
+                <div className="space-y-3 px-4 pb-4">
+                  <Skeleton className="h-5 w-3/4" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-9 w-full" />
+                </div>
               </div>
             ))}
           </div>
-        ) : tours.length === 0 ? (
+        ) : list.length === 0 ? (
           <div className="mt-8 rounded-xl border border-dashed border-sand-200 bg-white p-10 text-center text-ink-500">
             {t("noResults")}
           </div>
         ) : (
           <div className="mt-4 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-            {tours.map((tour, i) => (
+            {list.map((tour, i) => (
               <TourCard key={tour._id} tour={tour} priority={i < 3} />
             ))}
           </div>

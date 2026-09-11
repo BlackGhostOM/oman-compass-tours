@@ -111,7 +111,7 @@ export const siteSettingsSeed: Record<string, unknown> = {
   "home.heroPosterUrl": "/media/placeholders/hero.jpg",
 };
 
-export const bannersSeed: { key: string; placement: string; title: L; subtitle: L; ctaLabel: L; ctaHref: string; image: string }[] = [
+export const bannersSeed: { key: string; placement: string; title: L; subtitle: L; ctaLabel: L; ctaHref: string; image: string; countdownDays?: number }[] = [
   {
     key: "home_hero",
     placement: "home_hero",
@@ -132,5 +132,6 @@ export const bannersSeed: { key: string; placement: string; title: L; subtitle: 
     ctaLabel: { en: "See all tours", ar: "جميع الجولات" },
     ctaHref: "/tours",
     image: "wahiba",
+    countdownDays: 21,
   },
 ];

@@ -33,7 +33,7 @@ export default async function BookPage({ params }: Props) {
         <p className="eyebrow">{t("eyebrow")}</p>
         <h1 className="heading-brand mt-2 font-heading text-2xl text-navy-950 sm:text-3xl">{pick(tour.title, locale)}</h1>
         <p className="mt-1 text-sm text-ink-500">
-          <Link href={`/tours/${pick(tour.slug, locale)}`} className="text-gold-600 underline-offset-4 hover:underline">{t("backToTour")}</Link>
+          <Link href={`/tours/${pick(tour.slug, locale)}`} className="text-gold-700 underline-offset-4 hover:underline">{t("backToTour")}</Link>
         </p>
         <div className="mt-8">
           <Suspense fallback={<Skeleton className="h-96 rounded-xl" />}>

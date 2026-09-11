@@ -80,7 +80,7 @@ export function ProviderPicker({
                 !available && "cursor-not-allowed opacity-50",
               )}
             >
-              <Icon className={cn("size-6", active ? "text-gold-600" : "text-ink-500")} />
+              <Icon className={cn("size-6", active ? "text-gold-700" : "text-ink-500")} />
               <span className="font-heading text-base text-navy-950">{t(`${p}.name`)}</span>
               <span className="text-xs text-ink-500">{t(`${p}.body`)}</span>
               {!available && <span className="text-[11px] text-warning">{t("notConfigured")}</span>}

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test.describe("Tour search & filters", () => {
   test("search finds the Wadi Shab tour", async ({ page }) => {

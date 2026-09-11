@@ -81,7 +81,7 @@ function InboxInner() {
               <header className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{thread.conversation.name ?? t("visitor")} <span className="text-xs text-muted-foreground">{thread.conversation.email ?? ""} {thread.conversation.phone ?? ""}</span></p>
-                  <p className="text-xs text-muted-foreground">{thread.conversation.pagePath ?? ""}{thread.conversation.handoffReason ? ` · ${t("handoff")}: ${thread.conversation.handoffReason}` : ""}{thread.customer ? <> · <Link href={`/admin/customers/${thread.customer._id}`} className="text-gold-600 hover:underline">{t("customer")}</Link></> : null}{thread.booking ? <> · <Link href={`/admin/bookings/${thread.booking._id}`} className="text-gold-600 hover:underline">{thread.booking.reference}</Link></> : null}</p>
+                  <p className="text-xs text-muted-foreground">{thread.conversation.pagePath ?? ""}{thread.conversation.handoffReason ? ` · ${t("handoff")}: ${thread.conversation.handoffReason}` : ""}{thread.customer ? <> · <Link href={`/admin/customers/${thread.customer._id}`} className="text-gold-700 hover:underline">{t("customer")}</Link></> : null}{thread.booking ? <> · <Link href={`/admin/bookings/${thread.booking._id}`} className="text-gold-700 hover:underline">{thread.booking.reference}</Link></> : null}</p>
                 </div>
                 <Select value={thread.conversation.assigneeId ?? "none"} onValueChange={(v) => update({ conversationId: selected, assigneeId: v === "none" ? null : (v as Id<"users">) })}>
                   <SelectTrigger className="h-8 w-40"><SelectValue placeholder={t("assign")} /></SelectTrigger>

@@ -23,10 +23,23 @@ const viewports = {
 };
 
 mkdirSync("docs/screenshots", { recursive: true });
+const CONSENT = JSON.stringify({ v: 1, analytics: false, marketing: false, at: Date.now() });
 const browser = await chromium.launch();
+
+// Cookie banner itself (once, desktop, both locales)
+for (const locale of ["en", "ar"]) {
+  const context = await browser.newContext({ viewport: viewports.desktop, deviceScaleFactor: 1 });
+  const page = await context.newPage();
+  await page.goto(`${base}/${locale}`, { waitUntil: "networkidle", timeout: 60_000 });
+  await page.screenshot({ path: `docs/screenshots/${locale}-consent-desktop.png` });
+  console.log("✓", locale, "consent");
+  await context.close();
+}
+
 for (const locale of ["en", "ar"]) {
   for (const [vpName, viewport] of Object.entries(viewports)) {
     const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
+    await context.addInitScript((c) => window.localStorage.setItem("oct_consent", c), CONSENT);
     const page = await context.newPage();
     for (const [name, path] of pages) {
       const url = `${base}/${locale}${path === "/" ? "" : path}`;

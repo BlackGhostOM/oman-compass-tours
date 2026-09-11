@@ -45,12 +45,12 @@ export default async function PlanMyTripPage({ params }: { params: Promise<{ loc
             <div className="rounded-xl border border-sand-200 bg-white p-5">
               <h2 className="font-heading text-lg text-navy-950">{t("preferChat")}</h2>
               <p className="mt-1 text-sm text-ink-500">{t("preferChatBody")}</p>
-              <Button asChild className="mt-4 w-full bg-[#25D366] text-white hover:bg-[#1ebe5b]">
+              <Button asChild className="mt-4 w-full bg-[#25D366] text-navy-950 hover:bg-[#1ebe5b]">
                 <a href={whatsappLink("Hello Oman Compass Tours 👋 I would like help planning a trip. / مرحباً، أرغب في المساعدة لتخطيط رحلة.")} target="_blank" rel="noopener noreferrer">
                   <MessageCircle className="size-4" /> WhatsApp
                 </a>
               </Button>
-              <a href={`tel:${site.phoneE164}`} dir="ltr" className="mt-3 block text-center text-sm text-gold-600">{site.phoneDisplay}</a>
+              <a href={`tel:${site.phoneE164}`} dir="ltr" className="mt-3 block text-center text-sm text-gold-700">{site.phoneDisplay}</a>
             </div>
           </aside>
         </div>

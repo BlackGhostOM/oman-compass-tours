@@ -45,7 +45,7 @@ export default async function BlogPage({ params }: { params: Promise<{ locale: s
                   <div className="flex flex-1 flex-col p-5">
                     <p className="eyebrow">{t(`categories.${p.category}`)}</p>
                     <h2 className="mt-2 font-heading text-lg leading-snug text-navy-950">
-                      <Link href={`/blog/${pick(p.slug, locale)}`} className="hover:text-gold-600">{pick(p.title, locale)}</Link>
+                      <Link href={`/blog/${pick(p.slug, locale)}`} className="hover:text-gold-700">{pick(p.title, locale)}</Link>
                     </h2>
                     <p className="mt-2 line-clamp-3 flex-1 text-sm text-ink-500">{pick(p.excerpt, locale)}</p>
                     <p className="mt-4 flex items-center gap-3 text-xs text-ink-500">

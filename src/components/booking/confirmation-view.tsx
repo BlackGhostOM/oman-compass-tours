@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
+import { track } from "@/lib/analytics";
 import { AlertTriangle, CalendarPlus, CheckCircle2, Clock, CreditCard, Download, MapPin, MessageCircle, UserRound } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Link } from "@/i18n/navigation";
@@ -51,6 +52,19 @@ export function ConfirmationView({ reference, token }: { reference: string; toke
     return () => clearInterval(id);
   }, [booking, t]);
 
+  // Conversion event, fired once per confirmed booking per browser.
+  useEffect(() => {
+    if (!booking || !["confirmed", "in_progress", "completed"].includes(booking.status)) return;
+    const key = `oct_purchase_${booking.reference}`;
+    try {
+      if (window.sessionStorage.getItem(key)) return;
+      window.sessionStorage.setItem(key, "1");
+    } catch {
+      /* ignore */
+    }
+    track("purchase", { transaction_id: booking.reference, currency: "OMR", value: booking.amountPaid / 1000, items: [{ item_name: booking.tourTitle.en, quantity: booking.adults + booking.children }] });
+  }, [booking]);
+
   if (booking === undefined) return <Skeleton className="h-96 rounded-xl" />;
   if (booking === null) {
     return (
@@ -84,7 +98,7 @@ export function ConfirmationView({ reference, token }: { reference: string; toke
           </p>
           <p className="mt-4 font-heading text-lg tracking-[0.2em] text-navy-950" dir="ltr">{booking.reference}</p>
           <Badge className={cn("mt-2", statusTone[booking.status])}>{ts(booking.status)}</Badge>
-          {countdown && confirmed && <p className="mt-3 text-sm text-gold-600">{countdown}</p>}
+          {countdown && confirmed && <p className="mt-3 text-sm text-gold-700">{countdown}</p>}
         </div>
 
         {needsPayment && (
@@ -97,11 +111,11 @@ export function ConfirmationView({ reference, token }: { reference: string; toke
         <div className="grid gap-3 sm:grid-cols-3">
           <Button asChild variant="outline" className="h-auto flex-col gap-1 py-4" disabled={!confirmed}>
             <a href={voucherUrl} target="_blank" rel="noopener noreferrer" aria-disabled={!confirmed} className={cn(!confirmed && "pointer-events-none opacity-50")}>
-              <Download className="size-5 text-gold-600" /> <span>{t("voucher")}</span>
+              <Download className="size-5 text-gold-700" /> <span>{t("voucher")}</span>
             </a>
           </Button>
           <Button asChild variant="outline" className="h-auto flex-col gap-1 py-4">
-            <a href={icsUrl}><CalendarPlus className="size-5 text-gold-600" /> <span>{t("addToCalendar")}</span></a>
+            <a href={icsUrl}><CalendarPlus className="size-5 text-gold-700" /> <span>{t("addToCalendar")}</span></a>
           </Button>
           <Button asChild variant="outline" className="h-auto flex-col gap-1 py-4 border-[#25D366]/50">
             <a href={`https://wa.me/?text=${encodeURIComponent(waText)}`} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-5 text-[#25D366]" /> <span>{t("sendWhatsapp")}</span></a>
@@ -153,8 +167,8 @@ export function ConfirmationView({ reference, token }: { reference: string; toke
         <div className="rounded-xl border border-sand-200 bg-white p-5 text-sm">
           <h2 className="font-heading text-base text-navy-950">{t("helpTitle")}</h2>
           <p className="mt-1 text-ink-500">{t("helpBody")}</p>
-          <a href={`https://wa.me/${site.whatsappNumber}?text=${encodeURIComponent(`Booking ${booking.reference}`)}`} target="_blank" rel="noopener noreferrer" className="mt-3 block text-gold-600 underline-offset-4 hover:underline">WhatsApp {site.phoneDisplay}</a>
-          <a href={`mailto:${site.email}?subject=Booking ${booking.reference}`} className="mt-1 block text-gold-600 underline-offset-4 hover:underline">{site.email}</a>
+          <a href={`https://wa.me/${site.whatsappNumber}?text=${encodeURIComponent(`Booking ${booking.reference}`)}`} target="_blank" rel="noopener noreferrer" className="mt-3 block text-gold-700 underline-offset-4 hover:underline">WhatsApp {site.phoneDisplay}</a>
+          <a href={`mailto:${site.email}?subject=Booking ${booking.reference}`} className="mt-1 block text-gold-700 underline-offset-4 hover:underline">{site.email}</a>
         </div>
       </aside>
     </div>

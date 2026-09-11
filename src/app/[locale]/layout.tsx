@@ -13,6 +13,8 @@ import { site } from "@/lib/site";
 import { cn } from "@/lib/utils";
 import { ConvexClientProvider } from "@/components/providers/convex-client-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { ConsentBanner } from "@/components/analytics/consent-banner";
+import { Pixels } from "@/components/analytics/pixels";
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -80,15 +82,23 @@ export default async function LocaleLayout({
         suppressHydrationWarning
       >
         <body className="flex min-h-dvh flex-col">
+          {/* Runs before first paint: shows the cookie banner only when no choice is stored (see ConsentBanner). */}
+          <script
+            dangerouslySetInnerHTML={{
+              __html: 'try{if(!localStorage.getItem("oct_consent"))document.documentElement.setAttribute("data-consent","pending")}catch(e){document.documentElement.setAttribute("data-consent","pending")}',
+            }}
+          />
           <ConvexClientProvider>
             <NextIntlClientProvider messages={messages}>
               <Direction.Provider dir={dir}>
                 {children}
                 <Toaster position={dir === "rtl" ? "bottom-left" : "bottom-right"} />
+                <ConsentBanner />
               </Direction.Provider>
             </NextIntlClientProvider>
           </ConvexClientProvider>
-          <Analytics />
+          {process.env.VERCEL ? <Analytics /> : null}
+          <Pixels />
         </body>
       </html>
     </ConvexAuthNextjsServerProvider>

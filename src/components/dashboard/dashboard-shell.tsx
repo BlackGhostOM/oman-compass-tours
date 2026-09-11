@@ -49,7 +49,7 @@ export function DashboardShell({
           aria-current={isActive(item) ? "page" : undefined}
           className={cn(
             "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition",
-            isActive(item) ? "bg-gold-500/15 font-medium text-gold-600 dark:text-gold-400" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+            isActive(item) ? "bg-gold-500/15 font-medium text-gold-700 dark:text-gold-400" : "text-muted-foreground hover:bg-muted hover:text-foreground",
           )}
         >
           <item.Icon className="size-4 shrink-0" />
@@ -107,7 +107,7 @@ export function DashboardShell({
                 <div className="ms-2 flex items-center gap-2">
                   <Avatar className="size-8">
                     {viewer.image && <AvatarImage src={viewer.image} alt="" />}
-                    <AvatarFallback className="bg-gold-500/20 text-xs text-gold-600">{initials}</AvatarFallback>
+                    <AvatarFallback className="bg-gold-500/20 text-xs text-gold-700">{initials}</AvatarFallback>
                   </Avatar>
                   <span className="hidden max-w-32 truncate text-sm text-muted-foreground sm:inline">{viewer.name ?? viewer.email}</span>
                 </div>

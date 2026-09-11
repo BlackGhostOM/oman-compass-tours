@@ -69,8 +69,8 @@ export default function AdminProductsPage() {
             <SelectItem value="archived"><StatusBadge status="archived" /></SelectItem>
           </SelectContent>
         </Select>
-        <a href="/templates/tours-import-template.json" download className="text-sm text-gold-600 hover:underline">{t("templateJson")}</a>
-        <a href="/templates/tours-import-template.csv" download className="text-sm text-gold-600 hover:underline">{t("templateCsv")}</a>
+        <a href="/templates/tours-import-template.json" download className="text-sm text-gold-700 hover:underline">{t("templateJson")}</a>
+        <a href="/templates/tours-import-template.csv" download className="text-sm text-gold-700 hover:underline">{t("templateCsv")}</a>
       </div>
 
       {rows === undefined ? <Skeleton className="h-96 rounded-xl" /> : rows.length === 0 ? <EmptyState title={t("empty")} /> : (
@@ -92,7 +92,7 @@ export default function AdminProductsPage() {
                 <TableRow key={tr._id}>
                   <TableCell className="font-mono text-xs">{tr.code}</TableCell>
                   <TableCell>
-                    <Link href={`/admin/products/${tr._id}`} className="font-medium text-foreground hover:text-gold-600">{pick(tr.title, locale)}</Link>
+                    <Link href={`/admin/products/${tr._id}`} className="font-medium text-foreground hover:text-gold-700">{pick(tr.title, locale)}</Link>
                     <div className="text-xs text-muted-foreground">{tr.kind} {tr.isFeatured ? `· ${t("featured")}` : ""} {tr.tags.includes("price-placeholder") ? `· ${t("pricePlaceholder")}` : ""}</div>
                   </TableCell>
                   <TableCell>{tr.category ? pick(tr.category, locale) : "—"}</TableCell>

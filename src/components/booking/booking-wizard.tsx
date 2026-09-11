@@ -10,6 +10,7 @@ import { api } from "../../../convex/_generated/api";
 import { useRouter } from "@/i18n/navigation";
 import { addDaysIso, pick, todayIso } from "@/lib/content";
 import { useSessionKey } from "@/hooks/use-session-key";
+import { track } from "@/lib/analytics";
 import { WizardProgress } from "@/components/booking/wizard-progress";
 import { PriceSummary } from "@/components/booking/price-summary";
 import { StepDates } from "@/components/booking/step-dates";
@@ -155,6 +156,7 @@ export function BookingWizard({ tour }: { tour: BookingTour }) {
         displayCurrency: currency,
         userAgent: navigator.userAgent,
       });
+      track("begin_checkout", { currency: "OMR", value: (quote?.total ?? 0) / 1000, items: [{ item_id: tour.code, item_name: tour.title.en, quantity: state.adults + state.children }], pay_later: payLater });
       if (payLater) {
         router.push(`/booking/${result.reference}?t=${result.token}&new=1`);
       } else {

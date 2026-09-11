@@ -45,7 +45,7 @@ export default function AdminCustomersPage() {
             <TableBody>
               {rows.map((c) => (
                 <TableRow key={c._id}>
-                  <TableCell><Link href={`/admin/customers/${c._id}`} className="font-medium text-foreground hover:text-gold-600">{c.name ?? "—"}</Link><div className="text-xs text-muted-foreground">{c.loyaltyPoints} pts{c.leadSource ? ` · ${c.leadSource}` : ""}</div></TableCell>
+                  <TableCell><Link href={`/admin/customers/${c._id}`} className="font-medium text-foreground hover:text-gold-700">{c.name ?? "—"}</Link><div className="text-xs text-muted-foreground">{c.loyaltyPoints} pts{c.leadSource ? ` · ${c.leadSource}` : ""}</div></TableCell>
                   <TableCell><div>{c.email}</div><div className="text-xs text-muted-foreground" dir="ltr">{c.phone}</div></TableCell>
                   <TableCell>{c.nationality ? countryName(c.nationality, locale) : "—"}</TableCell>
                   <TableCell className="text-end">{c.bookings}</TableCell>

@@ -12,10 +12,12 @@ const accounts = {
 };
 
 mkdirSync("docs/screenshots", { recursive: true });
+const CONSENT = JSON.stringify({ v: 1, analytics: false, marketing: false, at: Date.now() });
 const browser = await chromium.launch();
 for (const [role, acc] of Object.entries(accounts)) {
   for (const locale of ["en", "ar"]) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    await context.addInitScript((c) => window.localStorage.setItem("oct_consent", c), CONSENT);
     const page = await context.newPage();
     try {
       await page.goto(`${base}/${locale}/sign-in`, { waitUntil: "networkidle" });

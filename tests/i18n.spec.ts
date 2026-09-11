@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test.describe("Language switch", () => {
   test("keeps the visitor on the same page when switching EN ⇄ AR", async ({ page }) => {

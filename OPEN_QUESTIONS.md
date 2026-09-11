@@ -19,3 +19,13 @@ Decisions that need the owner's input. Each one has a **default already applied*
 | 13 | Analytics IDs (GA4, Meta, Snapchat, TikTok). | Pixels are wired but inactive until IDs are set; all load only after cookie consent. | `.env.local` (`NEXT_PUBLIC_*_ID`) |
 | 14 | Google OAuth client for "Sign in with Google". | Button shows but is disabled until `AUTH_GOOGLE_ID/SECRET` are set. | Convex env vars |
 | 15 | Loyalty programme rules (points per OMR, redemption). | 1 point per OMR spent, display-only placeholder; no redemption yet. | `convex/loyalty.ts` |
+| 16 | Real Tripadvisor / Viator review text. The brief only gave the aggregate (5.0, 70+ reviews). | Six representative sample reviews are seeded with `source` set to tripadvisor / viator / google and clearly generic wording; the aggregate badge uses the real 5.0 / 70+ figures. Replace them via Admin → Reviews (remove) and Import external review. | Admin → Reviews |
+| 17 | Anthropic API key for the AI concierge. | Without `ANTHROPIC_API_KEY` the chat uses a rule-based fallback (prices, cancellation, generic help) and still hands off to staff. With the key it uses Claude Opus 5 with the live catalogue + policies as context. | Convex env vars |
+| 18 | Chat online hours and expected response time. | 07:30–19:30 Asia/Muscat, ~10 minutes. Offline visitors are told the hours and offered WhatsApp. | Admin → Settings → Booking & support |
+| 19 | Promo strip on the home page. | Seeded "Winter season is open" banner with a 21-day countdown from seeding (code EARLYBIRD, 8 %). | Admin → Content → Banners |
+
+## Known non-blocking notes
+
+- **Dev-only hydration warning.** In `next dev`, React logs a `useId` mismatch on the header language dropdown. It comes from the Next.js dev overlay changing the sibling count at the document root; production builds do not log it (verified in the Lighthouse run). No user-facing effect.
+- **Stripe hosted checkout test** in `tests/booking.spec.ts` is skipped unless `STRIPE_SECRET_KEY` is set on the Convex deployment; the webhook-confirmation test always runs with a locally signed payload.
+

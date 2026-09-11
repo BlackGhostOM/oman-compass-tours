@@ -60,7 +60,7 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
             <ul className="divide-y divide-border text-sm">
               {c.bookings.map((b) => (
                 <li key={b._id} className="flex flex-wrap items-center gap-3 py-2">
-                  <Link href={`/admin/bookings/${b._id}`} className="font-medium text-gold-600 hover:underline" dir="ltr">{b.reference}</Link>
+                  <Link href={`/admin/bookings/${b._id}`} className="font-medium text-gold-700 hover:underline" dir="ltr">{b.reference}</Link>
                   <span className="flex-1 truncate">{pick(b.tourTitle, locale)}</span>
                   <DateTime value={b.date} withTime={false} />
                   <Money baisa={b.amountPaid} /> / <Money baisa={b.total} />
@@ -73,7 +73,7 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
         <Panel title={t("activity")} className="lg:col-span-3">
           <div className="grid gap-6 sm:grid-cols-3 text-sm">
             <div><p className="mb-2 font-medium">{t("reviews")}</p>{c.reviews.length === 0 ? <p className="text-muted-foreground">—</p> : c.reviews.map((r) => <p key={String(r._id)}>★{r.rating} · <StatusBadge status={r.status} /> {r.body.slice(0, 60)}…</p>)}</div>
-            <div><p className="mb-2 font-medium">{t("conversations")}</p>{c.conversations.length === 0 ? <p className="text-muted-foreground">—</p> : c.conversations.map((x) => <p key={String(x._id)}><Link href={`/admin/inbox?c=${x._id}`} className="text-gold-600 hover:underline">{x.subject ?? t("chat")}</Link> · <StatusBadge status={x.status} /> · <DateTime value={x.lastMessageAt} /></p>)}</div>
+            <div><p className="mb-2 font-medium">{t("conversations")}</p>{c.conversations.length === 0 ? <p className="text-muted-foreground">—</p> : c.conversations.map((x) => <p key={String(x._id)}><Link href={`/admin/inbox?c=${x._id}`} className="text-gold-700 hover:underline">{x.subject ?? t("chat")}</Link> · <StatusBadge status={x.status} /> · <DateTime value={x.lastMessageAt} /></p>)}</div>
             <div><p className="mb-2 font-medium">{t("leads")}</p>{c.leads.length === 0 ? <p className="text-muted-foreground">—</p> : c.leads.map((l) => <p key={String(l._id)}>{l.source} · <StatusBadge status={l.status} /> · <DateTime value={l.createdAt} /></p>)}{c.dataRequests.length > 0 && <p className="mt-2 text-warning">{t("dataRequests", { count: c.dataRequests.length })}</p>}</div>
           </div>
         </Panel>

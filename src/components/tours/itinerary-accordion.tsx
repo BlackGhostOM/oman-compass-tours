@@ -18,7 +18,7 @@ export function ItineraryAccordion({ items }: { items: ItineraryDay[] }) {
             <span className="flex items-center gap-3">
               <CompassPoint point={points[i % 4]} className="size-4" />
               {it.time && (
-                <span className="min-w-14 font-heading text-xs tracking-wide text-gold-600" dir="ltr">
+                <span className="min-w-14 font-heading text-xs tracking-wide text-gold-700" dir="ltr">
                   {it.time}
                 </span>
               )}

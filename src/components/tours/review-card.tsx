@@ -60,7 +60,7 @@ export function ReviewCard({
       </blockquote>
       {review.staffReply && (
         <p className={cn("mt-3 rounded-lg border-s-2 border-gold-500 px-3 py-2 text-xs", dark ? "bg-navy-950 text-sand-100/70" : "bg-sand-100 text-ink-500")}>
-          <span className="font-semibold text-gold-600">{t("replyFrom")}: </span>
+          <span className="font-semibold text-gold-700">{t("replyFrom")}: </span>
           {review.staffReply}
         </p>
       )}

@@ -55,7 +55,7 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
                   <MapPin className="mt-0.5 size-5 shrink-0 text-gold-500" />
                   <div>
                     <p>{site.address[locale]}</p>
-                    <a href={site.mapsDirectionsUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-gold-600 underline-offset-4 hover:underline">
+                    <a href={site.mapsDirectionsUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-gold-700 underline-offset-4 hover:underline">
                       <Navigation className="size-3.5" /> {t("directions")}
                     </a>
                   </div>
@@ -63,13 +63,13 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
                 <li className="flex gap-3">
                   <Phone className="mt-0.5 size-5 shrink-0 text-gold-500" />
                   <div>
-                    <a href={`tel:${site.phoneE164}`} dir="ltr" className="hover:text-gold-600">{site.phoneDisplay}</a>
+                    <a href={`tel:${site.phoneE164}`} dir="ltr" className="hover:text-gold-700">{site.phoneDisplay}</a>
                     <p className="text-xs text-ink-500">{t("phoneHint")}</p>
                   </div>
                 </li>
                 <li className="flex gap-3">
                   <Mail className="mt-0.5 size-5 shrink-0 text-gold-500" />
-                  <a href={`mailto:${site.email}`} className="hover:text-gold-600">{site.email}</a>
+                  <a href={`mailto:${site.email}`} className="hover:text-gold-700">{site.email}</a>
                 </li>
                 <li className="flex gap-3">
                   <Clock className="mt-0.5 size-5 shrink-0 text-gold-500" />
@@ -84,7 +84,7 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
                 </li>
               </ul>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Button asChild className="bg-[#25D366] text-white hover:bg-[#1ebe5b]">
+                <Button asChild className="bg-[#25D366] text-navy-950 hover:bg-[#1ebe5b]">
                   <a href={whatsappLink("Hello Oman Compass Tours 👋 / مرحباً")} target="_blank" rel="noopener noreferrer">
                     <MessageCircle className="size-4" /> {t("whatsapp")}
                   </a>
@@ -95,7 +95,7 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
               </div>
               <div className="mt-6">
                 <p className="mb-2 text-xs text-ink-500">{t("follow")}</p>
-                <SocialLinks iconClassName="border-sand-200 bg-sand-50 text-ink-500 hover:border-gold-500 hover:text-gold-600" />
+                <SocialLinks iconClassName="border-sand-200 bg-sand-50 text-ink-500 hover:border-gold-500 hover:text-gold-700" />
               </div>
             </div>
 

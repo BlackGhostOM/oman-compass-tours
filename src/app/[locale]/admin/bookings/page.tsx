@@ -86,7 +86,7 @@ export default function AdminBookingsPage() {
             <TableBody>
               {rows.map((b) => (
                 <TableRow key={b._id} className="cursor-pointer" onClick={() => (window.location.href = `/${locale}/admin/bookings/${b._id}`)}>
-                  <TableCell><Link href={`/admin/bookings/${b._id}`} className="font-medium text-gold-600 hover:underline" dir="ltr" onClick={(e) => e.stopPropagation()}>{b.reference}</Link></TableCell>
+                  <TableCell><Link href={`/admin/bookings/${b._id}`} className="font-medium text-gold-700 hover:underline" dir="ltr" onClick={(e) => e.stopPropagation()}>{b.reference}</Link></TableCell>
                   <TableCell className="max-w-56 truncate">{pick(b.tourTitle, locale)}</TableCell>
                   <TableCell><DateTime value={b.date} withTime={false} /> <span className="text-muted-foreground" dir="ltr">{b.startTime}</span></TableCell>
                   <TableCell><div>{b.traveller}</div><div className="text-xs text-muted-foreground">{b.nationality} · {b.groupSize} {t("guestsShort")}</div></TableCell>

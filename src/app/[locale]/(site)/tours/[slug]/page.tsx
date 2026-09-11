@@ -274,7 +274,7 @@ export default async function TourPage({ params }: Props) {
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <h2 className="font-heading text-2xl text-navy-950">{t("reviews")}</h2>
                   {tour.tripadvisorUrl && (
-                    <a href={tour.tripadvisorUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-gold-600 underline-offset-4 hover:underline">
+                    <a href={tour.tripadvisorUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-gold-700 underline-offset-4 hover:underline">
                       {t("readOnTripadvisor")}
                     </a>
                   )}

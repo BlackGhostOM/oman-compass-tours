@@ -105,7 +105,7 @@ export function AuthForm({ mode }: { mode: "signIn" | "signUp" | "magic" }) {
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <Label htmlFor="auth-password">{t("password")}</Label>
-          {mode === "signIn" && <Link href="/forgot-password" className="text-xs text-gold-600 underline-offset-4 hover:underline">{t("forgot")}</Link>}
+          {mode === "signIn" && <Link href="/forgot-password" className="text-xs text-gold-700 underline-offset-4 hover:underline">{t("forgot")}</Link>}
         </div>
         <Input id="auth-password" type="password" autoComplete={mode === "signUp" ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} required />
         {mode === "signUp" && <p className="text-xs text-ink-500">{t("passwordHint")}</p>}
@@ -165,9 +165,9 @@ export function AuthForm({ mode }: { mode: "signIn" | "signUp" | "magic" }) {
 
       <p className="text-center text-sm text-ink-500">
         {mode === "signUp" ? (
-          <>{t("haveAccount")} <Link href={`/sign-in?redirect=${encodeURIComponent(redirect)}`} className="text-gold-600 underline-offset-4 hover:underline">{t("signIn")}</Link></>
+          <>{t("haveAccount")} <Link href={`/sign-in?redirect=${encodeURIComponent(redirect)}`} className="text-gold-700 underline-offset-4 hover:underline">{t("signIn")}</Link></>
         ) : (
-          <>{t("noAccount")} <Link href={`/sign-up?redirect=${encodeURIComponent(redirect)}`} className="text-gold-600 underline-offset-4 hover:underline">{t("createAccount")}</Link></>
+          <>{t("noAccount")} <Link href={`/sign-up?redirect=${encodeURIComponent(redirect)}`} className="text-gold-700 underline-offset-4 hover:underline">{t("createAccount")}</Link></>
         )}
       </p>
     </div>

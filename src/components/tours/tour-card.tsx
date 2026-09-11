@@ -38,7 +38,7 @@ export function TourCard({
         className,
       )}
     >
-      <Link href={href} className="relative block aspect-[4/3] overflow-hidden" aria-label={pick(tour.title, locale)}>
+      <Link href={href} className="relative block aspect-[4/3] overflow-hidden">
         <Image
           src={image}
           alt={pick(tour.coverImage?.alt, locale) || pick(tour.title, locale)}
@@ -67,7 +67,7 @@ export function TourCard({
 
       <div className="flex flex-1 flex-col p-4 sm:p-5">
         <h3 className="font-heading text-base leading-snug sm:text-lg">
-          <Link href={href} className={cn("transition", dark ? "hover:text-gold-400" : "hover:text-gold-600")}>
+          <Link href={href} className={cn("transition", dark ? "hover:text-gold-400" : "hover:text-gold-700")}>
             {pick(tour.title, locale)}
           </Link>
         </h3>

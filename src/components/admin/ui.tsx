@@ -28,7 +28,7 @@ export function PageHeader({ eyebrow, title, description, actions }: { eyebrow?:
 }
 
 export function StatCard({ label, value, hint, tone = "default", className }: { label: string; value: React.ReactNode; hint?: string; tone?: "default" | "gold" | "success" | "warning" | "danger"; className?: string }) {
-  const toneClass = { default: "text-foreground", gold: "text-gold-600 dark:text-gold-400", success: "text-success", warning: "text-warning", danger: "text-danger" }[tone];
+  const toneClass = { default: "text-foreground", gold: "text-gold-700 dark:text-gold-400", success: "text-success", warning: "text-warning", danger: "text-danger" }[tone];
   return (
     <div className={cn("rounded-xl border border-border bg-card p-4", className)}>
       <p className="text-xs text-muted-foreground">{label}</p>
@@ -84,7 +84,7 @@ const statusTone: Record<string, string> = {
   created: "bg-muted text-muted-foreground",
   failed: "bg-danger/15 text-danger",
   partially_refunded: "bg-warning/15 text-warning",
-  new: "bg-gold-500/15 text-gold-600 dark:text-gold-400",
+  new: "bg-gold-500/15 text-gold-700 dark:text-gold-400",
   contacted: "bg-navy-950/10 text-foreground",
   qualified: "bg-success/15 text-success",
   converted: "bg-success text-white",
@@ -94,7 +94,7 @@ const statusTone: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
   published: "bg-success/15 text-success",
   archived: "bg-danger/15 text-danger",
-  ai: "bg-gold-500/15 text-gold-600 dark:text-gold-400",
+  ai: "bg-gold-500/15 text-gold-700 dark:text-gold-400",
   waiting_human: "bg-warning/15 text-warning",
   human: "bg-success/15 text-success",
   closed: "bg-muted text-muted-foreground",

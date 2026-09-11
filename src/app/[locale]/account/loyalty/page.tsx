@@ -51,7 +51,7 @@ export default function LoyaltyPage() {
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <code className="flex-1 truncate rounded-lg border border-border bg-muted px-3 py-2 text-sm" dir="ltr">{referralUrl}</code>
             <Button variant="outline" onClick={async () => { await navigator.clipboard.writeText(referralUrl); toast.success(t("copied")); }}><Copy className="size-4" /> {t("copy")}</Button>
-            <Button asChild className="bg-[#25D366] text-white hover:bg-[#1ebe5b]"><a href={`https://wa.me/?text=${encodeURIComponent(`${t("shareText")} ${referralUrl}`)}`} target="_blank" rel="noopener noreferrer"><Share2 className="size-4" /> WhatsApp</a></Button>
+            <Button asChild className="bg-[#25D366] text-navy-950 hover:bg-[#1ebe5b]"><a href={`https://wa.me/?text=${encodeURIComponent(`${t("shareText")} ${referralUrl}`)}`} target="_blank" rel="noopener noreferrer"><Share2 className="size-4" /> WhatsApp</a></Button>
           </div>
         )}
         <p className="mt-3 text-xs text-muted-foreground">{t("placeholderNote")}</p>

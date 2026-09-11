@@ -42,9 +42,9 @@ export default function AdminOverviewPage() {
             <ul className="divide-y divide-border">
               {stats.departuresToday.map((d) => (
                 <li key={d._id} className="flex flex-wrap items-center gap-3 py-3 text-sm">
-                  <span className="w-12 font-heading text-gold-600 dark:text-gold-400" dir="ltr">{d.startTime ?? "—"}</span>
+                  <span className="w-12 font-heading text-gold-700 dark:text-gold-400" dir="ltr">{d.startTime ?? "—"}</span>
                   <div className="min-w-0 flex-1">
-                    <Link href={`/admin/bookings/${d._id}`} className="font-medium text-foreground hover:text-gold-600">{pick(d.tourTitle, locale)}</Link>
+                    <Link href={`/admin/bookings/${d._id}`} className="font-medium text-foreground hover:text-gold-700">{pick(d.tourTitle, locale)}</Link>
                     <p className="text-xs text-muted-foreground">{d.reference} · {d.traveller} · {t("guests", { count: d.groupSize })}{d.pickup ? ` · ${d.pickup}` : ""}{d.guide ? ` · ${t("guide")}: ${d.guide}` : ""}</p>
                   </div>
                   <StatusBadge status={d.status} />
@@ -76,7 +76,7 @@ export default function AdminOverviewPage() {
             <ol className="space-y-2 text-sm">
               {stats.topTours.map((tt, i) => (
                 <li key={tt.tourId} className="flex items-center gap-3">
-                  <span className="w-5 font-heading text-gold-600">{i + 1}</span>
+                  <span className="w-5 font-heading text-gold-700">{i + 1}</span>
                   <span className="flex-1 truncate">{pick(tt.title, locale)}</span>
                   <span className="text-muted-foreground">{t("bookingsCount", { count: tt.count })}</span>
                   <span className="w-28 text-end tabular-nums" dir="ltr">{formatOmr(tt.revenue, locale, { compact: true })}</span>

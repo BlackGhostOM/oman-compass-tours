@@ -15,6 +15,7 @@
   --gold-500: #c9a15c;
   --gold-400: #ddb97a;
   --gold-600: #a8843f;
+  --gold-700: #7a5e2a; /* text-safe gold on sand/white (≥ 5:1) */
   --gold-300: #ecd6a6;
   --sand-100: #f6efe2;
   --sand-50: #fbf8f2;
@@ -22,7 +23,7 @@
   --ink-900: #1a1a2e;
   --ink-500: #5c5a6e;
   --ink-300: #9c99ae;
-  --success: #2e8b6b;
+  --success: #1f6f50;
   --warning: #d9962b;
   --danger: #b5443c;
 
@@ -115,6 +116,7 @@ html[lang="ar"] {
   --color-gold-400: var(--gold-400);
   --color-gold-500: var(--gold-500);
   --color-gold-600: var(--gold-600);
+  --color-gold-700: var(--gold-700);
   --color-sand-50: var(--sand-50);
   --color-sand-100: var(--sand-100);
   --color-sand-200: var(--sand-200);
@@ -264,8 +266,28 @@ html[lang="ar"] {
   }
   /* Spaced uppercase eyebrow text echoing the wordmark (LTR only) */
   .eyebrow {
-    @apply font-heading text-xs font-medium uppercase text-gold-500;
+    @apply font-heading text-xs font-medium uppercase text-gold-700;
     letter-spacing: var(--tracking-brand);
+  }
+  /* On navy surfaces the lighter gold keeps ≥ 7:1 contrast */
+  .surface-dark .eyebrow,
+  .bg-navy-950 .eyebrow,
+  .bg-navy-900 .eyebrow,
+  .dark .eyebrow,
+  .eyebrow-light {
+    @apply text-gold-400;
+  }
+  /* Cookie banner: hidden until the inline boot script marks consent as pending */
+  .consent-banner {
+    display: none;
+  }
+  html[data-consent="pending"] .consent-banner {
+    display: block;
+  }
+  /* Gold text links inside dark shells keep the lighter, higher-contrast gold */
+  .dark .text-gold-700,
+  .surface-dark .text-gold-700 {
+    color: var(--gold-400);
   }
   html[lang="ar"] .eyebrow {
     @apply text-sm;

@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { usePathname } from "@/i18n/navigation";
+import { track } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,6 +52,7 @@ export function ContactForm({ tourId, compact = false }: { tourId?: Id<"tours">;
       await create({ ...parsed.data, phone: parsed.data.phone || undefined, locale, tourId, pagePath: pathname, honeypot, turnstileToken: turnstile });
       setDone(true);
       toast.success(t("success"));
+      track("generate_lead", { source: "contact_form" });
     } catch (err) {
       const code = err instanceof ConvexError ? (err.data as { code?: string })?.code : undefined;
       toast.error(code === "RATE_LIMITED" ? t("rateLimited") : t("error"));

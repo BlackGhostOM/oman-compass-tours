@@ -1,14 +1,17 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { convexRun, convexSiteUrl, envLocal, stripeCheckoutCompletedEvent, stripeSignature, testTraveller } from "./helpers";
 
 const STRIPE_WEBHOOK_SECRET = envLocal("STRIPE_WEBHOOK_SECRET") ?? process.env.TEST_STRIPE_WEBHOOK_SECRET ?? "whsec_test_local_secret";
 
 async function fillWizardToPayment(page: Page) {
-  await page.goto("/en/book/experience-muscat-city-tour");
+  // A date a few weeks out keeps repeated runs from exhausting the slot capacity of "tomorrow"
+  const date = new Date(Date.now() + (20 + Math.floor(Math.random() * 60)) * 86_400_000).toISOString().slice(0, 10);
+  await page.goto(`/en/book/experience-muscat-city-tour?date=${date}`);
   await expect(page.getByRole("heading", { name: /Choose your date/ })).toBeVisible();
 
-  // Step 1: date is pre-selected (tomorrow); pick the first available time and continue
-  const timeButtons = page.locator("button", { hasText: /^\d{2}:\d{2}/ });
+  // Step 1: pick the first time slot that still has capacity and continue
+  const timeButtons = page.locator("button:not([disabled])", { hasText: /^\d{2}:\d{2}/ });
   await timeButtons.first().click();
   await page.getByRole("button", { name: "Continue" }).click();
 

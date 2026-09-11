@@ -1,36 +1,190 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Oman Compass Tours — website & booking platform
 
-## Getting Started
+Bilingual (English / Arabic, full RTL) marketing site and booking platform for
+**Oman Compass Tours Company**, Muscat (Ministry of Heritage & Tourism licence
+1440944). Built with Next.js 15 (App Router), Tailwind + shadcn/ui, Convex
+(database, realtime, auth, crons, file storage), next-intl, react-pdf and
+Playwright. Payments through Thawani (Oman), Stripe and PayPal with
+server-verified webhooks; transactional email through Resend; AI concierge
+through the Claude API with human handoff.
 
-First, run the development server:
+- `PLAN.md` — architecture, data model, routes and phase plan
+- `DESIGN.md` — design system and screenshots
+- `OPEN_QUESTIONS.md` — decisions taken with defaults that the owner can change
+
+## 1. Local setup
+
+Requirements: Node 20+, npm, Git. Convex runs locally in anonymous mode (no
+account needed) and in the cloud for staging/production.
+
+```bash
+npm install
+cp .env.example .env.local           # fill NEXT_PUBLIC_* values as needed
+```
+
+Start the backend and the web app in two terminals:
+
+```bash
+CONVEX_AGENT_MODE=anonymous npx convex dev
+```
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The first `convex dev` run writes `CONVEX_DEPLOYMENT`, `NEXT_PUBLIC_CONVEX_URL`
+and `NEXT_PUBLIC_CONVEX_SITE_URL` to `.env.local`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Auth keys (once per deployment)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Convex Auth signs sessions with an RSA key pair stored as deployment
+environment variables:
 
-## Learn More
+```bash
+npm run auth:keys
+```
 
-To learn more about Next.js, take a look at the following resources:
+This generates `JWT_PRIVATE_KEY` and `JWKS` and sets them with `convex env set`.
+Also set `SITE_URL` (e.g. `http://localhost:3000` locally) so auth redirects
+resolve.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Seed data and demo accounts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run seed
+```
 
-## Deploy on Vercel
+Seeds 8 categories, 8 destinations, 10 tours/services with bilingual content,
+pricing seasons, add-ons, 8 versioned policies, reviews, blog posts, team,
+banners, coupons, FX rates and three demo accounts:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Role | Email | Password |
+| --- | --- | --- |
+| Owner | `owner@omancompasstours.com` | `OmanCompass!2026` |
+| Staff | `staff@omancompasstours.com` | `OmanCompass!2026` |
+| Customer | `customer@example.com` | `Traveller!2026` |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`npm run seed:reset` wipes catalogue/content tables before re-seeding (bookings
+and users are kept).
+
+## 2. Environment variables
+
+`.env.example` lists every variable with comments. Two groups:
+
+**Next.js (`.env.local`, public):** `NEXT_PUBLIC_SITE_URL`,
+`NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CONVEX_SITE_URL`, optional
+`NEXT_PUBLIC_GOOGLE_MAPS_EMBED_KEY`, analytics IDs (`NEXT_PUBLIC_GA4_ID`,
+`NEXT_PUBLIC_META_PIXEL_ID`, `NEXT_PUBLIC_SNAP_PIXEL_ID`,
+`NEXT_PUBLIC_TIKTOK_PIXEL_ID`), `NEXT_PUBLIC_TURNSTILE_SITE_KEY`,
+`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_PAYPAL_CLIENT_ID`.
+
+**Convex deployment secrets (`npx convex env set NAME value`):**
+
+| Area | Variables |
+| --- | --- |
+| Auth | `SITE_URL`, `JWT_PRIVATE_KEY`, `JWKS`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `AUTH_RESEND_KEY` |
+| Email | `EMAIL_FROM`, `STAFF_NOTIFICATION_EMAIL` |
+| Thawani | `THAWANI_SECRET_KEY`, `THAWANI_PUBLISHABLE_KEY`, `THAWANI_MODE` (`uat` / `production`), `THAWANI_WEBHOOK_SECRET` |
+| Stripe | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` |
+| PayPal | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_MODE` (`sandbox` / `live`), `PAYPAL_WEBHOOK_ID` |
+| AI chat | `ANTHROPIC_API_KEY` (without it a rule-based fallback answers and still hands off to staff) |
+| Anti-abuse | `TURNSTILE_SECRET_KEY` |
+| FX | `FX_API_URL` (optional; pegged fallback 1 OMR = 2.6008 USD) |
+| Payments policy | `PAYMENTS_TRUST_API_VERIFICATION=true` lets the return page confirm a payment by re-checking the provider API when a webhook is delayed |
+
+Admin → Settings → Payments & integrations shows which of these are configured
+without exposing values.
+
+## 3. Payment providers and webhooks
+
+A booking is confirmed only after a webhook whose signature was verified on
+the server (`convex/http.ts` → `convex/payments.ts`). Register these endpoints
+on the Convex **site** URL (`https://<deployment>.convex.site`):
+
+| Provider | Endpoint | Events |
+| --- | --- | --- |
+| Stripe | `/webhooks/stripe` | `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `charge.refunded` |
+| Thawani | `/webhooks/thawani` | payment success / failure (HMAC secret) |
+| PayPal | `/webhooks/paypal` | `CHECKOUT.ORDER.APPROVED`, `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.REFUNDED` |
+
+Every event is stored in `webhookEvents` and processed once (idempotent).
+Amounts are stored in baisa (OMR × 1000); USD/EUR/GBP are display conversions.
+Refunds are issued from the booking page and reconciled through the same
+webhooks.
+
+## 4. Deploy to Vercel
+
+1. Create a Convex production deployment: `npx convex deploy` (or connect the
+   repo in the Convex dashboard) and set every secret from section 2.
+2. In Vercel, import the repository and set the build command to
+   `npx convex deploy --cmd 'npm run build'` with `CONVEX_DEPLOY_KEY` from the
+   Convex dashboard. Add the `NEXT_PUBLIC_*` variables.
+3. Set `SITE_URL` on Convex to the production domain and add the domain to
+   Google OAuth, Stripe, Thawani and PayPal dashboards; register the webhooks
+   above.
+4. `vercel.json` sets the region (`fra1`) and security headers are emitted from
+   `next.config.ts` (CSP, HSTS, frame and referrer policies).
+
+Crons (`convex/crons.ts`) run automatically: hold expiry every 15 minutes,
+booking lifecycle hourly, reminders and abandoned-draft follow-ups, FX refresh
+daily.
+
+## 5. Everyday operations
+
+- **Import / update the catalogue:** Admin → Products → Import. Download the
+  JSON or CSV template (`public/templates/`), fill one row per tour (matched by
+  `code`; existing tours are updated, new ones are created as drafts), paste
+  and run.
+- **Media:** upload images (≤ 100 MB) in the tour editor; larger videos are
+  hosted externally and linked.
+- **Policies:** Admin → Settings → Policies. Publishing a new version forces
+  re-acceptance at the next checkout; acceptances are stored per version.
+- **Staff accounts:** Admin → Settings → Staff & roles → Invite (link expires
+  in 7 days). Roles: customer, staff, admin, owner.
+- **Notifications:** email templates live in `convex/lib/email.ts`; WhatsApp
+  quick-reply templates are editable in Settings.
+- **Backups:** `npx convex export --path backups/$(date +%F).zip` exports every
+  table and file; `npx convex import` restores. Schedule it in CI or run it
+  before large content changes.
+- **Data requests (PDPL):** customers request export/deletion from
+  `/account/privacy`; staff process them in Admin → Audit log → Privacy requests.
+
+## 6. Adding a language
+
+1. Add the locale code to `locales` in `src/i18n/routing.ts` and a direction
+   in `dirFor`.
+2. Copy `messages/en.json` to `messages/<locale>.json` and translate (the merge
+   script `node scripts/merge-messages.mjs <locale> patch.json` deep-merges
+   partial files).
+3. Content fields are bilingual objects (`{ en, ar }`); extend `LocalizedString`
+   in `src/lib/content.ts` and the `localized` validator in `convex/schema.ts`
+   with the new key, then fill translations in the dashboard editors.
+4. Add fonts for the script in `src/lib/fonts.ts` if needed.
+
+## 7. Quality gates
+
+```bash
+npm run typecheck
+npm run lint
+PLAYWRIGHT_BASE_URL=http://localhost:3000 npx playwright test --project=chromium
+```
+
+The Playwright suite (`tests/`) covers language switching, tour search and
+filters, the booking wizard with reserve-now-pay-later, a signed Stripe webhook
+confirming a booking and unlocking the voucher, customer sign-in and voucher
+download, staff booking status changes with audit trail, the cookie consent
+banner and the live chat with human handoff. Screenshots for `DESIGN.md` are
+produced by `node scripts/screenshots.mjs` and `node scripts/screenshots-auth.mjs`.
+
+## 8. Project layout
+
+```
+convex/            schema, auth, http routes, crons, bookings, payments, gateways/, admin/, chat
+messages/          en.json, ar.json (next-intl)
+public/            brand assets, placeholders, fonts, import templates
+scripts/           seed helpers, screenshots, message merge, auth keys
+src/app/[locale]/  (site) public pages · account/ customer dashboard · admin/ staff dashboard
+src/components/    ui (shadcn), layout, home, booking, chat, admin, analytics
+src/i18n/          routing, request config, navigation helpers
+tests/             Playwright specs
+```

@@ -45,7 +45,7 @@ export default function AdminPaymentsPage() {
                   {rows.map((p) => (
                     <TableRow key={p._id}>
                       <TableCell><DateTime value={p.paidAt ?? p.createdAt} /></TableCell>
-                      <TableCell>{p.reference ? <Link href={`/admin/bookings/${p.bookingId}`} className="text-gold-600 hover:underline" dir="ltr">{p.reference}</Link> : "—"}<div className="text-xs text-muted-foreground">{p.customer} · {p.tourTitle ? pick(p.tourTitle, locale) : ""}</div></TableCell>
+                      <TableCell>{p.reference ? <Link href={`/admin/bookings/${p.bookingId}`} className="text-gold-700 hover:underline" dir="ltr">{p.reference}</Link> : "—"}<div className="text-xs text-muted-foreground">{p.customer} · {p.tourTitle ? pick(p.tourTitle, locale) : ""}</div></TableCell>
                       <TableCell className="capitalize">{p.provider} · {p.kind}</TableCell>
                       <TableCell className="text-end" dir="ltr">{p.currency} {(p.amount / (p.currency === "OMR" ? 1000 : 100)).toFixed(p.currency === "OMR" ? 3 : 2)}</TableCell>
                       <TableCell className="text-end"><Money baisa={p.amountOmr} />{p.refundedAmount > 0 && <div className="text-xs text-warning">−<Money baisa={p.refundedAmount} /></div>}</TableCell>
@@ -65,7 +65,7 @@ export default function AdminPaymentsPage() {
             <div className="overflow-x-auto rounded-xl border border-border bg-card">
               <Table>
                 <TableHeader><TableRow><TableHead>{t("cols.date")}</TableHead><TableHead>{t("cols.booking")}</TableHead><TableHead className="text-end">OMR</TableHead><TableHead>{t("cols.reason")}</TableHead><TableHead>{t("cols.status")}</TableHead><TableHead>{t("cols.by")}</TableHead></TableRow></TableHeader>
-                <TableBody>{refunds.map((r) => <TableRow key={r._id}><TableCell><DateTime value={r._creationTime} /></TableCell><TableCell><Link href={`/admin/bookings/${r.bookingId}`} className="text-gold-600 hover:underline" dir="ltr">{r.reference}</Link></TableCell><TableCell className="text-end"><Money baisa={r.amountOmr} /></TableCell><TableCell className="max-w-56 truncate">{r.reason}{r.error ? ` · ${r.error}` : ""}</TableCell><TableCell><StatusBadge status={r.status === "processing" ? "pending" : r.status} /></TableCell><TableCell>{r.requestedBy}</TableCell></TableRow>)}</TableBody>
+                <TableBody>{refunds.map((r) => <TableRow key={r._id}><TableCell><DateTime value={r._creationTime} /></TableCell><TableCell><Link href={`/admin/bookings/${r.bookingId}`} className="text-gold-700 hover:underline" dir="ltr">{r.reference}</Link></TableCell><TableCell className="text-end"><Money baisa={r.amountOmr} /></TableCell><TableCell className="max-w-56 truncate">{r.reason}{r.error ? ` · ${r.error}` : ""}</TableCell><TableCell><StatusBadge status={r.status === "processing" ? "pending" : r.status} /></TableCell><TableCell>{r.requestedBy}</TableCell></TableRow>)}</TableBody>
               </Table>
             </div>
           )}

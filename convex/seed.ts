@@ -253,7 +253,7 @@ export const seedContent = internalMutation({
     /* Banners */
     for (const [i, b] of bannersSeed.entries()) {
       const existing = await ctx.db.query("banners").withIndex("by_key", (q) => q.eq("key", b.key)).unique();
-      const doc = { key: b.key, placement: b.placement, title: b.title, subtitle: b.subtitle, ctaLabel: b.ctaLabel, ctaHref: b.ctaHref, media: media(b.image, b.title), order: i, isActive: true };
+      const doc = { key: b.key, placement: b.placement, title: b.title, subtitle: b.subtitle, ctaLabel: b.ctaLabel, ctaHref: b.ctaHref, media: media(b.image, b.title), order: i, isActive: true, countdownTo: b.countdownDays ? Date.now() + b.countdownDays * 86_400_000 : undefined };
       if (existing) await ctx.db.patch(existing._id, doc);
       else await ctx.db.insert("banners", doc);
     }

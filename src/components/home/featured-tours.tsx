@@ -17,7 +17,7 @@ export function FeaturedTours({ tours }: { tours: TourCardData[] }) {
       <div className="container-brand">
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <SectionHeading eyebrow={t("eyebrow")} title={t("title")} description={t("description")} align="start" />
-          <Link href="/tours" className="inline-flex items-center gap-2 font-medium text-gold-600 transition hover:text-gold-500">
+          <Link href="/tours" className="inline-flex items-center gap-2 font-medium text-gold-700 transition hover:text-gold-500">
             {t("viewAll")} <ArrowRight className="size-4 rtl-flip" />
           </Link>
         </div>

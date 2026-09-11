@@ -49,7 +49,7 @@ export function LanguageSwitcher({ className, variant = "ghost" }: { className?:
         <Button
           variant={variant}
           size="sm"
-          aria-label={t("switch")}
+          aria-label={`${t("switch")}: ${labels[locale].short}`}
           disabled={isPending}
           className={cn("gap-1.5 text-sand-100 hover:bg-navy-800 hover:text-gold-400", className)}
         >
@@ -64,7 +64,7 @@ export function LanguageSwitcher({ className, variant = "ghost" }: { className?:
             onSelect={() => switchTo(l)}
             lang={l}
             dir={l === "ar" ? "rtl" : "ltr"}
-            className={cn("justify-between", l === locale && "font-semibold text-gold-600")}
+            className={cn("justify-between", l === locale && "font-semibold text-gold-700")}
           >
             <span>{labels[l].native}</span>
             <span className="text-xs text-muted-foreground">{labels[l].short}</span>

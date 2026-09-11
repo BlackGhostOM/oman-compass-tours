@@ -61,7 +61,7 @@ export default function AdminLeadsPage() {
                   <p className="mt-1 text-xs text-muted-foreground">{l.email ?? ""} {l.phone ? `· ${l.phone}` : ""} · <DateTime value={l.createdAt} /> · {slaLabel(l)}</p>
                   <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">{l.message}</p>
                   {l.tripDetails && <p className="mt-1 text-xs text-muted-foreground">{[l.tripDetails.startDate && `${l.tripDetails.startDate} → ${l.tripDetails.endDate ?? "?"}`, l.tripDetails.travellers && `${l.tripDetails.travellers} pax`, l.tripDetails.budget, l.tripDetails.interests?.join(", ")].filter(Boolean).join(" · ")}</p>}
-                  {l.conversationId && <Link href={`/admin/inbox?c=${l.conversationId}`} className="mt-1 inline-block text-xs text-gold-600 hover:underline">{t("openChat")}</Link>}
+                  {l.conversationId && <Link href={`/admin/inbox?c=${l.conversationId}`} className="mt-1 inline-block text-xs text-gold-700 hover:underline">{t("openChat")}</Link>}
                 </div>
                 <div className="flex flex-col gap-2 sm:w-64">
                   <Select value={l.status} onValueChange={(v) => update({ id: l._id, status: v as (typeof STATUSES)[number] }).then(() => toast.success(t("updated")))}>

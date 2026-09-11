@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 const OWNER = { email: "owner@omancompasstours.com", password: "OmanCompass!2026" };
 const CUSTOMER = { email: "customer@example.com", password: "Traveller!2026" };
@@ -32,6 +33,9 @@ test.describe("Staff dashboard", () => {
     await dialog.getByRole("combobox").first().click();
     await page.getByRole("option", { name: /Experience Muscat City Tour/ }).click();
 
+    // Far-future date so repeated runs never exhaust the slot capacity used by the booking spec
+    const future = new Date(Date.now() + (45 + Math.floor(Math.random() * 60)) * 86_400_000).toISOString().slice(0, 10);
+    await dialog.locator("#mb-date").fill(future);
     await dialog.getByLabel("First name").fill("Walk-in");
     await dialog.getByLabel("Last name").fill("Guest");
     await dialog.getByLabel("Email", { exact: true }).fill(`walkin+${Date.now()}@example.com`);

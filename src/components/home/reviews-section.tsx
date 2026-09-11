@@ -39,7 +39,7 @@ export async function ReviewsSection({ reviews, stats }: { reviews: Review[]; st
           <div className="text-center text-sm text-ink-500">
             <p className="font-medium text-ink-900">{t("rank", { position: site.tripadvisor.rank.position, of: site.tripadvisor.rank.of })}</p>
             {stats && stats.count > 0 && <p className="mt-1">{t("siteStats", { count: stats.count, average: stats.average })}</p>}
-            <Button asChild variant="link" className="mt-1 h-auto p-0 text-gold-600">
+            <Button asChild variant="link" className="mt-1 h-auto p-0 text-gold-700">
               <a href={site.tripadvisor.url} target="_blank" rel="noopener noreferrer">
                 {t("readReviews")} <ExternalLink className="size-3.5" />
               </a>

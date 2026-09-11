@@ -58,7 +58,7 @@ function Countdown({ date, startTime }: { date: string; startTime: string | null
   if (diff <= 0) return null;
   const d = Math.floor(diff / 86_400_000);
   const h = Math.floor((diff % 86_400_000) / 3_600_000);
-  return <span className="text-xs text-gold-600 dark:text-gold-400">{t("countdown", { d, h })}</span>;
+  return <span className="text-xs text-gold-700 dark:text-gold-400">{t("countdown", { d, h })}</span>;
 }
 
 export function BookingCard({ booking }: { booking: BookingSummary }) {
@@ -95,7 +95,7 @@ export function BookingCard({ booking }: { booking: BookingSummary }) {
           <div>
             <p className="font-heading text-xs tracking-[0.2em] text-muted-foreground" dir="ltr">{booking.reference}</p>
             <h3 className="mt-1 font-heading text-base text-foreground">
-              {booking.tourSlug ? <Link href={`/tours/${pick(booking.tourSlug, locale)}`} className="hover:text-gold-600">{pick(booking.tourTitle, locale)}</Link> : pick(booking.tourTitle, locale)}
+              {booking.tourSlug ? <Link href={`/tours/${pick(booking.tourSlug, locale)}`} className="hover:text-gold-700">{pick(booking.tourTitle, locale)}</Link> : pick(booking.tourTitle, locale)}
             </h3>
           </div>
           <Badge className={cn(tone[booking.status])}>{ts(booking.status)}</Badge>

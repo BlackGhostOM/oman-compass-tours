@@ -19,8 +19,8 @@ export default function MessagesPage() {
           <MessagesSquare className="size-6 text-gold-500" />
           <h3 className="mt-3 font-heading text-base text-foreground">{t("otherChannels")}</h3>
           <p className="mt-1 text-muted-foreground">{t("otherChannelsBody")}</p>
-          <Button asChild className="mt-4 w-full bg-[#25D366] text-white hover:bg-[#1ebe5b]"><a href={whatsappLink("Hello Oman Compass Tours 👋")} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" /> WhatsApp</a></Button>
-          <a href={`mailto:${site.email}`} className="mt-3 block text-center text-gold-600 underline-offset-4 hover:underline">{site.email}</a>
+          <Button asChild className="mt-4 w-full bg-[#25D366] text-navy-950 hover:bg-[#1ebe5b]"><a href={whatsappLink("Hello Oman Compass Tours 👋")} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4" /> WhatsApp</a></Button>
+          <a href={`mailto:${site.email}`} className="mt-3 block text-center text-gold-700 underline-offset-4 hover:underline">{site.email}</a>
         </aside>
       </div>
     </div>

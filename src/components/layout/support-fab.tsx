@@ -37,7 +37,7 @@ export function SupportFab({ contextLabel }: { contextLabel?: string }) {
               onClick={() => setOpen(false)}
               className="flex items-center gap-3 rounded-xl border border-navy-800 bg-navy-900 py-2.5 pe-4 ps-3 text-sm text-sand-50 shadow-lg transition hover:border-gold-500/60"
             >
-              <span className="flex size-8 items-center justify-center rounded-full bg-[#25D366] text-white">
+              <span className="flex size-8 items-center justify-center rounded-full bg-[#25D366] text-navy-950">
                 <MessageCircle className="size-4" />
               </span>
               <span>

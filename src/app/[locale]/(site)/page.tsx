@@ -3,6 +3,7 @@ import { api } from "../../../../convex/_generated/api";
 import { fetchPublic } from "@/lib/convex-server";
 import { site } from "@/lib/site";
 import { Hero } from "@/components/home/hero";
+import { PromoBannerStrip } from "@/components/home/promo-banner";
 import { FeaturedTours } from "@/components/home/featured-tours";
 import { WhyUs } from "@/components/home/why-us";
 import { DestinationsGrid } from "@/components/home/destinations-grid";
@@ -59,6 +60,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     <>
       <JsonLd data={jsonLd} />
       <Hero banner={content?.hero ?? null} videoUrl={content?.heroVideoUrl ?? null} posterUrl={content?.heroPosterUrl ?? "/media/placeholders/hero.jpg"} />
+      <PromoBannerStrip promos={(content?.promos ?? []).map((b) => ({ _id: b._id, key: b.key, title: b.title, subtitle: b.subtitle, ctaLabel: b.ctaLabel, ctaHref: b.ctaHref, countdownTo: b.countdownTo, endsAt: b.endsAt }))} />
       <FeaturedTours tours={featured ?? []} />
       <WhyUs />
       <DestinationsGrid destinations={destinations ?? []} />

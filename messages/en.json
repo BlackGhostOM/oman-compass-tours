@@ -175,6 +175,14 @@
       "ratedBody": "{count}+ five-star reviews and the #1 spot among Muscat experiences.",
       "secureTitle": "Secure checkout",
       "secureBody": "Pay in OMR or your own currency through Thawani, Stripe or PayPal. Card data never touches our servers."
+    },
+    "promo": {
+      "endsIn": "Offer ends in",
+      "days": "days",
+      "hours": "hrs",
+      "minutes": "min",
+      "seconds": "sec",
+      "cta": "Book now"
     }
   },
   "catalog": {
@@ -1004,7 +1012,15 @@
       "emptyTitle": "No conversations yet",
       "emptyBody": "Start a chat from the button at the bottom of any page — your history will appear here.",
       "otherChannels": "Prefer another channel?",
-      "otherChannelsBody": "We answer WhatsApp within minutes during office hours."
+      "otherChannelsBody": "We answer WhatsApp within minutes during office hours.",
+      "select": "Select a conversation",
+      "noMessages": "No messages yet",
+      "status": {
+        "ai": "Assistant",
+        "waiting_human": "Waiting for the team",
+        "human": "With the team",
+        "closed": "Closed"
+      }
     },
     "loyalty": {
       "eyebrow": "Rewards",
@@ -1776,5 +1792,56 @@
       "noDataRequests": "No privacy requests.",
       "dataHint": "Process export/deletion requests within 30 days (Oman PDPL). Deletion: anonymise the user record and keep booking records required for accounting."
     }
+  },
+  "chat": {
+    "title": "Live chat",
+    "poweredBy": "Instant answers by our AI concierge · real people when you need them",
+    "assistant": "Oman Compass assistant",
+    "team": "Oman Compass team",
+    "you": "You",
+    "online": "Team online",
+    "offline": "Team offline",
+    "offlineHint": "Our team is online {start}–{end} Oman time. Leave your message and we reply within about {minutes} minutes once we are back, or continue on WhatsApp.",
+    "statusAi": "Ask about tours, prices, pickup or availability. Ask for a person any time.",
+    "statusWaiting": "A team member will join shortly (about {minutes} minutes).",
+    "statusHuman": "{name} is with you.",
+    "statusClosed": "This conversation is closed.",
+    "startNew": "Start a new conversation",
+    "welcome": "Marhaba! 👋 I am the Oman Compass assistant. Ask me about our tours, prices, hotel pickup or dates, or ask for a team member.",
+    "quick1": "Price for Wadi Shab",
+    "quick2": "Is hotel pickup included?",
+    "quick3": "Plan a 3-day trip",
+    "placeholder": "Type your message…",
+    "send": "Send",
+    "typing": "Assistant is typing…",
+    "talkToHuman": "Talk to a team member",
+    "handoffTitle": "Before we connect you",
+    "handoffBody": "Share your name and phone so our team can follow up even if you leave the page.",
+    "name": "Name",
+    "phone": "Phone",
+    "email": "Email (optional)",
+    "connect": "Connect me",
+    "cancel": "Cancel",
+    "whatsapp": "Continue on WhatsApp",
+    "privacy": "Chats are stored so our team can help you. See our privacy policy.",
+    "unavailable": "The chat is unavailable right now. Reach us on WhatsApp or by phone.",
+    "error": "Message not sent. Please try again.",
+    "rateLimited": "You are sending messages too quickly. Please wait a moment."
+  },
+  "consent": {
+    "title": "Cookies & privacy",
+    "body": "We use essential cookies to run the site and, only with your permission, analytics and marketing cookies to understand how visitors use it and to measure our ads. Change your choice any time from the footer.",
+    "policy": "Privacy policy",
+    "noPixels": "No analytics or marketing tags are configured on this site yet.",
+    "accept": "Accept all",
+    "reject": "Essential only",
+    "manage": "Manage",
+    "save": "Save choices",
+    "analytics": "Analytics (Google Analytics 4)",
+    "analyticsHint": "Anonymous usage statistics that help us improve the site.",
+    "marketing": "Marketing (Meta, Snapchat, TikTok pixels)",
+    "marketingHint": "Measures our campaigns and personalises ads.",
+    "settings": "Cookie settings",
+    "short": "Essential cookies only, unless you allow analytics or marketing."
   }
 }
