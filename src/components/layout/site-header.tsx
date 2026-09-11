@@ -61,7 +61,7 @@ export function SiteHeader() {
                 key={item.key}
                 href={item.href}
                 className={cn(
-                  "relative rounded-md px-2.5 py-2 text-[13px] font-medium whitespace-nowrap text-sand-100/85 transition hover:text-gold-400 2xl:px-3 2xl:text-sm",
+                  "nav-link relative rounded-md px-2.5 py-2 font-medium whitespace-nowrap text-sand-100/85 transition hover:text-gold-400 2xl:px-3",
                   "after:absolute after:inset-x-3 after:-bottom-0.5 after:h-px after:origin-start after:scale-x-0 after:bg-gold-500 after:transition-transform hover:after:scale-x-100",
                   active && "text-gold-400 after:scale-x-100",
                 )}

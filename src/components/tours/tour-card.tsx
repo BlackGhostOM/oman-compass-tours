@@ -49,11 +49,11 @@ export function TourCard({
         />
         <div className="absolute inset-0 bg-gradient-to-t from-navy-950/70 via-transparent to-transparent" />
         <div className="absolute inset-x-3 top-3 flex items-center justify-between gap-2">
-          <span className="rounded-md bg-navy-950/80 px-2 py-1 text-[11px] font-medium text-sand-50 backdrop-blur">
+          <span className="rounded-md bg-navy-950/80 px-2 py-1 text-xs font-medium text-sand-50 backdrop-blur">
             {tour.kind === "service" ? t("service") : tour.durationDays > 1 ? t("days", { count: tour.durationDays }) : pick(tour.durationLabel, locale)}
           </span>
           {tour.isFeatured && (
-            <span className="rounded-md bg-gold-gradient px-2 py-1 text-[11px] font-semibold text-navy-950">{t("featured")}</span>
+            <span className="rounded-md bg-gold-gradient px-2 py-1 text-xs font-semibold text-navy-950">{t("featured")}</span>
           )}
         </div>
         {tour.ratingAverage > 0 && (

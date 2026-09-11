@@ -75,6 +75,27 @@ html[lang="ar"] {
   --font-editorial: var(--font-amiri), "Amiri", serif;
   --font-body: var(--font-tajawal), "Tajawal", "Segoe UI", Tahoma, sans-serif;
   --tracking-brand: 0;
+  /* Arabic scripts read smaller at the same nominal size: scale the whole type ramp up and loosen leading */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.6;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.65;
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.75;
+  --text-lg: 1.25rem;
+  --text-lg--line-height: 1.6;
+  --text-xl: 1.4375rem;
+  --text-xl--line-height: 1.5;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 1.4;
+  --text-3xl: 2.125rem;
+  --text-3xl--line-height: 1.35;
+  --text-4xl: 2.625rem;
+  --text-4xl--line-height: 1.25;
+  --text-5xl: 3.375rem;
+  --text-5xl--line-height: 1.15;
+  --text-6xl: 4.125rem;
+  --text-6xl--line-height: 1.1;
 }
 
 .dark {
@@ -315,8 +336,30 @@ html[lang="ar"] {
     color: var(--gold-400);
   }
   html[lang="ar"] .eyebrow {
-    @apply text-sm;
+    @apply text-base font-bold;
     text-transform: none;
+  }
+  /* Amiri is a light Naskh face; bold keeps headings crisp at card and nav sizes */
+  html[lang="ar"] .font-heading {
+    font-weight: 700;
+  }
+  html[lang="ar"] .font-editorial {
+    font-weight: 700;
+  }
+  /* Header navigation: compact Latin, roomier Arabic */
+  .nav-link {
+    font-size: 13px;
+  }
+  html[lang="ar"] .nav-link {
+    font-size: 16px;
+  }
+  @media (min-width: 96rem) {
+    .nav-link {
+      font-size: 14px;
+    }
+    html[lang="ar"] .nav-link {
+      font-size: 17px;
+    }
   }
   .heading-brand {
     letter-spacing: var(--tracking-brand);
