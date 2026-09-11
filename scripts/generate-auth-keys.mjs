@@ -3,7 +3,8 @@
  * prints (or sets) them on the current Convex deployment.
  *
  *   node scripts/generate-auth-keys.mjs            # print
- *   node scripts/generate-auth-keys.mjs --set      # npx convex env set …
+ *   node scripts/generate-auth-keys.mjs --set         # npx convex env set … (dev deployment)
+ *   node scripts/generate-auth-keys.mjs --set --prod  # same, targeting the production deployment
  */
 import { exportJWK, exportPKCS8, generateKeyPair } from "jose";
 import { execSync } from "node:child_process";
@@ -16,8 +17,9 @@ const jwks = JSON.stringify({ keys: [{ use: "sig", ...publicKey }] });
 const privateKeyOneLine = privateKey.trimEnd().replace(/\n/g, " ");
 
 if (process.argv.includes("--set")) {
-  execSync(`npx convex env set JWT_PRIVATE_KEY -- "${privateKeyOneLine}"`, { stdio: "inherit" });
-  execSync(`npx convex env set JWKS -- '${jwks}'`, { stdio: "inherit", shell: process.platform === "win32" ? "bash" : undefined });
+  const target = process.argv.includes("--prod") ? "--prod " : "";
+  execSync(`npx convex env set ${target}JWT_PRIVATE_KEY -- "${privateKeyOneLine}"`, { stdio: "inherit" });
+  execSync(`npx convex env set ${target}JWKS -- '${jwks}'`, { stdio: "inherit", shell: process.platform === "win32" ? "bash" : undefined });
   console.log("JWT_PRIVATE_KEY and JWKS set on the Convex deployment.");
 } else {
   console.log(`JWT_PRIVATE_KEY="${privateKeyOneLine}"`);
