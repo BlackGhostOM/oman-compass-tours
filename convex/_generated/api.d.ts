@@ -9,12 +9,25 @@
  */
 
 import type * as account from "../account.js";
+import type * as admin_audit from "../admin/audit.js";
+import type * as admin_bookings from "../admin/bookings.js";
+import type * as admin_content from "../admin/content.js";
+import type * as admin_customers from "../admin/customers.js";
+import type * as admin_finance from "../admin/finance.js";
+import type * as admin_leads from "../admin/leads.js";
+import type * as admin_overview from "../admin/overview.js";
+import type * as admin_products from "../admin/products.js";
+import type * as admin_reviews from "../admin/reviews.js";
+import type * as admin_settings from "../admin/settings.js";
+import type * as adminActions from "../adminActions.js";
 import type * as auth from "../auth.js";
 import type * as availability from "../availability.js";
 import type * as blog from "../blog.js";
 import type * as bookingEmails from "../bookingEmails.js";
 import type * as bookings from "../bookings.js";
 import type * as catalog from "../catalog.js";
+import type * as chat from "../chat.js";
+import type * as chatAi from "../chatAi.js";
 import type * as content from "../content.js";
 import type * as crons from "../crons.js";
 import type * as files from "../files.js";
@@ -57,12 +70,25 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   account: typeof account;
+  "admin/audit": typeof admin_audit;
+  "admin/bookings": typeof admin_bookings;
+  "admin/content": typeof admin_content;
+  "admin/customers": typeof admin_customers;
+  "admin/finance": typeof admin_finance;
+  "admin/leads": typeof admin_leads;
+  "admin/overview": typeof admin_overview;
+  "admin/products": typeof admin_products;
+  "admin/reviews": typeof admin_reviews;
+  "admin/settings": typeof admin_settings;
+  adminActions: typeof adminActions;
   auth: typeof auth;
   availability: typeof availability;
   blog: typeof blog;
   bookingEmails: typeof bookingEmails;
   bookings: typeof bookings;
   catalog: typeof catalog;
+  chat: typeof chat;
+  chatAi: typeof chatAi;
   content: typeof content;
   crons: typeof crons;
   files: typeof files;

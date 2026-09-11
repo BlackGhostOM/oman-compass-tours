@@ -8,7 +8,7 @@ import { mkdirSync } from "node:fs";
 const base = process.argv[2] ?? process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 const accounts = {
   customer: { email: "customer@example.com", password: "Traveller!2026", pages: [["account", "/account"], ["account-payments", "/account/payments"], ["account-travellers", "/account/travellers"], ["account-loyalty", "/account/loyalty"]] },
-  staff: { email: "owner@omancompasstours.com", password: "OmanCompass!2026", pages: [["admin", "/admin"], ["admin-bookings", "/admin/bookings"], ["admin-products", "/admin/products"], ["admin-inbox", "/admin/inbox"]] },
+  staff: { email: "owner@omancompasstours.com", password: "OmanCompass!2026", pages: [["admin", "/admin"], ["admin-bookings", "/admin/bookings"], ["admin-products", "/admin/products"], ["admin-customers", "/admin/customers"], ["admin-leads", "/admin/leads"], ["admin-inbox", "/admin/inbox"], ["admin-reviews", "/admin/reviews"], ["admin-content", "/admin/content"], ["admin-payments", "/admin/payments"], ["admin-reports", "/admin/reports"], ["admin-settings", "/admin/settings"], ["admin-audit", "/admin/audit"]] },
 };
 
 mkdirSync("docs/screenshots", { recursive: true });
@@ -32,6 +32,23 @@ for (const [role, acc] of Object.entries(accounts)) {
         } catch (err) {
           console.warn("✗", locale, name, String(err).split("\n")[0]);
         }
+      }
+      if (role === "staff" && locale === "en") {
+        // First booking detail + dark-mode dashboard
+        await page.goto(`${base}/en/admin/bookings`, { waitUntil: "networkidle" });
+        const first = page.getByRole("link", { name: /^OCT-/ }).first();
+        if (await first.count()) {
+          await first.click();
+          await page.waitForURL(/\/admin\/bookings\/[a-z0-9]+$/);
+          await page.waitForTimeout(1200);
+          await page.screenshot({ path: `docs/screenshots/en-admin-booking-detail-desktop.png`, fullPage: true });
+          console.log("✓ en admin booking detail");
+        }
+        await page.goto(`${base}/en/admin`, { waitUntil: "networkidle" });
+        await page.getByRole("button", { name: /Dark mode/ }).click();
+        await page.waitForTimeout(500);
+        await page.screenshot({ path: `docs/screenshots/en-admin-dark-desktop.png`, fullPage: true });
+        console.log("✓ en admin dark");
       }
       if (role === "customer" && locale === "en") {
         // Dark mode variant of the dashboard
