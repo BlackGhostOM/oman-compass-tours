@@ -4,7 +4,7 @@ import { use, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
-import { Copy, Download, Link2, Mail, MessageCircle, RefreshCw, Send } from "lucide-react";
+import { ArrowLeft, Copy, Download, Link2, Mail, MessageCircle, RefreshCw, Send } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../../../../../convex/_generated/api";
 import type { Id } from "../../../../../../convex/_generated/dataModel";
@@ -75,6 +75,7 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ i
         description={`${formatDate(b.date, locale)} · ${b.startTime ?? ""} · ${b.adults}A ${b.children}C ${b.infants}I · ${t("source")}: ${b.source}`}
         actions={
           <>
+            <Button asChild variant="ghost" size="sm"><Link href="/admin/bookings"><ArrowLeft className="size-4 rtl:-scale-x-100" /> {t("back")}</Link></Button>
             <StatusBadge status={b.status} />
             <Button asChild variant="outline" size="sm"><a href={`/api/voucher/${b.voucherToken}`} target="_blank" rel="noopener noreferrer"><Download className="size-4" /> {t("voucher")}</a></Button>
             <Button variant="outline" size="sm" disabled={busy === "resend"} onClick={() => run("resend", () => resend({ bookingId: b._id }), t("resent"))}><Mail className="size-4" /> {t("resend")}</Button>

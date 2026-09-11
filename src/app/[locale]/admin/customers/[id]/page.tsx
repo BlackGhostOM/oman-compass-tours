@@ -3,7 +3,7 @@
 import { use, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useMutation, useQuery } from "convex/react";
-import { MessageCircle } from "lucide-react";
+import { ArrowLeft, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../../../../../convex/_generated/api";
 import type { Id } from "../../../../../../convex/_generated/dataModel";
@@ -43,7 +43,7 @@ export default function AdminCustomerDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow={t("eyebrow")} title={c.name ?? c.email ?? "—"} description={`${c.email ?? ""} · ${c.phone ?? ""} · ${c.nationality ? countryName(c.nationality, locale) : ""} · ${t("joined")} ${new Date(c.createdAt).toLocaleDateString()}`} actions={c.phone ? <Button asChild variant="outline" size="sm"><a href={`https://wa.me/${c.phone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4 text-[#25D366]" /> WhatsApp</a></Button> : undefined} />
+      <PageHeader eyebrow={t("eyebrow")} title={c.name ?? c.email ?? "—"} description={`${c.email ?? ""} · ${c.phone ?? ""} · ${c.nationality ? countryName(c.nationality, locale) : ""} · ${t("joined")} ${new Date(c.createdAt).toLocaleDateString()}`} actions={<><Button asChild variant="ghost" size="sm"><Link href="/admin/customers"><ArrowLeft className="size-4 rtl:-scale-x-100" /> {t("back")}</Link></Button>{c.phone ? <Button asChild variant="outline" size="sm"><a href={`https://wa.me/${c.phone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4 text-[#25D366]" /> WhatsApp</a></Button> : null}</>} />
       <div className="grid gap-6 lg:grid-cols-3">
         <Panel title={t("crm")}>
           <div className="space-y-3">

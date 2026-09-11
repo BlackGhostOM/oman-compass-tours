@@ -1261,7 +1261,8 @@
         "timeline": "Timeline",
         "regenerateVoucher": "Rotate voucher token",
         "regenerated": "Voucher token rotated.",
-        "policiesAccepted": "Customer accepted {count} policy versions"
+        "policiesAccepted": "Customer accepted {count} policy versions",
+        "back": "Back to bookings"
       },
       "manualCta": "Manual booking"
     },
@@ -1398,7 +1399,8 @@
         "seoTitle": "Meta title",
         "seoDescription": "Meta description",
         "tags": "Tags",
-        "externalReviews": "External review count"
+        "externalReviews": "External review count",
+        "back": "Back to products"
       }
     },
     "customers": {
@@ -1437,7 +1439,8 @@
         "conversations": "Conversations",
         "chat": "Chat",
         "leads": "Leads",
-        "dataRequests": "{count} privacy request(s) pending"
+        "dataRequests": "{count} privacy request(s) pending",
+        "back": "Back to customers"
       }
     },
     "leads": {

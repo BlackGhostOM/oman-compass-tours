@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
-import { ArrowUp, ArrowDown, ImagePlus, Plus, Star, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowUp, ArrowDown, ImagePlus, Plus, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
@@ -158,6 +158,7 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
         title={tour ? pick(tour.title, locale) : t("newTitle")}
         actions={
           <>
+            <Button asChild variant="ghost" size="sm"><Link href="/admin/products"><ArrowLeft className="size-4 rtl:-scale-x-100" /> {t("back")}</Link></Button>
             {tour && <Button asChild variant="outline" size="sm"><Link href={`/tours/${tour.slug.en}`} target="_blank">{t("preview")}</Link></Button>}
             <Button variant="outline" disabled={busy} onClick={() => save("draft")}>{t("saveDraft")}</Button>
             <Button disabled={busy} onClick={() => save("published")} className="bg-gold-gradient text-navy-950">{busy ? t("saving") : t("publish")}</Button>

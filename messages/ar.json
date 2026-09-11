@@ -1261,7 +1261,8 @@
         "timeline": "الخط الزمني",
         "regenerateVoucher": "تدوير رمز القسيمة",
         "regenerated": "تم تدوير رمز القسيمة.",
-        "policiesAccepted": "وافق العميل على {count} إصدارات من السياسات"
+        "policiesAccepted": "وافق العميل على {count} إصدارات من السياسات",
+        "back": "العودة إلى الحجوزات"
       },
       "manualCta": "حجز يدوي"
     },
@@ -1398,7 +1399,8 @@
         "seoTitle": "عنوان الميتا",
         "seoDescription": "وصف الميتا",
         "tags": "الوسوم",
-        "externalReviews": "عدد التقييمات الخارجية"
+        "externalReviews": "عدد التقييمات الخارجية",
+        "back": "العودة إلى المنتجات"
       }
     },
     "customers": {
@@ -1437,7 +1439,8 @@
         "conversations": "المحادثات",
         "chat": "محادثة",
         "leads": "الاستفسارات",
-        "dataRequests": "{count} طلب خصوصية معلّق"
+        "dataRequests": "{count} طلب خصوصية معلّق",
+        "back": "العودة إلى العملاء"
       }
     },
     "leads": {
