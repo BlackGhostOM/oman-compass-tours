@@ -114,6 +114,7 @@ webhooks.
 
 ## 4. Deploy (Convex + Vercel)
 
+Live site: **https://oman-compass-tours.vercel.app** (staff dashboard at `/en/admin`).
 The live setup uses two deployments that are updated independently:
 
 | Piece | Where | How to update |
