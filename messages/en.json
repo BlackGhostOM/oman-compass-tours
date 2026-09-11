@@ -1,0 +1,127 @@
+{
+  "meta": {
+    "defaultTitle": "Oman Compass Tours · Private & Luxury Tours in Oman",
+    "defaultDescription": "Licensed Omani tour operator in Muscat with 10+ years of experience. Private 4WD tours, desert adventures, wadis, mountains, cultural experiences and transfers. Rated 5.0 on Tripadvisor."
+  },
+  "language": {
+    "switch": "Change language",
+    "en": "English",
+    "ar": "Arabic"
+  },
+  "nav": {
+    "primary": "Primary navigation",
+    "tours": "Tours",
+    "destinations": "Destinations",
+    "services": "Services",
+    "about": "About",
+    "bookingMethods": "How to Book",
+    "blog": "Journal",
+    "contact": "Contact",
+    "planMyTrip": "Plan My Trip",
+    "policies": "Policies",
+    "account": "My Account",
+    "signIn": "Sign in",
+    "openMenu": "Open menu"
+  },
+  "common": {
+    "bookNow": "Book Now",
+    "learnMore": "Learn more",
+    "viewAll": "View all",
+    "from": "From",
+    "perPerson": "per person",
+    "perGroup": "per group",
+    "perAdult": "per adult",
+    "perChild": "per child",
+    "duration": "Duration",
+    "freeCancellation": "Free cancellation up to {hours} h before",
+    "nonRefundable": "Non-refundable",
+    "loading": "Loading…",
+    "error": "Something went wrong. Please try again.",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "continue": "Continue",
+    "submit": "Submit",
+    "search": "Search",
+    "filters": "Filters",
+    "reset": "Reset",
+    "apply": "Apply",
+    "yes": "Yes",
+    "no": "No",
+    "optional": "optional",
+    "required": "required",
+    "readMore": "Read more",
+    "share": "Share",
+    "copied": "Link copied",
+    "whatsapp": "WhatsApp",
+    "email": "Email",
+    "phone": "Phone",
+    "hours": "{count, plural, one {# hour} other {# hours}}",
+    "days": "{count, plural, one {# day} other {# days}}",
+    "reviews": "{count, plural, =0 {No reviews yet} one {# review} other {# reviews}}",
+    "adults": "{count, plural, one {# adult} other {# adults}}",
+    "children": "{count, plural, =0 {no children} one {# child} other {# children}}",
+    "ratingOutOf": "{rating} out of 5"
+  },
+  "footer": {
+    "blurb": "A fully licensed Omani tour operator based in Muscat. For more than ten years we have guided travellers through Oman's deserts, wadis, mountains and living heritage — privately, comfortably and with genuine local knowledge.",
+    "rating": "{rating} / 5 on Tripadvisor · {count}+ reviews",
+    "ranked": "#{position} of {of} experiences in Muscat",
+    "explore": "Explore",
+    "company": "Company",
+    "contact": "Contact",
+    "timezone": "Oman time (GST, UTC+4)",
+    "license": "Ministry of Heritage & Tourism licence no. {number}",
+    "secureCheckout": "Secure checkout · card data never touches our servers",
+    "rights": "All rights reserved."
+  },
+  "newsletter": {
+    "title": "Travel notes from Oman",
+    "placeholder": "Your email address",
+    "subscribe": "Subscribe",
+    "success": "Thank you — you are on the list.",
+    "error": "We could not subscribe that address. Please try again.",
+    "rateLimited": "Too many attempts. Please try again later.",
+    "privacy": "No spam. Unsubscribe any time."
+  },
+  "support": {
+    "open": "Contact us",
+    "close": "Close support menu",
+    "whatsapp": "Chat on WhatsApp",
+    "whatsappHint": "Typical reply within minutes",
+    "chat": "Live chat",
+    "chatHint": "Ask about tours, prices & availability",
+    "chatComingSoon": "Our assistant answers instantly; a team member joins when needed.",
+    "chatFallback": "The live chat is being prepared. Meanwhile, reach us on WhatsApp or by phone."
+  },
+  "home": {
+    "hero": {
+      "eyebrow": "Private & luxury experiences · Sultanate of Oman",
+      "title": "Find your bearings in Oman",
+      "subtitle": "Deserts, wadis, mountains and living heritage — explored privately with expert Omani guides.",
+      "exploreTours": "Explore Tours",
+      "planMyTrip": "Plan My Trip"
+    }
+  },
+  "policies": {
+    "titles": {
+      "terms": "Terms & Conditions",
+      "cancellation": "Booking & Cancellation Policy",
+      "refund": "Refund Policy",
+      "privacy": "Privacy Policy",
+      "cookies": "Cookie Policy",
+      "waiver": "Travel Safety & Liability Waiver",
+      "child": "Child Policy",
+      "payment": "Payment Terms"
+    }
+  },
+  "errors": {
+    "notFound": {
+      "title": "This page has drifted off the map",
+      "body": "The link may be outdated or the page may have moved. Let us guide you back.",
+      "home": "Back to home"
+    }
+  }
+}

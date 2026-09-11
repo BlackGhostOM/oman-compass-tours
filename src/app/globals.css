@@ -1,0 +1,303 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ------------------------------------------------------------------ */
+/* Brand tokens — derived from the compass-rose logo                   */
+/* ------------------------------------------------------------------ */
+:root {
+  --navy-950: #0e0b2e;
+  --navy-900: #14113a;
+  --navy-800: #1e1a4f;
+  --navy-700: #2a2566;
+  --gold-500: #c9a15c;
+  --gold-400: #ddb97a;
+  --gold-600: #a8843f;
+  --gold-300: #ecd6a6;
+  --sand-100: #f6efe2;
+  --sand-50: #fbf8f2;
+  --sand-200: #ebe1cc;
+  --ink-900: #1a1a2e;
+  --ink-500: #5c5a6e;
+  --ink-300: #9c99ae;
+  --success: #2e8b6b;
+  --warning: #d9962b;
+  --danger: #b5443c;
+
+  --gold-gradient: linear-gradient(135deg, var(--gold-400) 0%, var(--gold-500) 50%, var(--gold-600) 100%);
+
+  /* Typography — swapped per locale below */
+  --font-heading: var(--font-cinzel), "Times New Roman", serif;
+  --font-editorial: var(--font-cormorant), Georgia, serif;
+  --font-body: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --tracking-brand: 0.12em;
+
+  /* shadcn semantic tokens (light / sand surfaces) */
+  --background: var(--sand-50);
+  --foreground: var(--ink-900);
+  --card: #ffffff;
+  --card-foreground: var(--ink-900);
+  --popover: #ffffff;
+  --popover-foreground: var(--ink-900);
+  --primary: var(--gold-500);
+  --primary-foreground: var(--navy-950);
+  --secondary: var(--sand-100);
+  --secondary-foreground: var(--ink-900);
+  --muted: var(--sand-100);
+  --muted-foreground: var(--ink-500);
+  --accent: var(--sand-100);
+  --accent-foreground: var(--navy-950);
+  --destructive: var(--danger);
+  --border: var(--sand-200);
+  --input: var(--sand-200);
+  --ring: var(--gold-500);
+  --chart-1: var(--gold-500);
+  --chart-2: var(--navy-800);
+  --chart-3: var(--success);
+  --chart-4: var(--warning);
+  --chart-5: var(--ink-500);
+  --radius: 0.75rem; /* 12px max */
+  --sidebar: var(--navy-950);
+  --sidebar-foreground: var(--sand-100);
+  --sidebar-primary: var(--gold-500);
+  --sidebar-primary-foreground: var(--navy-950);
+  --sidebar-accent: var(--navy-900);
+  --sidebar-accent-foreground: var(--sand-50);
+  --sidebar-border: var(--navy-800);
+  --sidebar-ring: var(--gold-500);
+}
+
+html[lang="ar"] {
+  --font-heading: var(--font-amiri), "Amiri", "Traditional Arabic", serif;
+  --font-editorial: var(--font-amiri), "Amiri", serif;
+  --font-body: var(--font-tajawal), "Tajawal", "Segoe UI", Tahoma, sans-serif;
+  --tracking-brand: 0;
+}
+
+.dark {
+  --background: var(--navy-950);
+  --foreground: var(--sand-50);
+  --card: var(--navy-900);
+  --card-foreground: var(--sand-50);
+  --popover: var(--navy-900);
+  --popover-foreground: var(--sand-50);
+  --primary: var(--gold-500);
+  --primary-foreground: var(--navy-950);
+  --secondary: var(--navy-800);
+  --secondary-foreground: var(--sand-50);
+  --muted: var(--navy-800);
+  --muted-foreground: var(--ink-300);
+  --accent: var(--navy-800);
+  --accent-foreground: var(--sand-50);
+  --destructive: #d16a62;
+  --border: var(--navy-800);
+  --input: var(--navy-800);
+  --ring: var(--gold-500);
+  --sidebar: var(--navy-950);
+  --sidebar-foreground: var(--sand-100);
+  --sidebar-primary: var(--gold-500);
+  --sidebar-primary-foreground: var(--navy-950);
+  --sidebar-accent: var(--navy-900);
+  --sidebar-accent-foreground: var(--sand-50);
+  --sidebar-border: var(--navy-800);
+  --sidebar-ring: var(--gold-500);
+}
+
+@theme inline {
+  /* Brand palette as Tailwind colors (bg-navy-950, text-gold-500 …) */
+  --color-navy-950: var(--navy-950);
+  --color-navy-900: var(--navy-900);
+  --color-navy-800: var(--navy-800);
+  --color-navy-700: var(--navy-700);
+  --color-gold-300: var(--gold-300);
+  --color-gold-400: var(--gold-400);
+  --color-gold-500: var(--gold-500);
+  --color-gold-600: var(--gold-600);
+  --color-sand-50: var(--sand-50);
+  --color-sand-100: var(--sand-100);
+  --color-sand-200: var(--sand-200);
+  --color-ink-900: var(--ink-900);
+  --color-ink-500: var(--ink-500);
+  --color-ink-300: var(--ink-300);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  /* shadcn */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: var(--font-body);
+  --font-heading: var(--font-heading);
+  --font-editorial: var(--font-editorial);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --tracking-brand: var(--tracking-brand);
+
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: calc(var(--radius) * 0.75);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
+  --radius-2xl: var(--radius);
+  --radius-3xl: var(--radius);
+  --radius-4xl: var(--radius);
+
+  --shadow-gold: 0 10px 30px -10px color-mix(in oklch, var(--gold-500) 45%, transparent);
+  --animate-fade-up: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-slow-zoom: slow-zoom 24s ease-in-out infinite alternate;
+  --animate-spin-slow: spin 90s linear infinite;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes slow-zoom {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.08);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans antialiased;
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground;
+    min-height: 100dvh;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-heading;
+    text-wrap: balance;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 2px solid var(--gold-500);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: color-mix(in oklch, var(--gold-500) 35%, transparent);
+  }
+  html[lang="ar"] body {
+    line-height: 1.75;
+  }
+  /* Arabic numerals option: toggled by data attribute on <html> */
+  html[data-numerals="arabic"] {
+    font-variant-numeric: normal;
+  }
+}
+
+@layer utilities {
+  /* Gold gradient — buttons & headline accents (never flat yellow) */
+  .bg-gold-gradient {
+    background-image: var(--gold-gradient);
+  }
+  .text-gold-gradient {
+    background-image: var(--gold-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  /* 1px gold hairline dividers */
+  .hairline {
+    height: 1px;
+    background-image: linear-gradient(to right, transparent, var(--gold-500) 50%, transparent);
+  }
+  .hairline-solid {
+    height: 1px;
+    background-color: color-mix(in oklch, var(--gold-500) 45%, transparent);
+  }
+  .hairline-vertical {
+    width: 1px;
+    background-image: linear-gradient(to bottom, transparent, var(--gold-500) 50%, transparent);
+  }
+  /* Spaced uppercase eyebrow text echoing the wordmark (LTR only) */
+  .eyebrow {
+    @apply font-heading text-xs font-medium uppercase text-gold-500;
+    letter-spacing: var(--tracking-brand);
+  }
+  html[lang="ar"] .eyebrow {
+    @apply text-sm;
+    text-transform: none;
+  }
+  .heading-brand {
+    letter-spacing: var(--tracking-brand);
+  }
+  /* Dark marketing surface */
+  .surface-dark {
+    @apply bg-navy-950 text-sand-50;
+  }
+  .surface-sand {
+    @apply bg-sand-50 text-ink-900;
+  }
+  .card-dark {
+    @apply rounded-xl border border-navy-800 bg-navy-900 text-sand-50;
+  }
+  /* Flip directional icons in RTL */
+  [dir="rtl"] .rtl-flip {
+    transform: scaleX(-1);
+  }
+  .container-brand {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+  .prose-brand :where(h2, h3) {
+    @apply font-heading text-navy-950;
+  }
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
