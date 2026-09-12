@@ -1534,7 +1534,8 @@
         "team": "Team",
         "coupons": "Promotions",
         "newsletter": "Newsletter",
-        "seo": "SEO"
+        "seo": "SEO",
+        "reels": "Reels"
       },
       "banners": {
         "heroMedia": "Home hero media",
@@ -1625,6 +1626,31 @@
         "save": "Save",
         "saved": "Saved.",
         "edit": "Edit"
+      },
+      "reels": {
+        "title": "Home-page reels",
+        "hint": "Short vertical videos (9:16) shown in “Moments from our tours”. MP4 or WebM up to 100 MB. Add a cover image so the card looks good before playback; the order here is the order on the site.",
+        "upload": "Upload video",
+        "uploading": "Uploading…",
+        "uploaded": "Reel uploaded.",
+        "empty": "No reels yet. Upload the first video to replace the placeholder cards.",
+        "caption": "Caption",
+        "link": "Link (Instagram / TikTok, optional)",
+        "poster": "Cover image",
+        "active": "Visible",
+        "hidden": "Hidden",
+        "save": "Save",
+        "saved": "Saved.",
+        "remove": "Delete",
+        "confirmRemove": "Delete this reel? The video file will be removed too.",
+        "removed": "Reel deleted.",
+        "moveUp": "Move earlier",
+        "moveDown": "Move later",
+        "notVideo": "Please choose a video file (MP4 or WebM).",
+        "notImage": "Please choose an image file.",
+        "tooLarge": "The video is larger than 100 MB. Compress it or host it externally.",
+        "error": "Something went wrong. Please try again.",
+        "noCaption": "No caption"
       }
     },
     "payments": {

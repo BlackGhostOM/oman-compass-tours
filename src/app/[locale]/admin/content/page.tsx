@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useMutation, useQuery } from "convex/react";
-import { Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ImagePlus, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../../../../convex/_generated/api";
 import type { Doc, Id } from "../../../../../convex/_generated/dataModel";
@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { CsvButton, DateTime, LocalizedField, PageHeader, Panel, StatusBadge } from "@/components/admin/ui";
+import { cn } from "@/lib/utils";
 
 const L = (en = "", ar = ""): LocalizedString => ({ en, ar });
 
@@ -129,6 +130,112 @@ function BlogTab() {
 }
 
 /* ---------------- Team ---------------- */
+function ReelsTab() {
+  const t = useTranslations("admin.content.reels");
+  const locale = useLocale();
+  const reels = useQuery(api.admin.reels.list);
+  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const add = useMutation(api.admin.reels.add);
+  const update = useMutation(api.admin.reels.update);
+  const reorder = useMutation(api.admin.reels.reorder);
+  const remove = useMutation(api.admin.reels.remove);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, { caption: LocalizedString; href: string }>>({});
+
+  async function upload(file: File): Promise<Id<"_storage">> {
+    const url = await generateUploadUrl({ purpose: "media" });
+    const res = await fetch(url, { method: "POST", headers: { "Content-Type": file.type }, body: file });
+    const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
+    return storageId;
+  }
+
+  async function addVideo(file: File) {
+    if (!file.type.startsWith("video/")) return toast.error(t("notVideo"));
+    if (file.size > 100 * 1024 * 1024) return toast.error(t("tooLarge"));
+    setBusy("add");
+    try {
+      const storageId = await upload(file);
+      await add({ storageId });
+      toast.success(t("uploaded"));
+    } catch {
+      toast.error(t("error"));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function addPoster(id: Id<"banners">, file: File) {
+    if (!file.type.startsWith("image/")) return toast.error(t("notImage"));
+    setBusy(`poster-${id}`);
+    try {
+      const posterStorageId = await upload(file);
+      await update({ id, posterStorageId });
+      toast.success(t("saved"));
+    } catch {
+      toast.error(t("error"));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const move = async (index: number, dir: -1 | 1) => {
+    if (!reels) return;
+    const ids = reels.map((r) => r._id);
+    const j = index + dir;
+    if (j < 0 || j >= ids.length) return;
+    [ids[index], ids[j]] = [ids[j], ids[index]];
+    await reorder({ orderedIds: ids });
+  };
+
+  return (
+    <div className="space-y-4">
+      <Panel title={t("title")} actions={
+        <label className={cn("inline-flex cursor-pointer items-center gap-2 rounded-lg bg-gold-gradient px-3 py-1.5 text-sm font-medium text-navy-950", busy === "add" && "pointer-events-none opacity-60")}>
+          <Upload className="size-4" /> {busy === "add" ? t("uploading") : t("upload")}
+          <input type="file" accept="video/mp4,video/webm,video/quicktime" className="sr-only" disabled={busy === "add"} onChange={(e) => { const f = e.target.files?.[0]; if (f) void addVideo(f); e.target.value = ""; }} />
+        </label>
+      }>
+        <p className="text-xs text-muted-foreground">{t("hint")}</p>
+        {reels === undefined ? null : reels.length === 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">{t("empty")}</p>
+        ) : (
+          <ul className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {reels.map((r, i) => {
+              const d = drafts[r._id] ?? { caption: r.caption ?? { en: "", ar: "" }, href: r.href ?? "" };
+              return (
+                <li key={r._id} className="overflow-hidden rounded-xl border border-border bg-card">
+                  <div className="relative aspect-[9/16] bg-navy-950">
+                    {r.url && <video src={r.url} poster={r.posterUrl ?? undefined} muted playsInline preload="metadata" controls className="h-full w-full object-cover" />}
+                    {!r.isActive && <span className="absolute start-2 top-2 rounded bg-navy-950/80 px-2 py-0.5 text-[11px] text-sand-50">{t("hidden")}</span>}
+                  </div>
+                  <div className="space-y-3 p-3">
+                    <LocalizedField label={t("caption")} value={d.caption} onChange={(v) => setDrafts({ ...drafts, [r._id]: { ...d, caption: v } })} />
+                    <div className="space-y-1.5"><Label>{t("link")}</Label><Input dir="ltr" placeholder="https://www.instagram.com/reel/…" value={d.href} onChange={(e) => setDrafts({ ...drafts, [r._id]: { ...d, href: e.target.value } })} /></div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button size="sm" onClick={async () => { await update({ id: r._id, caption: d.caption, href: d.href }); toast.success(t("saved")); }}>{t("save")}</Button>
+                      <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs hover:bg-muted">
+                        <ImagePlus className="size-3.5" /> {busy === `poster-${r._id}` ? t("uploading") : t("poster")}
+                        <input type="file" accept="image/*" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) void addPoster(r._id, f); e.target.value = ""; }} />
+                      </label>
+                      <label className="ms-auto inline-flex items-center gap-1.5 text-xs"><Switch checked={r.isActive} onCheckedChange={(v) => update({ id: r._id, isActive: v })} /> {t("active")}</label>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button size="icon-xs" variant="ghost" aria-label={t("moveUp")} onClick={() => move(i, -1)}><ArrowUp className="size-3.5" /></Button>
+                      <Button size="icon-xs" variant="ghost" aria-label={t("moveDown")} onClick={() => move(i, 1)}><ArrowDown className="size-3.5" /></Button>
+                      <Button size="icon-xs" variant="ghost" className="ms-auto text-danger" aria-label={t("remove")} onClick={async () => { if (window.confirm(t("confirmRemove"))) { await remove({ id: r._id }); toast.success(t("removed")); } }}><Trash2 className="size-3.5" /></Button>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">{pick(r.caption ?? { en: "", ar: "" }, locale) || t("noCaption")}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Panel>
+    </div>
+  );
+}
+
 function TeamTab() {
   const t = useTranslations("admin.content.team");
   const locale = useLocale();
@@ -250,6 +357,7 @@ export default function AdminContentPage() {
       <Tabs defaultValue="banners">
         <TabsList className="flex-wrap">
           <TabsTrigger value="banners">{t("tabs.banners")}</TabsTrigger>
+          <TabsTrigger value="reels">{t("tabs.reels")}</TabsTrigger>
           <TabsTrigger value="blog">{t("tabs.blog")}</TabsTrigger>
           <TabsTrigger value="team">{t("tabs.team")}</TabsTrigger>
           <TabsTrigger value="coupons">{t("tabs.coupons")}</TabsTrigger>
@@ -257,6 +365,7 @@ export default function AdminContentPage() {
           <TabsTrigger value="seo">{t("tabs.seo")}</TabsTrigger>
         </TabsList>
         <TabsContent value="banners" className="pt-4"><BannersTab /></TabsContent>
+        <TabsContent value="reels" className="pt-4"><ReelsTab /></TabsContent>
         <TabsContent value="blog" className="pt-4"><BlogTab /></TabsContent>
         <TabsContent value="team" className="pt-4"><TeamTab /></TabsContent>
         <TabsContent value="coupons" className="pt-4"><CouponsTab /></TabsContent>

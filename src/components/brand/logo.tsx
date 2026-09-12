@@ -50,10 +50,10 @@ export function Logo({
       />
       {variant === "lockup" && (
         <span className="hidden flex-col leading-none whitespace-nowrap sm:flex lg:hidden xl:flex">
-          <span className="font-heading text-[0.95rem] font-semibold tracking-[0.14em] text-gold-400 sm:text-base">
+          <span className="wordmark-name font-heading text-[0.95rem] font-semibold tracking-[0.14em] text-gold-400 sm:text-base">
             {locale === "ar" ? "بوصلة عُمان للسياحة" : "OMAN COMPASS TOURS"}
           </span>
-          <span className="mt-1 text-[0.6rem] font-medium tracking-[0.3em] text-sand-100/70 uppercase">
+          <span className="wordmark-sub mt-1 text-[0.6rem] font-medium tracking-[0.3em] text-sand-100/70 uppercase">
             {locale === "ar" ? "شركة" : "Company"}
           </span>
         </span>

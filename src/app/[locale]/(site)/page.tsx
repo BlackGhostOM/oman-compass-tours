@@ -26,10 +26,13 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
     fetchPublic(api.reviews.stats, {}),
   ]);
 
-  const reels = [1, 2, 3, 4].map((i) => ({
-    posterUrl: `/media/placeholders/reel-${i}.jpg`,
-    alt: { en: "Oman Compass Tours reel", ar: "مقطع من جولات بوصلة عُمان" },
-  }));
+  const uploadedReels = (content?.reels ?? []).map((r) => ({ url: r.url ?? undefined, posterUrl: r.posterUrl ?? undefined, alt: r.alt, caption: r.caption ?? undefined }));
+  const reels = uploadedReels.length
+    ? uploadedReels
+    : [1, 2, 3, 4].map((i) => ({
+        posterUrl: `/media/placeholders/reel-${i}.jpg`,
+        alt: { en: "Oman Compass Tours reel", ar: "مقطع من جولات بوصلة عُمان" },
+      }));
 
   const jsonLd = {
     "@context": "https://schema.org",
