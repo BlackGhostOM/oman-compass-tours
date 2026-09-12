@@ -6,6 +6,7 @@ import { Sparkles } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { pick, type LocalizedString } from "@/lib/content";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export type PromoBanner = {
   _id: string;
@@ -47,7 +48,7 @@ export function PromoBannerStrip({ promos }: { promos: PromoBanner[] }) {
           <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gold-gradient text-navy-950" aria-hidden><Sparkles className="size-5" /></span>
           <div>
             <p className="font-heading text-xl leading-normal text-gold-400 sm:text-2xl">{title}</p>
-            {pick(promo.subtitle, locale) && <p className="mt-1.5 text-sm leading-relaxed text-sand-100/75">{pick(promo.subtitle, locale)}</p>}
+            {pick(promo.subtitle, locale) && <p className={cn("text-sm leading-relaxed text-sand-100/75", locale === "ar" ? "mt-3" : "mt-1.5")}>{pick(promo.subtitle, locale)}</p>}
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-4">
