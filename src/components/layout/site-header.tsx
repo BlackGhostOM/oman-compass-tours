@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Menu, Phone, UserRound } from "lucide-react";
+import { Home, Menu, Phone, UserRound } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Link, usePathname } from "@/i18n/navigation";
@@ -54,6 +54,15 @@ export function SiteHeader() {
         <Logo priority markClassName="size-10" />
 
         <nav aria-label={t("primary")} className="hidden shrink-0 items-center gap-0.5 lg:flex">
+          {!isHome && (
+            <Link
+              href="/"
+              className="nav-link relative me-1 inline-flex items-center gap-1.5 rounded-md border border-gold-500/40 bg-navy-900/60 px-2.5 py-1.5 font-medium whitespace-nowrap text-gold-400 transition hover:border-gold-500 hover:bg-navy-900"
+            >
+              <Home className="size-4" />
+              {t("home")}
+            </Link>
+          )}
           {primaryNav.map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
@@ -121,6 +130,11 @@ export function SiteHeader() {
                 </SheetTitle>
               </SheetHeader>
               <nav aria-label={t("primary")} className="flex flex-col gap-1 px-4 py-4">
+                {!isHome && (
+                  <Link href="/" className="inline-flex items-center gap-2 rounded-md px-3 py-3 font-heading text-base tracking-wide text-gold-400 transition hover:bg-navy-900">
+                    <Home className="size-4" /> {t("home")}
+                  </Link>
+                )}
                 {primaryNav.map((item) => (
                   <Link
                     key={item.key}
