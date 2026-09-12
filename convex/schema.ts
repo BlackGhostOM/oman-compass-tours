@@ -529,6 +529,7 @@ export default defineSchema({
       v.literal("trip_planner"),
       v.literal("chat_offline"),
       v.literal("chat_handoff"),
+      v.literal("chat"),
       v.literal("newsletter"),
       v.literal("whatsapp"),
       v.literal("phone"),
@@ -616,6 +617,7 @@ export default defineSchema({
     leadId: v.optional(v.id("leads")),
     notifiedNewAt: v.optional(v.number()),
     notifiedHandoffAt: v.optional(v.number()),
+    guestPreferredChannel: v.optional(v.string()),
   })
     .index("by_user", ["userId", "lastMessageAt"])
     .index("by_session", ["sessionKey"])

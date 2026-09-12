@@ -6,7 +6,9 @@ import { internalMutation, internalQuery, mutation, query, type MutationCtx, typ
 import { assertString, enforceRateLimit, getViewer, isStaff, requireStaff } from "./lib/access";
 import { localeValidator } from "./schema";
 
-const HANDOFF_PATTERNS = /\b(human|agent|person|staff|someone|talk to|speak to|refund|cancel|change my booking|modify|complain|manager)\b|موظف|شخص|إنسان|استرداد|إلغاء|تعديل|شكوى|أريد التحدث/i;
+// Only explicit requests for a person trigger an immediate transfer; everything else is handled by the assistant,
+// which offers a transfer itself when it cannot help or after ten replies (see chatAi.ts).
+const HANDOFF_PATTERNS = /\b(human|real person|live agent|an agent|representative|staff member|someone from (the |your )?team|talk to (a|an|someone|your)|speak (to|with) (a|an|someone|your)|manager|complaint)\b|موظف|مسؤول|أريد التحدث|اريد التحدث|أكلم شخص|اكلم شخص|أتكلم مع شخص|اتكلم مع شخص|شخص حقيقي|إنسان حقيقي|شكوى/i;
 
 async function loadConversationForCaller(ctx: QueryCtx | MutationCtx, conversationId: Id<"conversations">, sessionKey?: string) {
   const c = await ctx.db.get(conversationId);
@@ -247,17 +249,42 @@ export const knowledgeBase = internalQuery({
 });
 
 export const postAssistantMessage = internalMutation({
-  args: { conversationId: v.id("conversations"), body: v.string(), confidence: v.number(), suggestHandoff: v.boolean() },
+  args: {
+    conversationId: v.id("conversations"),
+    body: v.string(),
+    confidence: v.number(),
+    suggestHandoff: v.boolean(),
+    offerHandoff: v.optional(v.boolean()),
+    visitor: v.optional(v.object({ name: v.optional(v.string()), phone: v.optional(v.string()), email: v.optional(v.string()), preferredChannel: v.optional(v.string()) })),
+  },
   returns: v.null(),
-  handler: async (ctx, { conversationId, body, confidence, suggestHandoff }) => {
+  handler: async (ctx, { conversationId, body, confidence, suggestHandoff, offerHandoff, visitor }) => {
     const c = await ctx.db.get(conversationId);
     if (!c) return null;
-    await ctx.db.insert("messages", { conversationId, role: "assistant", body, aiConfidence: confidence, aiSuggestedHandoff: suggestHandoff });
+    await ctx.db.insert("messages", { conversationId, role: "assistant", body, aiConfidence: confidence, aiSuggestedHandoff: suggestHandoff || !!offerHandoff });
     const handoff = suggestHandoff && c.status === "ai";
-    await ctx.db.patch(conversationId, { lastMessageAt: Date.now(), lastMessagePreview: body.slice(0, 120), unreadForCustomer: c.unreadForCustomer + 1, status: handoff ? "waiting_human" : c.status, handoffReason: handoff ? "low_confidence" : c.handoffReason });
+    // Contact details the visitor shared in the conversation become part of the record (never overwrite what we already know).
+    const clean = (value?: string, max = 120) => (value && value.trim() ? value.trim().slice(0, max) : undefined);
+    const captured = {
+      guestName: c.guestName ?? clean(visitor?.name),
+      guestPhone: c.guestPhone ?? clean(visitor?.phone, 32),
+      guestEmail: c.guestEmail ?? clean(visitor?.email)?.toLowerCase(),
+      guestPreferredChannel: c.guestPreferredChannel ?? clean(visitor?.preferredChannel, 32),
+    };
+    await ctx.db.patch(conversationId, {
+      ...captured,
+      lastMessageAt: Date.now(),
+      lastMessagePreview: body.slice(0, 120),
+      unreadForCustomer: c.unreadForCustomer + 1,
+      status: handoff ? "waiting_human" : c.status,
+      handoffReason: handoff ? "ai_handoff" : c.handoffReason,
+    });
     if (handoff) {
-      await ctx.scheduler.runAfter(0, internal.chat.ensureLeadForHandoff, { conversationId });
+      await ctx.scheduler.runAfter(0, internal.chat.ensureLeadForHandoff, { conversationId, source: "chat_handoff" });
       await ctx.scheduler.runAfter(0, internal.chatEmails.notifyStaff, { conversationId, kind: "handoff" });
+    } else if (!c.leadId && captured.guestName && (captured.guestPhone || captured.guestEmail)) {
+      // A visitor who left a name and a way to reach them is a lead even without a transfer.
+      await ctx.scheduler.runAfter(0, internal.chat.ensureLeadForHandoff, { conversationId, source: "chat" });
     }
     return null;
   },
@@ -275,9 +302,9 @@ export const markStaffNotified = internalMutation({
 
 /** Every handoff (or offline message) becomes a lead for the CRM. */
 export const ensureLeadForHandoff = internalMutation({
-  args: { conversationId: v.id("conversations") },
+  args: { conversationId: v.id("conversations"), source: v.optional(v.union(v.literal("chat_handoff"), v.literal("chat"))) },
   returns: v.null(),
-  handler: async (ctx, { conversationId }) => {
+  handler: async (ctx, { conversationId, source }) => {
     const c = await ctx.db.get(conversationId);
     if (!c || c.leadId) return null;
     const user = c.userId ? await ctx.db.get(c.userId) : null;
@@ -289,7 +316,7 @@ export const ensureLeadForHandoff = internalMutation({
       phone: c.guestPhone ?? user?.phone,
       message: last?.body ?? "(chat handoff)",
       locale: c.locale,
-      source: "chat_handoff",
+      source: source ?? "chat_handoff",
       tourId: c.tourId,
       conversationId,
       status: "new",
