@@ -28,6 +28,7 @@ import type * as bookings from "../bookings.js";
 import type * as catalog from "../catalog.js";
 import type * as chat from "../chat.js";
 import type * as chatAi from "../chatAi.js";
+import type * as chatEmails from "../chatEmails.js";
 import type * as content from "../content.js";
 import type * as crons from "../crons.js";
 import type * as files from "../files.js";
@@ -89,6 +90,7 @@ declare const fullApi: ApiFromModules<{
   catalog: typeof catalog;
   chat: typeof chat;
   chatAi: typeof chatAi;
+  chatEmails: typeof chatEmails;
   content: typeof content;
   crons: typeof crons;
   files: typeof files;

@@ -614,6 +614,8 @@ export default defineSchema({
     unreadForCustomer: v.number(),
     handoffReason: v.optional(v.string()),
     leadId: v.optional(v.id("leads")),
+    notifiedNewAt: v.optional(v.number()),
+    notifiedHandoffAt: v.optional(v.number()),
   })
     .index("by_user", ["userId", "lastMessageAt"])
     .index("by_session", ["sessionKey"])

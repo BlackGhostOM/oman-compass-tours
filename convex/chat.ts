@@ -77,9 +77,11 @@ export const send = mutation({
     const wantsHuman = HANDOFF_PATTERNS.test(text);
     const nextStatus = c.status === "ai" && wantsHuman ? "waiting_human" : c.status;
     await ctx.db.patch(conversationId, { lastMessageAt: now, lastMessagePreview: text.slice(0, 120), unreadForStaff: c.unreadForStaff + 1, status: nextStatus, handoffReason: nextStatus === "waiting_human" && c.status === "ai" ? "customer_request" : c.handoffReason });
+    if (!c.notifiedNewAt) await ctx.scheduler.runAfter(0, internal.chatEmails.notifyStaff, { conversationId, kind: "new" });
     if (nextStatus === "waiting_human" && c.status === "ai") {
       await ctx.db.insert("messages", { conversationId, role: "system", body: c.locale === "ar" ? "تم تحويل المحادثة إلى أحد أعضاء الفريق. سيرد عليك قريبًا." : "Handing you over to a team member. Someone will reply shortly." });
       await ctx.scheduler.runAfter(0, internal.chat.ensureLeadForHandoff, { conversationId });
+      await ctx.scheduler.runAfter(0, internal.chatEmails.notifyStaff, { conversationId, kind: "handoff" });
     } else if (c.status === "ai" || c.status === "waiting_human") {
       // Keep answering until a team member actually takes over (status "human"); nobody should be left waiting.
       await ctx.scheduler.runAfter(0, internal.chatAi.respond, { conversationId });
@@ -108,6 +110,7 @@ export const requestHuman = mutation({
       await ctx.db.patch(c._id, { status: "waiting_human", handoffReason: "customer_button", lastMessageAt: Date.now() });
       await ctx.db.insert("messages", { conversationId, role: "system", body: c.locale === "ar" ? "تم تحويل المحادثة إلى أحد أعضاء الفريق." : "Handing you over to a team member." });
       await ctx.scheduler.runAfter(0, internal.chat.ensureLeadForHandoff, { conversationId });
+      await ctx.scheduler.runAfter(0, internal.chatEmails.notifyStaff, { conversationId, kind: "handoff" });
     }
     return null;
   },
@@ -252,7 +255,20 @@ export const postAssistantMessage = internalMutation({
     await ctx.db.insert("messages", { conversationId, role: "assistant", body, aiConfidence: confidence, aiSuggestedHandoff: suggestHandoff });
     const handoff = suggestHandoff && c.status === "ai";
     await ctx.db.patch(conversationId, { lastMessageAt: Date.now(), lastMessagePreview: body.slice(0, 120), unreadForCustomer: c.unreadForCustomer + 1, status: handoff ? "waiting_human" : c.status, handoffReason: handoff ? "low_confidence" : c.handoffReason });
-    if (handoff) await ctx.scheduler.runAfter(0, internal.chat.ensureLeadForHandoff, { conversationId });
+    if (handoff) {
+      await ctx.scheduler.runAfter(0, internal.chat.ensureLeadForHandoff, { conversationId });
+      await ctx.scheduler.runAfter(0, internal.chatEmails.notifyStaff, { conversationId, kind: "handoff" });
+    }
+    return null;
+  },
+});
+
+/** Records that the company was emailed about this conversation (once per kind). */
+export const markStaffNotified = internalMutation({
+  args: { conversationId: v.id("conversations"), kind: v.union(v.literal("new"), v.literal("handoff")) },
+  returns: v.null(),
+  handler: async (ctx, { conversationId, kind }) => {
+    await ctx.db.patch(conversationId, kind === "new" ? { notifiedNewAt: Date.now() } : { notifiedHandoffAt: Date.now() });
     return null;
   },
 });
