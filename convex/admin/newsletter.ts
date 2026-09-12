@@ -137,4 +137,44 @@ export const send = mutation({
   },
 });
 
+/* ------------------------------------------------------------------ */
+/* Welcome email                                                       */
+/* ------------------------------------------------------------------ */
+
+export const welcome = query({
+  args: {},
+  returns: v.union(v.object({ subject: localized, body: localized }), v.null()),
+  handler: async (ctx) => {
+    await requireStaff(ctx);
+    const setting = await ctx.db.query("siteSettings").withIndex("by_key", (q) => q.eq("key", "newsletter.welcome")).unique();
+    const value = setting?.value as { subject?: { en: string; ar: string }; body?: { en: string; ar: string } } | undefined;
+    return value?.subject && value?.body ? { subject: value.subject, body: value.body } : null;
+  },
+});
+
+export const setWelcome = mutation({
+  args: { subject: localized, body: localized },
+  returns: v.null(),
+  handler: async (ctx, { subject, body }) => {
+    const staff = await requireStaff(ctx);
+    const existing = await ctx.db.query("siteSettings").withIndex("by_key", (q) => q.eq("key", "newsletter.welcome")).unique();
+    const value = { subject, body };
+    if (existing) await ctx.db.patch(existing._id, { value, updatedBy: staff._id, updatedAt: Date.now() });
+    else await ctx.db.insert("siteSettings", { key: "newsletter.welcome", value, updatedBy: staff._id, updatedAt: Date.now() });
+    await audit(ctx, staff, "newsletter.welcome_update", "siteSettings", "newsletter.welcome");
+    return null;
+  },
+});
+
+export const sendWelcomeTest = mutation({
+  args: { locale: localeValidator },
+  returns: v.null(),
+  handler: async (ctx, { locale }) => {
+    const staff = await requireStaff(ctx);
+    if (!staff.email) throw new ConvexError({ code: "INVALID_STATE", reason: "staff email missing" });
+    await ctx.scheduler.runAfter(0, internal.newsletterSend.sendWelcome, { to: staff.email, locale });
+    return null;
+  },
+});
+
 export type Campaign = Doc<"newsletterCampaigns">;

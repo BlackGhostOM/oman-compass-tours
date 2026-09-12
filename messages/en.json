@@ -85,13 +85,13 @@
     "rights": "All rights reserved."
   },
   "newsletter": {
-    "title": "Travel notes from Oman",
+    "title": "Subscribe to our travel newsletter",
     "placeholder": "Your email address",
     "subscribe": "Subscribe",
-    "success": "Thank you — you are on the list.",
+    "success": "Welcome aboard! Our welcome email is on its way to your inbox.",
     "error": "We could not subscribe that address. Please try again.",
     "rateLimited": "Too many attempts. Please try again later.",
-    "privacy": "No spam. Unsubscribe any time.",
+    "privacy": "Seasonal tips, new tours and offers. No spam, unsubscribe any time.",
     "unsubscribeTitle": "Unsubscribe",
     "unsubscribeWorking": "One moment…",
     "unsubscribeDone": "You have been removed from our newsletter. Sorry to see you go.",
@@ -1665,7 +1665,10 @@
           "sent": "Sent",
           "failed": "Failed"
         },
-        "stats": "{sent} sent of {targeted} ({failed} failed)"
+        "stats": "{sent} sent of {targeted} ({failed} failed)",
+        "welcomeTitle": "Welcome email (sent automatically to every new subscriber)",
+        "welcomeHint": "Sent the moment someone subscribes, in their language. Your three featured tours, a link to the catalogue and the unsubscribe link are added below this text automatically.",
+        "saveWelcome": "Save welcome email"
       },
       "seo": {
         "title": "Page metadata",

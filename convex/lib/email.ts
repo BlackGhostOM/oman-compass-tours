@@ -71,6 +71,7 @@ export async function sendEmail(args: {
   subject: string;
   html: string;
   replyTo?: string;
+  headers?: Record<string, string>;
   attachments?: { filename: string; content: Buffer | string }[];
 }): Promise<{ status: "sent" | "skipped" | "failed"; id?: string; error?: string }> {
   const key = process.env.AUTH_RESEND_KEY ?? process.env.RESEND_API_KEY;
@@ -85,6 +86,7 @@ export async function sendEmail(args: {
     subject: args.subject,
     html: args.html,
     replyTo: args.replyTo,
+    headers: args.headers,
     attachments: args.attachments,
   });
   if (error) return { status: "failed", error: JSON.stringify(error) };

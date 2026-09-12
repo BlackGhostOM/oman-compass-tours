@@ -374,6 +374,8 @@ function NewsletterTab() {
         )}
       </Panel>
 
+      <WelcomePanel />
+
       <Panel title={t("campaigns")} actions={<Button size="sm" onClick={() => setEditing({ subject: { en: "", ar: "" }, body: { en: "", ar: "" } })}><Plus className="size-4" /> {t("newCampaign")}</Button>}>
         <p className="text-xs text-muted-foreground">{t("campaignsHint")}</p>
         {campaigns && campaigns.length > 0 && (
@@ -407,6 +409,30 @@ function NewsletterTab() {
         )}
       </Panel>
     </div>
+  );
+}
+
+function WelcomePanel() {
+  const t = useTranslations("admin.content.newsletter");
+  const locale = useLocale();
+  const saved = useQuery(api.admin.newsletter.welcome);
+  const setWelcome = useMutation(api.admin.newsletter.setWelcome);
+  const sendWelcomeTest = useMutation(api.admin.newsletter.sendWelcomeTest);
+  const [draft, setDraft] = useState<{ subject: LocalizedString; body: LocalizedString } | null>(null);
+  const defaults = { subject: { en: "Welcome to Oman Compass Tours", ar: "أهلًا بك في بوصلة عُمان للسياحة" }, body: { en: "Marhaba, and thank you for joining us.\n\nYou are now on the list for our travel notes: seasonal tips on the best time for each wadi, desert and mountain, new private tours as we launch them, and subscriber-only offers. Expect a note every few weeks, never spam.\n\nMeanwhile, here are a few of our most-loved private days out:", ar: "مرحبًا بك، وشكرًا لانضمامك إلينا.\n\nأصبحت الآن ضمن قائمة رسائل السفر: نصائح موسمية عن أفضل وقت لكل وادٍ وصحراء وجبل، وجولات خاصة جديدة فور إطلاقها، وعروض للمشتركين فقط. تصلك رسالة كل بضعة أسابيع، ولا رسائل مزعجة.\n\nوإلى ذلك الحين، هذه بعض جولاتنا الخاصة الأكثر حبًا لدى ضيوفنا:" } };
+  const value = draft ?? saved ?? defaults;
+  return (
+    <Panel title={t("welcomeTitle")} actions={<Button size="sm" variant="outline" onClick={async () => { await sendWelcomeTest({ locale: locale === "ar" ? "ar" : "en" }); toast.success(t("testSent")); }}>{t("sendTest")}</Button>}>
+      <p className="text-xs text-muted-foreground">{t("welcomeHint")}</p>
+      <div className="mt-3 space-y-3">
+        <LocalizedField label={t("subject")} value={value.subject} onChange={(v) => setDraft({ ...value, subject: v })} />
+        <LocalizedField label={t("body")} value={value.body} onChange={(v) => setDraft({ ...value, body: v })} multiline rows={6} />
+        <div className="flex justify-end gap-2">
+          {draft && <Button variant="ghost" onClick={() => setDraft(null)}>{t("cancel")}</Button>}
+          <Button size="sm" disabled={!draft} onClick={async () => { if (!draft) return; await setWelcome(draft); setDraft(null); toast.success(t("saved")); }}>{t("saveWelcome")}</Button>
+        </div>
+      </div>
+    </Panel>
   );
 }
 

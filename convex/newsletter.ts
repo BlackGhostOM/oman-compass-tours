@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
+import { internal } from "./_generated/api";
 import { mutation } from "./_generated/server";
 import { enforceRateLimit } from "./lib/access";
 import { generateToken } from "./lib/ids";
@@ -29,16 +30,19 @@ export const subscribe = mutation({
     if (existing) {
       if (existing.unsubscribedAt) {
         await ctx.db.patch(existing._id, { unsubscribedAt: undefined, locale: args.locale });
+        await ctx.scheduler.runAfter(0, internal.newsletterSend.sendWelcome, { subscriberId: existing._id });
       }
       return { ok: true };
     }
 
-    await ctx.db.insert("newsletterSubscribers", {
+    const id = await ctx.db.insert("newsletterSubscribers", {
       email,
       locale: args.locale,
       source: args.source?.slice(0, 64),
       token: generateToken(),
     });
+    // The first newsletter goes out immediately: a welcome note with our signature tours.
+    await ctx.scheduler.runAfter(0, internal.newsletterSend.sendWelcome, { subscriberId: id });
     return { ok: true };
   },
 });
