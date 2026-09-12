@@ -34,6 +34,7 @@ yarn-error.log*
 .env*
 # public build-time values only (NEXT_PUBLIC_*); secrets live in Convex/Vercel env settings
 !.env.production
+!.env.example
 
 # vercel
 .vercel
