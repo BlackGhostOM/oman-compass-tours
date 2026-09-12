@@ -46,8 +46,8 @@ export function PromoBannerStrip({ promos }: { promos: PromoBanner[] }) {
         <div className="flex items-center gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gold-gradient text-navy-950" aria-hidden><Sparkles className="size-5" /></span>
           <div>
-            <p className="font-heading text-lg leading-tight text-gold-400">{title}</p>
-            {pick(promo.subtitle, locale) && <p className="text-sm text-sand-100/75">{pick(promo.subtitle, locale)}</p>}
+            <p className="font-heading text-xl leading-normal text-gold-400 sm:text-2xl">{title}</p>
+            {pick(promo.subtitle, locale) && <p className="mt-1.5 text-sm leading-relaxed text-sand-100/75">{pick(promo.subtitle, locale)}</p>}
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-center gap-4">
