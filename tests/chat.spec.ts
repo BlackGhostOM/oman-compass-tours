@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
+import { HIDE_DEV_OVERLAY } from "./fixtures";
 
 test.describe("Live chat & consent", () => {
+  test.beforeEach(async ({ context }) => {
+    await context.addInitScript(HIDE_DEV_OVERLAY);
+  });
+
   test("cookie banner: essential-only choice is remembered", async ({ page }) => {
     await page.goto("/en");
     const banner = page.getByRole("dialog", { name: "Cookies & privacy" });
