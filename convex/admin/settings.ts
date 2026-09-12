@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { Id } from "../_generated/dataModel";
 import { ConvexError } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { assertString, audit, requireAdmin, requireOwner, requireStaff, requireUser } from "../lib/access";
@@ -49,6 +50,29 @@ export const set = mutation({
     else await ctx.db.insert("siteSettings", { key: k, value, updatedBy: staff._id, updatedAt: Date.now() });
     await audit(ctx, staff, "settings.set", "siteSettings", k, existing?.value, value);
     return null;
+  },
+});
+
+/** Stores an uploaded company-profile PDF (or clears it) and exposes its public URL to the About page. */
+export const setProfilePdf = mutation({
+  args: { storageId: v.optional(v.id("_storage")) },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, { storageId }) => {
+    const staff = await requireAdmin(ctx);
+    const url = storageId ? await ctx.storage.getUrl(storageId) : null;
+    const upsert = async (key: string, value: unknown) => {
+      const existing = await ctx.db.query("siteSettings").withIndex("by_key", (q) => q.eq("key", key)).unique();
+      if (existing) await ctx.db.patch(existing._id, { value, updatedBy: staff._id, updatedAt: Date.now() });
+      else await ctx.db.insert("siteSettings", { key, value, updatedBy: staff._id, updatedAt: Date.now() });
+      return existing?.value;
+    };
+    const previousStorage = await upsert("company.profilePdfStorageId", storageId ?? "");
+    const previousUrl = await upsert("company.profilePdfUrl", url ?? "");
+    if (typeof previousStorage === "string" && previousStorage && previousStorage !== storageId) {
+      await ctx.storage.delete(previousStorage as Id<"_storage">).catch(() => undefined);
+    }
+    await audit(ctx, staff, "settings.profile_pdf", "siteSettings", "company.profilePdfUrl", previousUrl, url ?? "");
+    return url;
   },
 });
 

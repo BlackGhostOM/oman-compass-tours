@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useMutation, useQuery } from "convex/react";
-import { CheckCircle2, Copy, XCircle } from "lucide-react";
+import { CheckCircle2, Copy, FileText, Trash2, Upload, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import { pick, type LocalizedString } from "@/lib/content";
 import { site } from "@/lib/site";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +32,26 @@ function useSetting<T>(settings: Record<string, unknown> | undefined, key: strin
 function CompanyTab({ settings }: { settings: Record<string, unknown> }) {
   const t = useTranslations("admin.settings.company");
   const set = useMutation(api.admin.settings.set);
+  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const setProfilePdf = useMutation(api.admin.settings.setProfilePdf);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const storedPdfUrl = typeof settings["company.profilePdfUrl"] === "string" ? (settings["company.profilePdfUrl"] as string) : "";
+  async function uploadProfilePdf(file: File) {
+    if (file.type !== "application/pdf") return toast.error(t("profileNotPdf"));
+    if (file.size > 20 * 1024 * 1024) return toast.error(t("profileTooLarge"));
+    setPdfBusy(true);
+    try {
+      const url = await generateUploadUrl({ purpose: "media" });
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": file.type }, body: file });
+      const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
+      await setProfilePdf({ storageId });
+      toast.success(t("profileUploaded"));
+    } catch {
+      toast.error(t("profileUploadError"));
+    } finally {
+      setPdfBusy(false);
+    }
+  }
   const [info, setInfo] = useSetting<Record<string, string>>(settings, "company.info", { name: site.name, nameAr: site.nameAr, phone: site.phoneDisplay, whatsapp: site.whatsappNumber, email: site.email, license: site.licenseNumber, vat: "", addressEn: site.address.en, addressAr: site.address.ar, instagram: site.social.instagram, tiktok: site.social.tiktok, snapchat: site.social.snapchat, facebook: site.social.facebook, x: site.social.x, profilePdfUrl: "" });
   const f = (k: keyof typeof info, label: string, dir?: "ltr" | "rtl") => <div className="space-y-1.5"><Label>{label}</Label><Input value={info[k] ?? ""} dir={dir} onChange={(e) => setInfo({ ...info, [k]: e.target.value })} /></div>;
   return (
@@ -43,6 +64,24 @@ function CompanyTab({ settings }: { settings: Record<string, unknown> }) {
       </div>
       <Button size="sm" className="mt-4 bg-gold-gradient text-navy-950" onClick={async () => { await set({ key: "company.info", value: info }); await set({ key: "company.profilePdfUrl", value: info.profilePdfUrl }); toast.success(t("saved")); }}>{t("save")}</Button>
       <p className="mt-2 text-xs text-muted-foreground">{t("note")}</p>
+      <div className="mt-6 rounded-lg border border-border bg-muted/30 p-4">
+        <p className="font-medium text-foreground">{t("profileTitle")}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{t("profileHint")}</p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <label className={cn("inline-flex cursor-pointer items-center gap-2 rounded-lg bg-gold-gradient px-3 py-2 text-sm font-medium text-navy-950", pdfBusy && "pointer-events-none opacity-60")}>
+            <Upload className="size-4" /> {pdfBusy ? t("profileUploading") : t("profileUpload")}
+            <input type="file" accept="application/pdf" className="sr-only" disabled={pdfBusy} onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadProfilePdf(file); e.target.value = ""; }} />
+          </label>
+          {storedPdfUrl ? (
+            <>
+              <Button asChild size="sm" variant="outline"><a href={storedPdfUrl} target="_blank" rel="noopener noreferrer"><FileText className="size-4" /> {t("profileCurrent")}</a></Button>
+              <Button size="sm" variant="ghost" className="text-danger" disabled={pdfBusy} onClick={async () => { await setProfilePdf({}); toast.success(t("profileRemoved")); }}><Trash2 className="size-4" /> {t("profileRemove")}</Button>
+            </>
+          ) : (
+            <span className="text-xs text-muted-foreground">{t("profileNone")}</span>
+          )}
+        </div>
+      </div>
     </Panel>
   );
 }

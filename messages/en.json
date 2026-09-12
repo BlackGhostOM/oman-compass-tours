@@ -1706,7 +1706,19 @@
         "addressAr": "Address (AR)",
         "save": "Save",
         "saved": "Saved.",
-        "note": "Header, footer and JSON-LD read defaults from code; values saved here are used by invoices, emails and the About page profile slot."
+        "note": "Header, footer and JSON-LD read defaults from code; values saved here are used by invoices, emails and the About page profile slot.",
+        "profileTitle": "Company profile (PDF)",
+        "profileHint": "Visitors download this file from the About page. PDF only, up to 20 MB; uploading a new file replaces the old one.",
+        "profileUpload": "Upload PDF",
+        "profileUploading": "Uploading…",
+        "profileUploaded": "Company profile uploaded.",
+        "profileUploadError": "Upload failed. Please try again.",
+        "profileNotPdf": "Please choose a PDF file.",
+        "profileTooLarge": "The file is larger than 20 MB.",
+        "profileCurrent": "Open current file",
+        "profileRemove": "Remove",
+        "profileRemoved": "Company profile removed.",
+        "profileNone": "No file uploaded yet."
       },
       "booking": {
         "title": "Booking & support rules",

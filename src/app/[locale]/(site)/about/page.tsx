@@ -150,13 +150,13 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
             <div className="mt-6 rounded-xl border border-dashed border-gold-500/50 bg-white p-5">
               <h3 className="font-heading text-navy-950">{t("profileTitle")}</h3>
               <p className="mt-1 text-sm text-ink-500">{typeof profilePdf === "string" && profilePdf ? t("profileBody") : t("profileSoon")}</p>
-              <Button asChild={typeof profilePdf === "string" && !!profilePdf} disabled={!(typeof profilePdf === "string" && profilePdf)} className="mt-3 bg-gold-gradient text-navy-950">
-                {typeof profilePdf === "string" && profilePdf ? (
-                  <a href={profilePdf} download><Download className="size-4" /> {t("profileDownload")}</a>
-                ) : (
-                  <span><Download className="size-4" /> {t("profileDownload")}</span>
-                )}
-              </Button>
+              {typeof profilePdf === "string" && profilePdf ? (
+                <Button asChild className="mt-3 bg-gold-gradient text-navy-950 shadow-gold">
+                  <a href={profilePdf} target="_blank" rel="noopener noreferrer" download><Download className="size-4" /> {t("profileDownload")}</a>
+                </Button>
+              ) : (
+                <Button disabled className="mt-3 bg-gold-gradient text-navy-950"><Download className="size-4" /> {t("profileDownload")}</Button>
+              )}
             </div>
           </div>
         </div>
