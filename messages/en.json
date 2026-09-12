@@ -1806,7 +1806,7 @@
     "offline": "Team offline",
     "offlineHint": "Our team is online {start}–{end} Oman time. Leave your message and we reply within about {minutes} minutes once we are back, or continue on WhatsApp.",
     "statusAi": "Ask about tours, prices, pickup or availability. Ask for a person any time.",
-    "statusWaiting": "A team member will join shortly (about {minutes} minutes).",
+    "statusWaiting": "A team member will join shortly (about {minutes} minutes); the assistant keeps answering in the meantime.",
     "statusHuman": "{name} is with you.",
     "statusClosed": "This conversation is closed.",
     "startNew": "Start a new conversation",

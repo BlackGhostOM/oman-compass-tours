@@ -56,7 +56,7 @@ export function ConversationThread({ conversationId, sessionKey, onStartNew, cla
   }, [messages.length, conversationId, sessionKey, markRead]);
 
   const last = messages[messages.length - 1];
-  const awaitingAi = status === "ai" && last?.role === "customer" && lastSentAt !== null && Date.now() - lastSentAt < 30_000;
+  const awaitingAi = (status === "ai" || status === "waiting_human") && last?.role === "customer" && lastSentAt !== null && Date.now() - lastSentAt < 30_000;
 
   async function submit(text: string) {
     const body = text.trim();

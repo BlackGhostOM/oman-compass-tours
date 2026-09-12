@@ -80,7 +80,8 @@ export const send = mutation({
     if (nextStatus === "waiting_human" && c.status === "ai") {
       await ctx.db.insert("messages", { conversationId, role: "system", body: c.locale === "ar" ? "تم تحويل المحادثة إلى أحد أعضاء الفريق. سيرد عليك قريبًا." : "Handing you over to a team member. Someone will reply shortly." });
       await ctx.scheduler.runAfter(0, internal.chat.ensureLeadForHandoff, { conversationId });
-    } else if (c.status === "ai") {
+    } else if (c.status === "ai" || c.status === "waiting_human") {
+      // Keep answering until a team member actually takes over (status "human"); nobody should be left waiting.
       await ctx.scheduler.runAfter(0, internal.chatAi.respond, { conversationId });
     }
     return null;

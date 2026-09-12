@@ -13,7 +13,7 @@ type KB = {
 
 const omr = (baisa: number) => `OMR ${(baisa / 1000).toFixed(baisa % 1000 === 0 ? 0 : 3)}`;
 
-function buildSystemPrompt(kb: KB, locale: "en" | "ar", siteUrl: string): string {
+function buildSystemPrompt(kb: KB, locale: "en" | "ar", siteUrl: string, handedOff: { name?: string; phone?: string } | null): string {
   const tours = kb.tours
     .map((t) => `- ${t.code} · ${t.title.en} / ${t.title.ar} · ${t.durationLabel.en} · ${t.pricingModel === "per_group" ? `${omr(t.priceGroup ?? t.priceFrom)} per private group (up to ${t.maxGroup})` : `${omr(t.priceAdult ?? t.priceFrom)} per adult${t.priceChild ? `, ${omr(t.priceChild)} per child` : ""}`} · starts ${t.startTimes.join("/")} · free cancellation ${t.freeCancellationHours}h · deposit ${t.depositPercent}% · pickup ${t.pickupIncluded ? "included" : "not included"} · includes: ${t.inclusions.slice(0, 5).join(", ")} · book: ${siteUrl}/${locale}/tours/${t.slug[locale]}`)
     .join("\n");
@@ -22,6 +22,8 @@ function buildSystemPrompt(kb: KB, locale: "en" | "ar", siteUrl: string): string
 Answer in the customer's language (${locale === "ar" ? "Arabic — Modern Standard, warm tourism register" : "English"}), briefly and warmly, like an experienced Omani guide. Use only the catalogue and policies below for prices, durations, inclusions and cancellation rules; convert OMR to USD at 1 OMR ≈ 2.60 USD only when asked. Give direct booking links from the catalogue. Never invent tours, prices, availability or discounts. For live availability on a date, say the booking page shows real-time availability and link it.
 
 Hand off to a human (set "handoff": true) when: the customer asks for a person; they want to change, cancel or refund a booking; they report a problem or complaint; they ask for a custom itinerary or group quote; or you are not confident (confidence below 0.6). Before handing off, ask for their name and phone number if not already given.
+
+${handedOff ? `NOTE: this conversation has already been passed to the human team, who will follow up${handedOff.name ? ` with ${handedOff.name}` : ""}${handedOff.phone ? " on the phone number they gave" : ""}. Keep answering every new question fully and helpfully from the catalogue; do not ask for their name or phone again; you may mention that a colleague will confirm details.` : ""}
 
 Respond ONLY with a JSON object: {"reply": string, "confidence": number between 0 and 1, "handoff": boolean}. No markdown fences.
 
@@ -55,7 +57,8 @@ export const respond = internalAction({
   returns: v.null(),
   handler: async (ctx, { conversationId }) => {
     const data = (await ctx.runQuery(internal.chat.getForAi, { conversationId })) as { conversation: Doc<"conversations">; history: { role: string; body: string }[]; tour: unknown } | null;
-    if (!data || data.conversation.status !== "ai") return null;
+    if (!data || (data.conversation.status !== "ai" && data.conversation.status !== "waiting_human")) return null;
+    const handedOff = data.conversation.status === "waiting_human" ? { name: data.conversation.guestName, phone: data.conversation.guestPhone } : null;
     const kb = (await ctx.runQuery(internal.chat.knowledgeBase, {})) as KB;
     const locale = data.conversation.locale;
     const siteUrl = process.env.SITE_URL ?? "https://omancompasstours.com";
@@ -77,7 +80,7 @@ export const respond = internalAction({
           model: "claude-opus-5",
           max_tokens: 2000,
           output_config: { effort: "low" },
-          system: [{ type: "text", text: buildSystemPrompt(kb, locale, siteUrl), cache_control: { type: "ephemeral" } }],
+          system: [{ type: "text", text: buildSystemPrompt(kb, locale, siteUrl, handedOff), cache_control: { type: "ephemeral" } }],
           messages,
         });
         if (response.stop_reason === "refusal") {

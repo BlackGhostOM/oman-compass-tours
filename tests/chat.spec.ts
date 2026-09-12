@@ -39,6 +39,11 @@ test.describe("Live chat & consent", () => {
     await expect(sheet.getByText(/Handing you over to a team member/)).toBeVisible();
     await expect(sheet.getByText(/A team member will join shortly/)).toBeVisible();
 
+    // While waiting for a person, the assistant keeps answering new questions
+    await sheet.getByPlaceholder("Type your message…").fill("How much is the Muscat city tour price for two?");
+    await sheet.getByRole("button", { name: "Send" }).click();
+    await expect(sheet.getByText(/Oman Compass assistant · /).nth(1)).toBeVisible({ timeout: 20_000 });
+
     // The conversation survives a reload for the same anonymous session
     await page.reload();
     await page.getByRole("button", { name: "Contact us" }).click();
