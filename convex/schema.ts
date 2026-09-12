@@ -742,6 +742,17 @@ export default defineSchema({
     .index("by_email", ["email"])
     .index("by_token", ["token"]),
 
+  newsletterCampaigns: defineTable({
+    subject: localized,
+    body: localized, // Markdown
+    status: v.union(v.literal("draft"), v.literal("sending"), v.literal("sent"), v.literal("failed")),
+    createdBy: v.id("users"),
+    sentAt: v.optional(v.number()),
+    stats: v.optional(v.object({ targeted: v.number(), sent: v.number(), failed: v.number() })),
+    error: v.optional(v.string()),
+    updatedAt: v.number(),
+  }).index("by_status", ["status"]),
+
   staffInvites: defineTable({
     email: v.string(),
     role: roleValidator,

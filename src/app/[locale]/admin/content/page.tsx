@@ -318,15 +318,95 @@ function CouponsTab() {
 /* ---------------- Newsletter + SEO ---------------- */
 function NewsletterTab() {
   const t = useTranslations("admin.content.newsletter");
-  const subs = useQuery(api.admin.content.subscribers);
-  const active = subs?.filter((s) => !s.unsubscribedAt);
+  const locale = useLocale();
+  const subs = useQuery(api.admin.newsletter.subscribers);
+  const campaigns = useQuery(api.admin.newsletter.campaigns);
+  const addSubscriber = useMutation(api.admin.newsletter.addSubscriber);
+  const setActive = useMutation(api.admin.newsletter.setSubscriberActive);
+  const removeSubscriber = useMutation(api.admin.newsletter.removeSubscriber);
+  const upsertCampaign = useMutation(api.admin.newsletter.upsertCampaign);
+  const removeCampaign = useMutation(api.admin.newsletter.removeCampaign);
+  const sendTest = useMutation(api.admin.newsletter.sendTest);
+  const sendCampaign = useMutation(api.admin.newsletter.send);
+  const [newEmail, setNewEmail] = useState("");
+  const [newLocale, setNewLocale] = useState<"en" | "ar">(locale === "ar" ? "ar" : "en");
+  const [search, setSearch] = useState("");
+  const [editing, setEditing] = useState<{ id?: Id<"newsletterCampaigns">; subject: LocalizedString; body: LocalizedString } | null>(null);
+  const active = subs?.filter((s) => !s.unsubscribedAt) ?? [];
+  const activeAr = active.filter((s) => s.locale === "ar").length;
+  const visible = (subs ?? []).filter((s) => !search || s.email.includes(search.toLowerCase()));
+
+  async function saveCampaign(): Promise<Id<"newsletterCampaigns"> | null> {
+    if (!editing) return null;
+    if (!editing.subject.en.trim() && !editing.subject.ar.trim()) { toast.error(t("subjectRequired")); return null; }
+    const id = await upsertCampaign({ id: editing.id, subject: editing.subject, body: editing.body });
+    setEditing({ ...editing, id });
+    toast.success(t("saved"));
+    return id;
+  }
+
   return (
-    <Panel title={t("title")} actions={<CsvButton filename="newsletter.csv" rows={active?.map((s) => ({ email: s.email, locale: s.locale, source: s.source ?? "", subscribedAt: new Date(s.subscribedAt).toISOString() }))} label={t("exportCsv")} />}>
-      <p className="text-sm text-muted-foreground">{t("count", { active: active?.length ?? 0, total: subs?.length ?? 0 })}</p>
-      <ul className="mt-3 max-h-80 divide-y divide-border overflow-y-auto text-sm">
-        {active?.map((s) => <li key={s._id} className="flex items-center gap-3 py-1.5"><span className="flex-1">{s.email}</span><span className="text-xs uppercase text-muted-foreground">{s.locale}</span><DateTime value={s.subscribedAt} withTime={false} /></li>)}
-      </ul>
-    </Panel>
+    <div className="space-y-6">
+      <Panel title={t("title")} actions={<CsvButton filename="newsletter.csv" rows={active.map((s) => ({ email: s.email, locale: s.locale, source: s.source ?? "", subscribedAt: new Date(s.subscribedAt).toISOString() }))} label={t("exportCsv")} />}>
+        <p className="text-sm text-muted-foreground">{t("count", { active: active.length, total: subs?.length ?? 0 })} · {t("byLanguage", { ar: activeAr, en: active.length - activeAr })}</p>
+        <form className="mt-3 flex flex-wrap items-end gap-2" onSubmit={async (e) => { e.preventDefault(); try { await addSubscriber({ email: newEmail, locale: newLocale }); setNewEmail(""); toast.success(t("added")); } catch { toast.error(t("invalidEmail")); } }}>
+          <div className="min-w-64 flex-1 space-y-1.5"><Label htmlFor="nl-email">{t("email")}</Label><Input id="nl-email" type="email" dir="ltr" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="name@example.com" /></div>
+          <div className="space-y-1.5"><Label>{t("language")}</Label><Select value={newLocale} onValueChange={(v) => setNewLocale(v as "en" | "ar")}><SelectTrigger className="w-32"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="en">English</SelectItem><SelectItem value="ar">العربية</SelectItem></SelectContent></Select></div>
+          <Button type="submit" size="sm" disabled={!newEmail.trim()}><Plus className="size-4" /> {t("add")}</Button>
+          <div className="ms-auto min-w-56 space-y-1.5"><Label htmlFor="nl-search">{t("search")}</Label><Input id="nl-search" dir="ltr" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="@" /></div>
+        </form>
+        {subs === undefined ? null : visible.length === 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">{t("empty")}</p>
+        ) : (
+          <ul className="mt-4 max-h-96 divide-y divide-border overflow-y-auto text-sm">
+            {visible.map((s) => (
+              <li key={s._id} className="flex flex-wrap items-center gap-3 py-2">
+                <span className="min-w-56 flex-1" dir="ltr">{s.email}</span>
+                <span className="text-xs uppercase text-muted-foreground">{s.locale}</span>
+                <span className="text-xs text-muted-foreground">{s.source ?? "site"}</span>
+                <DateTime value={s.subscribedAt} withTime={false} />
+                <StatusBadge status={s.unsubscribedAt ? "cancelled" : "succeeded"} label={s.unsubscribedAt ? t("unsubscribed") : t("active")} />
+                <Button size="xs" variant="outline" onClick={() => setActive({ id: s._id, active: !!s.unsubscribedAt })}>{s.unsubscribedAt ? t("resubscribe") : t("unsubscribe")}</Button>
+                <Button size="icon-xs" variant="ghost" className="text-danger" aria-label={t("remove")} onClick={async () => { if (window.confirm(t("confirmRemove"))) { await removeSubscriber({ id: s._id }); } }}><Trash2 className="size-3.5" /></Button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      <Panel title={t("campaigns")} actions={<Button size="sm" onClick={() => setEditing({ subject: { en: "", ar: "" }, body: { en: "", ar: "" } })}><Plus className="size-4" /> {t("newCampaign")}</Button>}>
+        <p className="text-xs text-muted-foreground">{t("campaignsHint")}</p>
+        {campaigns && campaigns.length > 0 && (
+          <ul className="mt-3 divide-y divide-border text-sm">
+            {campaigns.map((c) => (
+              <li key={c._id} className="flex flex-wrap items-center gap-3 py-2">
+                <span className="min-w-56 flex-1 font-medium">{pick(c.subject, locale) || c.subject.en || c.subject.ar}</span>
+                <StatusBadge status={c.status === "sent" ? "succeeded" : c.status === "failed" ? "failed" : c.status === "sending" ? "pending" : "draft"} label={t(`status.${c.status}`)} />
+                {c.stats && <span className="text-xs text-muted-foreground">{t("stats", { sent: c.stats.sent, targeted: c.stats.targeted, failed: c.stats.failed })}</span>}
+                {c.error && <span className="max-w-72 truncate text-xs text-danger" title={c.error}>{c.error}</span>}
+                <DateTime value={c.sentAt ?? c.updatedAt} />
+                {c.status === "draft" && <Button size="xs" variant="outline" onClick={() => setEditing({ id: c._id, subject: c.subject, body: c.body })}>{t("edit")}</Button>}
+                {c.status !== "sending" && <Button size="icon-xs" variant="ghost" className="text-danger" aria-label={t("remove")} onClick={async () => { if (window.confirm(t("confirmRemoveCampaign"))) await removeCampaign({ id: c._id }); }}><Trash2 className="size-3.5" /></Button>}
+              </li>
+            ))}
+          </ul>
+        )}
+        {editing && (
+          <div className="mt-4 space-y-4 rounded-xl border border-border bg-muted/30 p-4">
+            <LocalizedField label={t("subject")} value={editing.subject} onChange={(v) => setEditing({ ...editing, subject: v })} required />
+            <LocalizedField label={t("body")} value={editing.body} onChange={(v) => setEditing({ ...editing, body: v })} multiline rows={10} />
+            <MediaUrlField label={t("insertImage")} kind="image" value="" onChange={(url) => { if (!url) return; const md = `\n\n![](${url})\n`; setEditing({ ...editing, body: { en: editing.body.en + md, ar: editing.body.ar + md } }); }} placeholder={t("insertImageHint")} />
+            <p className="text-xs text-muted-foreground">{t("bodyHint")}</p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="ghost" onClick={() => setEditing(null)}>{t("cancel")}</Button>
+              <Button variant="outline" onClick={() => void saveCampaign()}>{t("saveDraft")}</Button>
+              <Button variant="outline" onClick={async () => { const id = await saveCampaign(); if (id) { await sendTest({ id, locale: locale === "ar" ? "ar" : "en" }); toast.success(t("testSent")); } }}>{t("sendTest")}</Button>
+              <Button className="bg-gold-gradient text-navy-950" onClick={async () => { const id = await saveCampaign(); if (id && window.confirm(t("confirmSend", { count: active.length }))) { await sendCampaign({ id }); setEditing(null); toast.success(t("sending")); } }}>{t("send")}</Button>
+            </div>
+          </div>
+        )}
+      </Panel>
+    </div>
   );
 }
 

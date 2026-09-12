@@ -49,6 +49,23 @@ export function escapeHtml(s: string): string {
  * Sends an email through Resend. Returns the provider id, or `skipped` when
  * no API key is configured (local development).
  */
+/**
+ * Sends up to 100 emails in one Resend batch call (used by newsletter campaigns).
+ * Returns `skipped` when no API key is configured.
+ */
+export async function sendBatch(messages: { to: string; subject: string; html: string; headers?: Record<string, string> }[]): Promise<{ status: "sent" | "skipped" | "failed"; error?: string }> {
+  const key = process.env.AUTH_RESEND_KEY ?? process.env.RESEND_API_KEY;
+  if (!key) {
+    console.log(`[email skipped] batch of ${messages.length}`);
+    return { status: "skipped" };
+  }
+  if (messages.length === 0) return { status: "sent" };
+  const resend = new Resend(key);
+  const { error } = await resend.batch.send(messages.map((m) => ({ from: FROM, to: [m.to], subject: m.subject, html: m.html, headers: m.headers })));
+  if (error) return { status: "failed", error: JSON.stringify(error) };
+  return { status: "sent" };
+}
+
 export async function sendEmail(args: {
   to: string | string[];
   subject: string;
