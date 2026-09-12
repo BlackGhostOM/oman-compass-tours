@@ -299,7 +299,7 @@ export const ensureLeadForHandoff = internalMutation({
       updatedAt: Date.now(),
     });
     await ctx.db.patch(conversationId, { leadId });
-    await ctx.scheduler.runAfter(0, internal.notifications.notifyStaffNewLead, { leadId });
+    // The chat handoff email (chatEmails.notifyStaff) already carries the transcript; no separate lead email.
     return null;
   },
 });
