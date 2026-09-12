@@ -19,6 +19,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { LocalizedField, LocalizedListField, PageHeader, Panel } from "@/components/admin/ui";
+import { MediaUrlField } from "@/components/admin/media-url-field";
 
 type TourDoc = Doc<"tours"> & { media: (Doc<"tourMedia"> & { url: string | null })[]; seasons: Doc<"pricingSeasons">[]; availability: Doc<"availability">[]; addOns: Doc<"addOns">[] };
 type Itinerary = { time?: string; title: LocalizedString; body: LocalizedString };
@@ -330,8 +331,8 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
                 ))}
               </ul>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5"><Label>{t("coverUrl")}</Label><Input value={f.coverUrl} onChange={(e) => set("coverUrl", e.target.value)} dir="ltr" placeholder="/media/placeholders/muscat.jpg" /></div>
-                <div className="space-y-1.5"><Label>{t("videoUrl")}</Label><Input value={f.videoUrl} onChange={(e) => set("videoUrl", e.target.value)} dir="ltr" placeholder="https://…/tour.mp4" /></div>
+                <MediaUrlField label={t("coverUrl")} kind="image" value={f.coverUrl} onChange={(url) => set("coverUrl", url)} placeholder="/media/placeholders/muscat.jpg" />
+                <MediaUrlField label={t("videoUrl")} kind="video" value={f.videoUrl} onChange={(url) => set("videoUrl", url)} placeholder="https://…/tour.mp4" />
               </div>
             </Panel>
           )}

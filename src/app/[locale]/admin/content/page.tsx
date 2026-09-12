@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { CsvButton, DateTime, LocalizedField, PageHeader, Panel, StatusBadge } from "@/components/admin/ui";
+import { MediaUrlField } from "@/components/admin/media-url-field";
 import { cn } from "@/lib/utils";
 
 const L = (en = "", ar = ""): LocalizedString => ({ en, ar });
@@ -40,8 +41,8 @@ function BannersTab() {
     <div className="space-y-5">
       <Panel title={t("heroMedia")}>
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5"><Label>{t("videoUrl")}</Label><Input value={video} onChange={(e) => setHeroVideo(e.target.value)} dir="ltr" placeholder="https://…/hero.mp4 (muted autoplay)" /></div>
-          <div className="space-y-1.5"><Label>{t("posterUrl")}</Label><Input value={poster} onChange={(e) => setHeroPoster(e.target.value)} dir="ltr" /></div>
+          <MediaUrlField label={t("videoUrl")} kind="video" value={video} onChange={setHeroVideo} placeholder="https://…/hero.mp4 (muted autoplay)" />
+          <MediaUrlField label={t("posterUrl")} kind="image" value={poster} onChange={setHeroPoster} />
         </div>
         <Button size="sm" className="mt-3 bg-gold-gradient text-navy-950" onClick={async () => { await setSetting({ key: "home.heroVideoUrl", value: video }); await setSetting({ key: "home.heroPosterUrl", value: poster }); toast.success(t("saved")); }}>{t("save")}</Button>
       </Panel>
@@ -69,7 +70,7 @@ function BannersTab() {
             <LocalizedField label={t("subtitle")} value={editing.subtitle ?? L()} onChange={(v) => setEditing({ ...editing, subtitle: v })} multiline rows={2} />
             <LocalizedField label={t("ctaLabel")} value={editing.ctaLabel ?? L()} onChange={(v) => setEditing({ ...editing, ctaLabel: v })} />
             <div className="grid gap-3 sm:grid-cols-3">
-              <div className="space-y-1.5"><Label>{t("imageUrl")}</Label><Input value={editing.media?.url ?? ""} onChange={(e) => setEditing({ ...editing, media: { kind: "image", url: e.target.value, alt: editing.title ?? L() } })} dir="ltr" /></div>
+              <MediaUrlField label={t("imageUrl")} kind="image" value={editing.media?.url ?? ""} onChange={(url) => setEditing({ ...editing, media: { kind: "image", url, alt: editing.title ?? L() } })} />
               <div className="space-y-1.5"><Label>{t("countdown")}</Label><Input type="datetime-local" value={editing.countdownTo ? new Date(editing.countdownTo).toISOString().slice(0, 16) : ""} onChange={(e) => setEditing({ ...editing, countdownTo: e.target.value ? new Date(e.target.value).getTime() : undefined })} /></div>
               <div className="flex items-end gap-2"><Switch checked={editing.isActive ?? true} onCheckedChange={(v) => setEditing({ ...editing, isActive: v })} /><Label>{t("active")}</Label></div>
             </div>
@@ -112,11 +113,12 @@ function BlogTab() {
           <LocalizedField label={t("slug")} value={editing.slug ?? L()} onChange={(v) => setEditing({ ...editing, slug: v })} />
           <LocalizedField label={t("excerpt")} value={editing.excerpt ?? L()} onChange={(v) => setEditing({ ...editing, excerpt: v })} multiline rows={2} />
           <LocalizedField label={t("body")} value={editing.body ?? L()} onChange={(v) => setEditing({ ...editing, body: v })} multiline rows={12} />
+          <MediaUrlField label={t("insertImage")} kind="image" value="" onChange={(url) => { if (!url) return; const body = editing.body ?? L(); const md = `\n\n![](${url})\n`; setEditing({ ...editing, body: { en: (body.en ?? "") + md, ar: (body.ar ?? "") + md } }); }} placeholder={t("insertImageHint")} />
           <div className="grid gap-3 sm:grid-cols-4">
             <div className="space-y-1.5"><Label>{t("category")}</Label><Select value={editing.category ?? "planning"} onValueChange={(v) => setEditing({ ...editing, category: v })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>{["planning", "guides", "culture", "news"].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
             <div className="space-y-1.5"><Label>{t("tags")}</Label><Input value={(editing.tags ?? []).join(", ")} onChange={(e) => setEditing({ ...editing, tags: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} dir="ltr" /></div>
             <div className="space-y-1.5"><Label>{t("author")}</Label><Input value={editing.authorName ?? ""} onChange={(e) => setEditing({ ...editing, authorName: e.target.value })} /></div>
-            <div className="space-y-1.5"><Label>{t("coverUrl")}</Label><Input value={editing.cover?.url ?? ""} onChange={(e) => setEditing({ ...editing, cover: { kind: "image", url: e.target.value, alt: editing.title ?? L() } })} dir="ltr" /></div>
+            <MediaUrlField label={t("coverUrl")} kind="image" value={editing.cover?.url ?? ""} onChange={(url) => setEditing({ ...editing, cover: { kind: "image", url, alt: editing.title ?? L() } })} />
           </div>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={async () => { await upsert({ id: editing._id, title: editing.title!, slug: editing.slug, excerpt: editing.excerpt!, body: editing.body!, cover: editing.cover, category: editing.category ?? "planning", tags: editing.tags ?? [], authorName: editing.authorName ?? "", status: "draft" }); setEditing(null); toast.success(t("saved")); }}>{t("saveDraft")}</Button>
@@ -256,7 +258,7 @@ function TeamTab() {
           <LocalizedField label={t("role")} value={editing.roleTitle ?? L()} onChange={(v) => setEditing({ ...editing, roleTitle: v })} />
           <LocalizedField label={t("bio")} value={editing.bio ?? L()} onChange={(v) => setEditing({ ...editing, bio: v })} multiline rows={3} />
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="space-y-1.5"><Label>{t("photoUrl")}</Label><Input value={editing.photo?.url ?? ""} onChange={(e) => setEditing({ ...editing, photo: { kind: "image", url: e.target.value, alt: editing.name ?? L() } })} dir="ltr" /></div>
+            <MediaUrlField label={t("photoUrl")} kind="image" value={editing.photo?.url ?? ""} onChange={(url) => setEditing({ ...editing, photo: { kind: "image", url, alt: editing.name ?? L() } })} />
             <div className="space-y-1.5"><Label>{t("languages")}</Label><Input value={(editing.languages ?? []).join(", ")} onChange={(e) => setEditing({ ...editing, languages: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} dir="ltr" /></div>
             <div className="flex items-end gap-2"><Switch checked={editing.isActive ?? true} onCheckedChange={(v) => setEditing({ ...editing, isActive: v })} /><Label>{t("active")}</Label></div>
           </div>

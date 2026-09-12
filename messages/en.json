@@ -1573,7 +1573,9 @@
         "saveDraft": "Save draft",
         "publish": "Publish",
         "saved": "Saved.",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "insertImage": "Insert an image into the text",
+        "insertImageHint": "Upload an image and it is appended to the article text"
       },
       "team": {
         "title": "Team members",
@@ -1832,6 +1834,14 @@
       },
       "noDataRequests": "No privacy requests.",
       "dataHint": "Process export/deletion requests within 30 days (Oman PDPL). Deletion: anonymise the user record and keep booking records required for accounting."
+    },
+    "media": {
+      "upload": "Upload",
+      "uploading": "Uploading…",
+      "uploaded": "File uploaded and linked.",
+      "error": "Upload failed. Please try again.",
+      "wrongType": "That file type is not allowed here.",
+      "tooLarge": "The file is larger than {mb} MB."
     }
   },
   "chat": {
