@@ -8,6 +8,7 @@ import { ArrowLeft, ArrowUp, ArrowDown, ImagePlus, Plus, Star, Trash2 } from "lu
 import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
+import { useSearchParams } from "next/navigation";
 import { Link, useRouter } from "@/i18n/navigation";
 import { pick, type LocalizedString } from "@/lib/content";
 import { Button } from "@/components/ui/button";
@@ -85,6 +86,8 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
   const locale = useLocale();
   const t = useTranslations("admin.products.editor");
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<string>(() => searchParams.get("tab") ?? "content");
   const upsert = useMutation(api.admin.products.upsert);
   const addMedia = useMutation(api.admin.products.addMedia);
   const removeMedia = useMutation(api.admin.products.removeMedia);
@@ -103,6 +106,11 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((s) => ({ ...s, [k]: v }));
 
   async function save(nextStatus?: "draft" | "published") {
+    if (!f.code.trim() || !(f.title.en.trim() || f.title.ar.trim()) || !f.categoryId) {
+      toast.error(t("missingRequired"));
+      setTab("content");
+      return;
+    }
     setBusy(true);
     try {
       const num = (x: string) => (x.trim() === "" ? undefined : Number(x));
@@ -123,7 +131,7 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
         },
       });
       toast.success(t("saved"));
-      if (!tour) router.replace(`/admin/products/${id}`);
+      if (!tour) router.replace(`/admin/products/${id}?tab=${tab}`);
       else if (nextStatus) set("status", nextStatus);
     } catch (err) {
       const code = err instanceof ConvexError ? (err.data as { code?: string; field?: string }) : undefined;
@@ -167,13 +175,13 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
         }
       />
 
-      <Tabs defaultValue="content">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="flex-wrap">
           <TabsTrigger value="content">{t("tabs.content")}</TabsTrigger>
           <TabsTrigger value="details">{t("tabs.details")}</TabsTrigger>
           <TabsTrigger value="pricing">{t("tabs.pricing")}</TabsTrigger>
-          <TabsTrigger value="media" disabled={!tour}>{t("tabs.media")}</TabsTrigger>
-          <TabsTrigger value="availability" disabled={!tour}>{t("tabs.availability")}</TabsTrigger>
+          <TabsTrigger value="media">{t("tabs.media")}</TabsTrigger>
+          <TabsTrigger value="availability">{t("tabs.availability")}</TabsTrigger>
           <TabsTrigger value="seo">{t("tabs.seo")}</TabsTrigger>
         </TabsList>
 
@@ -314,6 +322,13 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
         </TabsContent>
 
         <TabsContent value="media" className="space-y-5 pt-4">
+          <Panel title={t("tabs.media")}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <MediaUrlField label={t("coverUrl")} kind="image" value={f.coverUrl} onChange={(url) => set("coverUrl", url)} placeholder="/media/placeholders/muscat.jpg" />
+              <MediaUrlField label={t("videoUrl")} kind="video" value={f.videoUrl} onChange={(url) => set("videoUrl", url)} placeholder="https://…/tour.mp4" />
+            </div>
+          </Panel>
+          {!tour && <SaveFirstNotice text={t("saveFirst")} cta={t("saveDraftContinue")} busy={busy} onSave={() => save("draft")} />}
           {tour && (
             <Panel title={t("gallery")} actions={<label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-muted"><ImagePlus className="size-4" /> {uploading ? t("uploading") : t("upload")}<input type="file" multiple accept="image/*,video/*" className="hidden" onChange={(e) => upload(e.target.files)} /></label>}>
               <p className="mb-3 text-xs text-muted-foreground">{t("galleryHint")}</p>
@@ -330,15 +345,12 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
                   </li>
                 ))}
               </ul>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <MediaUrlField label={t("coverUrl")} kind="image" value={f.coverUrl} onChange={(url) => set("coverUrl", url)} placeholder="/media/placeholders/muscat.jpg" />
-                <MediaUrlField label={t("videoUrl")} kind="video" value={f.videoUrl} onChange={(url) => set("videoUrl", url)} placeholder="https://…/tour.mp4" />
-              </div>
             </Panel>
           )}
         </TabsContent>
 
         <TabsContent value="availability" className="space-y-5 pt-4">
+          {!tour && <SaveFirstNotice text={t("saveFirst")} cta={t("saveDraftContinue")} busy={busy} onSave={() => save("draft")} />}
           {tour && (
             <Panel title={t("availabilityTitle")}>
               <p className="mb-3 text-xs text-muted-foreground">{t("availabilityHint", { capacity: tour.defaultCapacityPerSlot })}</p>
@@ -380,6 +392,15 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
           </Panel>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function SaveFirstNotice({ text, cta, busy, onSave }: { text: string; cta: string; busy: boolean; onSave: () => void }) {
+  return (
+    <div className="flex flex-col items-start gap-3 rounded-xl border border-dashed border-gold-500/50 bg-gold-500/5 p-5 text-sm text-foreground sm:flex-row sm:items-center sm:justify-between">
+      <p>{text}</p>
+      <Button size="sm" disabled={busy} onClick={onSave} className="bg-gold-gradient text-navy-950">{cta}</Button>
     </div>
   );
 }

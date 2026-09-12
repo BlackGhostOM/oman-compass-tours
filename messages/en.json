@@ -1400,7 +1400,10 @@
         "seoDescription": "Meta description",
         "tags": "Tags",
         "externalReviews": "External review count",
-        "back": "Back to products"
+        "back": "Back to products",
+        "saveFirst": "Save the product as a draft first; then you can upload gallery photos and videos and manage availability here.",
+        "saveDraftContinue": "Save draft & continue",
+        "missingRequired": "Fill in the required fields first: code, title and main category."
       }
     },
     "customers": {

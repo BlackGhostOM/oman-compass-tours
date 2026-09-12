@@ -108,8 +108,11 @@ export const upsert = mutation({
     assertInt(data.freeCancellationHours, 0, 720, "freeCancellationHours");
     assertInt(data.holdHours, 1, 168, "holdHours");
     assertInt(data.durationDays, 1, 60, "durationDays");
-    if (data.pricingModel === "per_group" && !data.priceGroupOmr) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "priceGroupOmr" });
-    if (data.pricingModel === "per_person" && !data.priceAdultOmr) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "priceAdultOmr" });
+    // Drafts may be saved before pricing is decided; a price is required only to publish.
+    if (data.status === "published") {
+      if (data.pricingModel === "per_group" && !data.priceGroupOmr) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "priceGroupOmr" });
+      if (data.pricingModel === "per_person" && !data.priceAdultOmr) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "priceAdultOmr" });
+    }
     const priceGroup = omr(data.priceGroupOmr);
     const priceAdult = omr(data.priceAdultOmr);
     const priceChild = omr(data.priceChildOmr);
@@ -129,7 +132,7 @@ export const upsert = mutation({
       priceGroup,
       priceAdult,
       priceChild,
-      priceFrom: data.pricingModel === "per_group" ? priceGroup! : priceAdult!,
+      priceFrom: (data.pricingModel === "per_group" ? priceGroup : priceAdult) ?? 0, // 0 only for drafts without a price yet
       compareAtPriceFrom: omr(compareAtPriceFromOmr),
       searchText: `${data.title.en} ${data.title.ar} ${data.summary.en} ${data.summary.ar} ${data.tags.join(" ")}`,
       updatedAt: Date.now(),
