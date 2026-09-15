@@ -22,6 +22,7 @@ export const footerCompany = [
   { key: "bookingMethods", href: "/booking-methods" },
   { key: "contact", href: "/contact" },
   { key: "policies", href: "/policies" },
+  { key: "faq", href: "/faq" },
   { key: "account", href: "/account" },
 ] as const;
 

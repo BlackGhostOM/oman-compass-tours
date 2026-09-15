@@ -22,7 +22,8 @@
     "policies": "Policies",
     "account": "My Account",
     "signIn": "Sign in",
-    "openMenu": "Open menu"
+    "openMenu": "Open menu",
+    "faq": "FAQ"
   },
   "common": {
     "bookNow": "Book Now",
@@ -1945,5 +1946,17 @@
     "marketingHint": "Measures our campaigns and personalises ads.",
     "settings": "Cookie settings",
     "short": "Essential cookies only, unless you allow analytics or marketing."
+  },
+  "faq": {
+    "metaTitle": "FAQ · Oman Compass Tours",
+    "metaDescription": "Answers to the questions travellers ask us most: booking and payments, private tours, vehicles, guides, prices, travel tips and policies.",
+    "eyebrow": "Help centre",
+    "title": "Frequently asked questions",
+    "description": "Everything about booking with Oman Compass Tours, from deposits and vehicles to what to wear in a wadi. Still unsure? Our team answers on WhatsApp within minutes.",
+    "sections": "Sections",
+    "ctaTitle": "Didn't find your answer?",
+    "ctaBody": "Message us on WhatsApp or send a note from the contact page; a team member replies during office hours, and our assistant in the chat bubble answers instantly at any time.",
+    "ctaWhatsapp": "Chat on WhatsApp",
+    "ctaContact": "Contact page"
   }
 }

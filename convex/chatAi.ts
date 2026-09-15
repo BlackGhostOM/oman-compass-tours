@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import { internalAction } from "./_generated/server";
+import { faqAsText } from "./lib/faq";
 
 type KB = {
   tours: { code: string; title: { en: string; ar: string }; slug: { en: string; ar: string }; summary: { en: string; ar: string }; durationLabel: { en: string; ar: string }; pricingModel: string; priceFrom: number; priceAdult: number | null; priceChild: number | null; priceGroup: number | null; maxGroup: number; startTimes: string[]; freeCancellationHours: number; depositPercent: number; inclusions: string[]; pickupIncluded: boolean }[];
@@ -38,7 +39,10 @@ CATALOGUE
 ${tours}
 
 POLICIES (summary)
-${kb.policies}`;
+${kb.policies}
+
+FREQUENTLY ASKED QUESTIONS (official answers; reuse their wording when relevant)
+${faqAsText(locale)}`;
 }
 
 /** Rule-based fallback when ANTHROPIC_API_KEY is not configured (local dev). */

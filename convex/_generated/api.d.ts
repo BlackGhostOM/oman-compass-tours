@@ -44,6 +44,7 @@ import type * as http from "../http.js";
 import type * as leads from "../leads.js";
 import type * as lib_access from "../lib/access.js";
 import type * as lib_email from "../lib/email.js";
+import type * as lib_faq from "../lib/faq.js";
 import type * as lib_ids from "../lib/ids.js";
 import type * as lib_markdown from "../lib/markdown.js";
 import type * as lib_money from "../lib/money.js";
@@ -110,6 +111,7 @@ declare const fullApi: ApiFromModules<{
   leads: typeof leads;
   "lib/access": typeof lib_access;
   "lib/email": typeof lib_email;
+  "lib/faq": typeof lib_faq;
   "lib/ids": typeof lib_ids;
   "lib/markdown": typeof lib_markdown;
   "lib/money": typeof lib_money;
