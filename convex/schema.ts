@@ -548,6 +548,7 @@ export default defineSchema({
         clientTypes: v.array(v.string()),
         bookingsPerYear: v.optional(v.string()),
         interests: v.array(v.string()),
+        message: v.optional(v.string()),
       }),
     ),
     tourId: v.optional(v.id("tours")),

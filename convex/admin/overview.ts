@@ -55,7 +55,9 @@ export const stats = query({
     const capacityToday = tours.reduce((a, t) => a + t.defaultCapacityPerSlot * t.startTimes.length, 0);
     const bookedToday = active(todays).reduce((a, b) => a + (b.pricingModel === "per_group" ? 1 : b.groupSize), 0);
 
-    const openLeads = await ctx.db.query("leads").withIndex("by_status", (q) => q.eq("status", "new")).take(200);
+    const openAll = await ctx.db.query("leads").withIndex("by_status", (q) => q.eq("status", "new")).take(300);
+    const openLeads = openAll.filter((l) => l.source !== "partner");
+    const openPartners = openAll.length - openLeads.length;
     const overdueLeads = openLeads.filter((l) => l.slaDueAt < now).length;
     const waiting = await ctx.db.query("conversations").withIndex("by_status", (q) => q.eq("status", "waiting_human")).take(100);
     const human = await ctx.db.query("conversations").withIndex("by_status", (q) => q.eq("status", "human")).take(200);
@@ -73,6 +75,7 @@ export const stats = query({
       topTours,
       occupancy: { booked: bookedToday, capacity: capacityToday },
       openLeads: openLeads.length,
+      openPartners,
       overdueLeads,
       waitingChats: waiting.length,
       unreadInbox,

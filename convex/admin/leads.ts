@@ -19,6 +19,7 @@ export const list = query({
     const people = [...staff, ...admins, ...owners];
     const now = Date.now();
     return rows
+      .filter((l) => l.source !== "partner")
       .filter((l) => !assigneeId || l.assigneeId === assigneeId)
       .map((l) => ({
         _id: l._id,

@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useQuery } from "convex/react";
-import { BarChart3, CalendarCheck, CreditCard, FileText, Inbox, LayoutDashboard, Map, MessageSquareWarning, Package, ScrollText, Settings, Star, Users } from "lucide-react";
+import { BarChart3, CalendarCheck, CreditCard, FileText, Handshake, Inbox, LayoutDashboard, Map, MessageSquareWarning, Package, ScrollText, Settings, Star, Users } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Link } from "@/i18n/navigation";
 import { DashboardShell, type NavItem } from "@/components/dashboard/dashboard-shell";
@@ -32,6 +32,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     { key: "products", href: "/admin/products", Icon: Package },
     { key: "customers", href: "/admin/customers", Icon: Users },
     { key: "leads", href: "/admin/leads", Icon: Map, badge: stats?.openLeads || undefined },
+    { key: "partners", href: "/admin/partners", Icon: Handshake, badge: stats?.openPartners || undefined },
     { key: "inbox", href: "/admin/inbox", Icon: Inbox, badge: stats?.unreadInbox || undefined },
     { key: "reviews", href: "/admin/reviews", Icon: Star, badge: stats?.pendingReviews || undefined },
     { key: "content", href: "/admin/content", Icon: FileText },

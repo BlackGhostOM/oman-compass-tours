@@ -1109,7 +1109,8 @@
       "payments": "Payments",
       "reports": "Reports",
       "settings": "Settings",
-      "audit": "Audit log"
+      "audit": "Audit log",
+      "partners": "Partners"
     },
     "status": {
       "inquiry": "Inquiry",
@@ -1908,6 +1909,27 @@
       "error": "Upload failed. Please try again.",
       "wrongType": "That file type is not allowed here.",
       "tooLarge": "The file is larger than {mb} MB."
+    },
+    "partners": {
+      "eyebrow": "B2B",
+      "title": "Partnership requests",
+      "subtitle": "Travel agencies, tour operators, advisors and corporate partners who registered through the Partners page.",
+      "exportCsv": "Export CSV",
+      "all": "All",
+      "empty": "No partnership requests yet.",
+      "responded": "Responded",
+      "overdueBy": "Overdue by {min} min",
+      "dueIn": "Due in {min} min",
+      "slaBreached": "SLA breached",
+      "assign": "Assign",
+      "unassigned": "Unassigned",
+      "updated": "Updated.",
+      "email": "Email",
+      "remove": "Delete",
+      "confirmRemove": "Delete this partnership request?",
+      "removed": "Request deleted.",
+      "notesPlaceholder": "Internal note…",
+      "saveNote": "Save"
     }
   },
   "chat": {

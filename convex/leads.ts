@@ -24,6 +24,7 @@ const partnerProfile = v.object({
   clientTypes: v.array(v.string()),
   bookingsPerYear: v.optional(v.string()),
   interests: v.array(v.string()),
+  message: v.optional(v.string()),
 });
 
 /** B2B partnership registration from /partners. Stored as a lead with a structured partner profile. */
@@ -32,12 +33,11 @@ export const createPartnerRequest = mutation({
     name: v.string(),
     email: v.string(),
     phone: v.string(),
-    message: v.optional(v.string()),
     locale: localeValidator,
     pagePath: v.optional(v.string()),
     turnstileToken: v.optional(v.string()),
     honeypot: v.optional(v.string()),
-    ...partnerProfile.fields,
+    ...partnerProfile.fields, // includes the optional free-text message
   },
   returns: v.object({ ok: v.boolean(), leadId: v.id("leads") }),
   handler: async (ctx, args) => {
@@ -61,6 +61,7 @@ export const createPartnerRequest = mutation({
       clientTypes: list(args.clientTypes),
       bookingsPerYear: clip(args.bookingsPerYear, 20),
       interests: list(args.interests),
+      message: clip(args.message, 4000),
     };
     const summary = `Partnership request · ${partner.businessType}${partner.company ? ` · ${partner.company}` : ""} · ${partner.city}, ${partner.country}\nInterests: ${partner.interests.join(", ") || "-"}\nMarkets: ${partner.markets.join(", ") || "-"} · Clients: ${partner.clientTypes.join(", ") || "-"} · Bookings/yr: ${partner.bookingsPerYear ?? "-"}${partner.website ? `\nWebsite: ${partner.website}` : ""}${args.message ? `\n\n${args.message.trim().slice(0, 4000)}` : ""}`;
     const leadId = await ctx.db.insert("leads", {
