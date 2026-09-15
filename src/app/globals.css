@@ -364,7 +364,7 @@ html[lang="ar"] {
   html[lang="ar"] .nav-link {
     font-size: 16px;
   }
-  @media (min-width: 96rem) {
+  @media (min-width: 100rem) {
     .nav-link {
       font-size: 14px;
     }

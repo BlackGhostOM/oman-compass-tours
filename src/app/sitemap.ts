@@ -3,7 +3,7 @@ import { fetchQuery } from "convex/nextjs";
 import { api } from "../../convex/_generated/api";
 import { site } from "@/lib/site";
 
-const staticPaths = ["", "/tours", "/services", "/destinations", "/about", "/contact", "/booking-methods", "/faq", "/blog", "/plan-my-trip", "/policies/terms", "/policies/cancellation", "/policies/refund", "/policies/privacy", "/policies/cookies", "/policies/waiver", "/policies/child", "/policies/payment"];
+const staticPaths = ["", "/tours", "/services", "/destinations", "/about", "/contact", "/booking-methods", "/faq", "/partners", "/blog", "/plan-my-trip", "/policies/terms", "/policies/cancellation", "/policies/refund", "/policies/privacy", "/policies/cookies", "/policies/waiver", "/policies/child", "/policies/payment"];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = site.url;

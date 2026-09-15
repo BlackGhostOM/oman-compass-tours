@@ -23,7 +23,8 @@
     "account": "My Account",
     "signIn": "Sign in",
     "openMenu": "Open menu",
-    "faq": "FAQ"
+    "faq": "FAQ",
+    "partners": "Partners"
   },
   "common": {
     "bookNow": "Book Now",
@@ -1971,5 +1972,231 @@
     "ctaBody": "Message us on WhatsApp or send a note from the contact page; a team member replies during office hours, and our assistant in the chat bubble answers instantly at any time.",
     "ctaWhatsapp": "Chat on WhatsApp",
     "ctaContact": "Contact page"
+  },
+  "partners": {
+    "metaTitle": "Partner With Us · Oman DMC & Tour Operator",
+    "metaDescription": "Travel agencies, tour operators, advisors and corporate partners: work with Oman Compass Tours as your local DMC. B2B net rates, tailor-made programs and reliable ground operations across Oman.",
+    "hero": {
+      "eyebrow": "Oman DMC & tour operator",
+      "title": "Partner with us",
+      "subtitle": "Your local partner for tailor-made travel in Oman",
+      "body": "Join our growing network of travel agencies, tour operators, travel professionals and strategic partners around the world. As an Oman-based DMC and tour operator, we provide reliable local operations, tailor-made programs and competitive B2B solutions.",
+      "cta": "Become a partner",
+      "whatsapp": "Talk to us on WhatsApp"
+    },
+    "who": {
+      "eyebrow": "Who we work with",
+      "title": "Built for travel professionals",
+      "description": "We welcome individuals and organisations looking to develop and sell Oman travel experiences with a reliable local partner.",
+      "items": {
+        "agencies": {
+          "title": "Travel agencies",
+          "body": "Add Oman to your destination portfolio."
+        },
+        "operators": {
+          "title": "Tour operators",
+          "body": "Work with a reliable Oman ground partner."
+        },
+        "advisors": {
+          "title": "Travel advisors",
+          "body": "Create customised Oman trips for your clients."
+        },
+        "corporate": {
+          "title": "Corporate & MICE",
+          "body": "Arrange corporate travel, incentives and groups."
+        },
+        "hotels": {
+          "title": "Hotels & hospitality",
+          "body": "Develop joint travel experiences."
+        },
+        "independent": {
+          "title": "Independent travel partners",
+          "body": "Qualified professionals with access to Oman-bound travellers."
+        }
+      }
+    },
+    "why": {
+      "eyebrow": "Why partner with us",
+      "title": "Why partner with Oman Compass Tours",
+      "items": {
+        "expertise": {
+          "title": "Local expertise",
+          "body": "Authentic knowledge of Oman, its destinations, culture and experiences."
+        },
+        "rates": {
+          "title": "B2B rates",
+          "body": "Competitive net rates designed for professional travel partners."
+        },
+        "tailorMade": {
+          "title": "Tailor-made programs",
+          "body": "Flexible itineraries adapted to your clients' requirements."
+        },
+        "operations": {
+          "title": "Reliable operations",
+          "body": "Transportation, accommodation, guides and activities arranged locally."
+        },
+        "support": {
+          "title": "Professional support",
+          "body": "A dedicated local team to assist before and during every trip."
+        },
+        "onePartner": {
+          "title": "One local partner",
+          "body": "One point of contact for the complete Oman ground operation."
+        }
+      }
+    },
+    "services": {
+      "eyebrow": "Our DMC services",
+      "title": "A complete range of local services",
+      "description": "For FIT, private, group and tailor-made travel programs.",
+      "items": {
+        "private": "Private tours",
+        "group": "Group tours",
+        "fit": "FIT programs",
+        "luxury": "Luxury travel",
+        "adventure": "Adventure travel",
+        "cultural": "Cultural experiences",
+        "transport4wd": "4WD transportation",
+        "selfDrive": "4WD self-drive rentals",
+        "hotels": "Hotels & resorts",
+        "camps": "Desert camps",
+        "airport": "Airport transfers",
+        "intercity": "Intercity transfers",
+        "guides": "Omani experience guides",
+        "dhow": "Dhow cruises",
+        "marine": "Snorkelling & marine experiences",
+        "custom": "Customised itineraries"
+      }
+    },
+    "models": {
+      "eyebrow": "Partnership models",
+      "title": "Three ways to work together",
+      "items": {
+        "agency": {
+          "title": "Travel agency / tour operator",
+          "body": "Sell Oman programs to your clients while we manage the local operation.",
+          "points": "B2B net rates | Customised quotations | FIT & group handling | Accommodation arrangements | Local transportation | On-ground support"
+        },
+        "advisor": {
+          "title": "Travel professional / advisor",
+          "body": "Create customised Oman experiences for your clients with our local support.",
+          "points": "Partner rates | Flexible itineraries | Dedicated assistance | Commission opportunities | Direct communication"
+        },
+        "strategic": {
+          "title": "Strategic partner",
+          "body": "Explore long-term cooperation opportunities with Oman Compass Tours.",
+          "points": "Hotels & resorts | Tourism companies | Activity providers | Corporate travel partners | International tourism networks"
+        }
+      }
+    },
+    "how": {
+      "eyebrow": "How it works",
+      "title": "From registration to selling Oman in five steps",
+      "steps": {
+        "register": {
+          "title": "Register",
+          "body": "Complete the partnership registration form below."
+        },
+        "review": {
+          "title": "Review",
+          "body": "Our team reviews your business or partnership profile."
+        },
+        "connect": {
+          "title": "Connect",
+          "body": "We contact you to discuss the most suitable cooperation model."
+        },
+        "info": {
+          "title": "Receive partner information",
+          "body": "B2B information, rates and partnership terms."
+        },
+        "sell": {
+          "title": "Start selling Oman",
+          "body": "Create and operate memorable Oman experiences with us."
+        }
+      }
+    },
+    "form": {
+      "eyebrow": "Partnership registration",
+      "title": "Tell us about your business",
+      "description": "It takes two minutes. A member of our team replies within one working day.",
+      "footer": "Prefer to talk first?",
+      "contactTitle": "Contact information",
+      "name": "Full name",
+      "company": "Company name",
+      "country": "Country",
+      "city": "City",
+      "email": "Email address",
+      "phone": "Phone / WhatsApp",
+      "website": "Website / social media",
+      "select": "Select…",
+      "businessTitle": "Business information",
+      "businessType": "I am a",
+      "markets": "Main markets",
+      "clientTypes": "Client types",
+      "bookingsPerYear": "Estimated Oman bookings per year",
+      "businessTypes": {
+        "travel_agency": "Travel agency",
+        "tour_operator": "Tour operator",
+        "travel_advisor": "Travel advisor",
+        "corporate_mice": "Corporate / MICE",
+        "hotel_resort": "Hotel / resort",
+        "tourism_business": "Tourism business",
+        "independent": "Independent travel professional",
+        "other": "Other"
+      },
+      "marketOptions": {
+        "europe": "Europe",
+        "gcc": "GCC",
+        "usa_canada": "USA & Canada",
+        "asia": "Asia",
+        "australia_nz": "Australia & New Zealand",
+        "other": "Other"
+      },
+      "clientOptions": {
+        "luxury": "Luxury",
+        "families": "Families",
+        "adventure": "Adventure",
+        "cultural": "Cultural",
+        "fit": "FIT",
+        "groups": "Groups",
+        "corporate_mice": "Corporate / MICE"
+      },
+      "bookingOptions": {
+        "1_10": "1–10",
+        "11_30": "11–30",
+        "31_100": "31–100",
+        "100_plus": "100+"
+      },
+      "interestTitle": "Partnership interest",
+      "interestOptions": {
+        "sell_tours": "Sell Oman tours",
+        "net_rates": "Request B2B net rates",
+        "commission": "Commission-based partnership",
+        "ground_handling": "Ground handling / DMC",
+        "rental_4wd": "4WD rental partnership",
+        "custom_programs": "Customised programs",
+        "group_operations": "Group operations",
+        "other": "Other"
+      },
+      "message": "Tell us about your business or partnership requirements",
+      "messagePlaceholder": "Markets you serve, typical group sizes, seasons, what you need from a local partner…",
+      "consent": "I agree to be contacted by Oman Compass Tours regarding partnership opportunities.",
+      "submit": "Submit partnership request",
+      "sending": "Sending…",
+      "doneTitle": "Thank you for your interest in partnering with us",
+      "doneBody": "Your partnership request has been received. Our team will review your information and contact you to discuss the most suitable cooperation opportunities. We look forward to building a successful partnership with you in Oman.",
+      "error": "We could not send your request. Please try again or contact us on WhatsApp.",
+      "rateLimited": "Too many attempts. Please try again later.",
+      "errors": {
+        "name": "Please enter your full name.",
+        "country": "Please choose your country.",
+        "city": "Please enter your city.",
+        "email": "Please enter a valid email address.",
+        "phone": "Please enter a valid phone number.",
+        "interests": "Choose at least one partnership interest.",
+        "consent": "Please confirm you agree to be contacted.",
+        "generic": "Please check this field."
+      }
+    }
   }
 }
