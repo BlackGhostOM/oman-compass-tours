@@ -128,24 +128,37 @@
     "why": {
       "eyebrow": "Why travel with us",
       "title": "Why Oman Compass Tours",
-      "description": "Ten years of guiding, one promise: you see the real Oman, safely and at your own pace.",
+      "description": "Ten years of guiding, one promise: you see the real Oman, safely, comfortably and at your own pace.",
       "items": {
-        "licensed": {
-          "title": "Licensed operator",
-          "body": "Fully licensed by the Ministry of Heritage & Tourism (no. 1440944), insured vehicles and certified guides."
+        "hidden": {
+          "title": "Hidden gems",
+          "body": "Go beyond the usual sights to places known mainly to locals: quiet wadis, mountain villages and family homes that make your journey truly your own."
         },
         "guides": {
-          "title": "Local expert guides",
-          "body": "Born-and-raised Omani guides who know the wadis, the villages and the families behind every stop."
+          "title": "Local expertise, authentic experiences",
+          "body": "Born-and-raised Omani guides share the culture, traditions, history and everyday life of Oman while you explore its landscapes safely."
         },
-        "private": {
-          "title": "Private & customisable",
-          "body": "Every departure is yours alone. Change the pace, add a stop, skip a stop — the itinerary follows you."
+        "comfort": {
+          "title": "Comfort, safety and convenience",
+          "body": "Modern air-conditioned 4WD vehicles, professional guidance at every step, and complimentary Wi-Fi on selected multi-day tours."
         },
-        "support": {
-          "title": "24/7 support",
-          "body": "WhatsApp, phone and live chat before, during and after your trip, in English and Arabic."
+        "flexible": {
+          "title": "Flexible and fully private",
+          "body": "Every departure is yours alone. Adjust the itinerary, add a destination or change the pace; the trip follows your interests and schedule."
+        },
+        "service": {
+          "title": "Personal care, start to finish",
+          "body": "Clear communication before you book, WhatsApp support during the trip and a team that stays in touch afterwards, in English and Arabic."
+        },
+        "pricing": {
+          "title": "Fair, transparent pricing",
+          "body": "Prices in line with the Omani market with no hidden charges: the value you pay for is the quality, safety and comfort you get."
         }
+      },
+      "trust": {
+        "licensed": "Licensed by the Ministry of Heritage & Tourism, no. 1440944",
+        "insured": "Insured vehicles",
+        "guides": "Certified local guides"
       }
     },
     "destinations": {

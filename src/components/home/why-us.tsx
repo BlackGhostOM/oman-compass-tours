@@ -1,13 +1,15 @@
 import { getTranslations } from "next-intl/server";
-import { BadgeCheck, Headset, MapPinned, Sparkles } from "lucide-react";
+import { BadgeCheck, Car, Gem, HeartHandshake, MapPinned, ShieldCheck, SlidersHorizontal, Tags } from "lucide-react";
 import { SectionHeading } from "@/components/shared/section-heading";
 import { CompassWatermark } from "@/components/brand/compass-rose";
 
 const items = [
-  { key: "licensed", Icon: BadgeCheck },
+  { key: "hidden", Icon: Gem },
   { key: "guides", Icon: MapPinned },
-  { key: "private", Icon: Sparkles },
-  { key: "support", Icon: Headset },
+  { key: "comfort", Icon: Car },
+  { key: "flexible", Icon: SlidersHorizontal },
+  { key: "service", Icon: HeartHandshake },
+  { key: "pricing", Icon: Tags },
 ] as const;
 
 export async function WhyUs() {
@@ -17,7 +19,7 @@ export async function WhyUs() {
       <CompassWatermark opacity={0.04} className="translate-x-1/3" />
       <div className="container-brand relative">
         <SectionHeading eyebrow={t("eyebrow")} title={t("title")} description={t("description")} tone="dark" />
-        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {items.map(({ key, Icon }) => (
             <div key={key} className="card-dark group p-6 transition hover:border-gold-500/60">
               <div className="flex size-12 items-center justify-center rounded-lg bg-gold-gradient text-navy-950 shadow-gold">
@@ -29,6 +31,11 @@ export async function WhyUs() {
             </div>
           ))}
         </div>
+        <ul className="mt-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-sand-100/75">
+          <li className="inline-flex items-center gap-2"><BadgeCheck className="size-4 text-gold-400" /> {t("trust.licensed")}</li>
+          <li className="inline-flex items-center gap-2"><ShieldCheck className="size-4 text-gold-400" /> {t("trust.insured")}</li>
+          <li className="inline-flex items-center gap-2"><MapPinned className="size-4 text-gold-400" /> {t("trust.guides")}</li>
+        </ul>
       </div>
     </section>
   );
