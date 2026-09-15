@@ -6,13 +6,13 @@ Decisions that need the owner's input. Each one has a **default already applied*
 | --- | --- | --- | --- |
 | 1 | Prices for tours 6–10 (Traditional Dinner, 2-Day Jabal Akhdar, 3-Day, 6-Day, 8-Day) were `[[PRICE]]` in the brief. | Dinner **OMR 45 / group**; 2-Day **OMR 185 / person**; 3-Day **OMR 295 / person**; 6-Day **OMR 590 / person**; 8-Day **OMR 790 / person** — clearly placeholder. | Admin → Products → edit tour pricing |
 | 2 | Tours 1–5 are priced in USD on Viator. Base currency is OMR; the seed converts at the pegged rate (1 OMR = 2.6008 USD) and rounds to the nearest OMR. | e.g. $230 → OMR 88; $179 → OMR 69; $188 → OMR 72; $197 → OMR 76; $300 → OMR 115 | Admin → Products |
-| 3 | Deposit percentage per tour. | Day tours: 100 % (full payment). Multi-day: 30 % deposit, balance due 7 days before departure. | Admin → Products → Pricing |
+| 3 | Deposit percentage per tour. | **Resolved 2026-09-15:** 35 % deposit on every tour (full payment optional); the balance is paid to the guide at the start of the trip, per the official Payment Terms. | Admin → Products → Pricing |
 | 4 | Reserve-now-pay-later hold duration. | 24 hours for day tours, 48 hours for multi-day packages. | Admin → Settings → Booking |
 | 5 | Which Google Maps embed to use — the address in the brief did not include coordinates. | Query-based embed for "Oman Compass Tours, Bawshar, Muscat" (no API key needed). | `src/lib/site.ts` → `geo`, `mapsEmbedUrl` |
 | 6 | Social media handles (Instagram, Snapchat, TikTok, Facebook, X) were not provided. | `omancompasstours` on every network. | `src/lib/site.ts` → `social` or Admin → Settings → Company |
 | 7 | Viator listing URL. | Generic Viator Muscat page until the exact product URL is provided. | `src/lib/site.ts` → `viatorUrl` |
 | 8 | Team members beyond guide Musab (photos, bios, names). | Seeded: Musab (Senior Guide) + two placeholder profiles marked "placeholder". | Admin → Content → Team |
-| 9 | Legal text for the eight policies. | Professional placeholder drafts marked **FOR LEGAL REVIEW** in both languages. Version 1 seeded. | Admin → Settings → Policies |
+| 9 | Legal text for the eight policies. | Payment, cancellation, refund and waiver now carry the official wording supplied by the owner (2026-09-15). Terms, privacy, cookies and child policy remain placeholder drafts marked **FOR LEGAL REVIEW**. | Admin → Settings → Policies |
 | 10 | Thawani account: production keys and webhook secret; whether OmanNet debit cards should be routed via Thawani only. | UAT sandbox mode; Thawani default for OM/GCC visitors, Stripe otherwise. | Convex env vars (`THAWANI_*`) |
 | 11 | Company profile PDF for the About page download slot. | Slot renders a "coming soon" state until a PDF is uploaded. | Admin → Content → Company profile |
 | 12 | Hero background video. | Uses a still poster with slow zoom until a video is uploaded (autoplay video is wired and muted). | Admin → Content → Home hero |

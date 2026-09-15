@@ -1,3 +1,4 @@
+import { POLICY_TEXTS } from "./policyTexts2026";
 type L = { en: string; ar: string };
 
 export type PolicySeed = {
@@ -89,40 +90,8 @@ Oman Compass Tours Company · +968 9225 5028 · omancompasstours@gmail.com`,
     requiredAtCheckout: true,
     title: { en: "Booking & Cancellation Policy", ar: "سياسة الحجز والإلغاء" },
     body: {
-      en: `${legalNotice.en}## Free cancellation
-Most day tours and transfers can be cancelled **free of charge up to 24 hours** before the start time. Multi-day packages can be cancelled free of charge up to **72 hours** (2-day and 3-day) or **7 days** (6-day and 8-day) before departure. The exact window is shown on each tour page and on your voucher.
-
-## Late cancellation and no-show
-Cancellations inside the free window, and failure to appear at the pickup point, are charged at 100 % of the booking value.
-
-## How to cancel
-Cancel from **My Account → My Bookings**, or contact us on WhatsApp +968 9225 5028 or omancompasstours@gmail.com quoting your booking reference. The time we receive your message (Oman time) determines eligibility.
-
-## Changes
-Date, time and group-size changes are free when requested before the free-cancellation deadline and subject to availability. Price differences apply.
-
-## Reserve now, pay later
-Holds expire automatically at the time shown in your confirmation email (24–48 hours). An expired hold is not a booking and carries no charge.
-
-## Cancellation by us
-If we cancel for weather, safety or operational reasons, you receive a full refund or a free rebooking — your choice.`,
-      ar: `${legalNotice.ar}## الإلغاء المجاني
-يمكن إلغاء معظم الجولات اليومية وخدمات النقل **مجانًا حتى 24 ساعة** قبل موعد البدء. ويمكن إلغاء الباقات متعددة الأيام مجانًا حتى **72 ساعة** (باقات اليومين والثلاثة أيام) أو **7 أيام** (باقات الستة والثمانية أيام) قبل الانطلاق. تُعرض المهلة الدقيقة في صفحة كل جولة وعلى قسيمة الحجز.
-
-## الإلغاء المتأخر وعدم الحضور
-يُحتسب الإلغاء داخل مهلة الإلغاء المجاني، وكذلك عدم الحضور في نقطة الاستلام، بنسبة 100% من قيمة الحجز.
-
-## كيفية الإلغاء
-ألغِ من **حسابي ← حجوزاتي**، أو تواصل معنا عبر واتساب +968 9225 5028 أو omancompasstours@gmail.com مع ذكر رقم الحجز. ويُحدَّد الاستحقاق وفق وقت استلامنا لرسالتك (بتوقيت عُمان).
-
-## التعديلات
-تعديلات التاريخ والوقت وحجم المجموعة مجانية عند طلبها قبل موعد الإلغاء المجاني ورهنًا بالتوفر. وتُطبَّق فروق الأسعار.
-
-## احجز الآن وادفع لاحقًا
-ينتهي الحجز المؤقت تلقائيًا في الوقت المبيّن في رسالة التأكيد (24–48 ساعة). ولا يُعد الحجز المؤقت المنتهي حجزًا ولا تترتب عليه أي رسوم.
-
-## الإلغاء من جانبنا
-إذا ألغينا الجولة لأسباب تتعلق بالطقس أو السلامة أو التشغيل، تحصل على استرداد كامل أو إعادة حجز مجانية؛ الخيار لك.`,
+      en: POLICY_TEXTS.cancellation.en,
+      ar: POLICY_TEXTS.cancellation.ar,
     },
   },
   {
@@ -131,34 +100,8 @@ If we cancel for weather, safety or operational reasons, you receive a full refu
     requiredAtCheckout: false,
     title: { en: "Refund Policy", ar: "سياسة الاسترداد" },
     body: {
-      en: `${legalNotice.en}## Eligible refunds
-Refunds are issued for cancellations made within the free-cancellation window, for tours cancelled by us, and for services not delivered through our fault.
-
-## Method and timing
-Refunds are returned **to the original payment method** through the same provider (Thawani, Stripe or PayPal). We initiate refunds within 2 business days; banks and card issuers typically take 5–10 business days to show the credit. Refunds are made in the currency originally charged; exchange-rate differences are outside our control.
-
-## Partial refunds
-Where part of a package is cancelled or not used, we refund the unused portion at the rates shown on your invoice, less any non-recoverable third-party costs (hotel deposits, flights).
-
-## Deposits
-Deposits on multi-day packages are refundable under the same windows as the package itself.
-
-## Disputes
-Please contact us before opening a dispute with your bank; most issues are resolved within one business day.`,
-      ar: `${legalNotice.ar}## الحالات المستحقة للاسترداد
-يُرد المبلغ في حالات الإلغاء ضمن مهلة الإلغاء المجاني، وفي الجولات التي نلغيها نحن، وفي الخدمات التي لم تُقدَّم بسبب تقصير من جانبنا.
-
-## طريقة الاسترداد ومدته
-تُعاد المبالغ **إلى وسيلة الدفع الأصلية** عبر مزوّد الدفع نفسه (ثواني أو سترايب أو باي بال). نبدأ إجراءات الاسترداد خلال يومَي عمل؛ وعادةً ما تستغرق البنوك ومُصدرو البطاقات 5–10 أيام عمل لإظهار المبلغ. ويُرد المبلغ بالعملة التي حُصِّلت أصلًا؛ وفروق أسعار الصرف خارجة عن سيطرتنا.
-
-## الاسترداد الجزئي
-عند إلغاء جزء من الباقة أو عدم استخدامه، نرد قيمة الجزء غير المستخدم وفق الأسعار المبيّنة في الفاتورة، مخصومًا منها أي تكاليف غير قابلة للاسترداد من أطراف ثالثة (عربون الفنادق، تذاكر الطيران).
-
-## العربون
-يُرد عربون الباقات متعددة الأيام وفق المهل نفسها المطبقة على الباقة.
-
-## النزاعات
-يرجى التواصل معنا قبل فتح أي نزاع مع البنك؛ فمعظم المسائل تُحل خلال يوم عمل واحد.`,
+      en: POLICY_TEXTS.refund.en,
+      ar: POLICY_TEXTS.refund.ar,
     },
   },
   {
@@ -271,42 +214,8 @@ Payment pages hosted by Thawani, Stripe and PayPal set their own cookies under t
     requiredAtCheckout: true,
     title: { en: "Travel Safety & Liability Waiver", ar: "سلامة السفر وإخلاء المسؤولية" },
     body: {
-      en: `${legalNotice.en}## Acknowledgement of risk
-Tours may include off-road driving, swimming in natural pools, hiking on uneven terrain, dune driving, boat trips and exposure to heat. You confirm that you and every member of your party are in good health, able to take part, and have disclosed any medical condition that could affect participation.
-
-## Safety rules
-- Follow the guide's instructions at all times; the guide may stop any activity for safety.
-- Wear seat belts; remain seated during dune driving.
-- Do not enter wadis when rain is forecast; flash floods are dangerous.
-- Life jackets must be worn on boats and are recommended for weak swimmers in wadis.
-- Children must be supervised by an adult at all times.
-
-## Release
-To the extent permitted by Omani law, you release ${company.en} and its guides and drivers from claims arising from your own negligence, failure to follow instructions, pre-existing medical conditions or force majeure.
-
-## Animal welfare
-We do not offer activities that harm animals. Camel encounters take place with licensed Bedouin families who care for their animals; riding is optional and short.
-
-## Insurance
-Comprehensive travel insurance including adventure activities is a condition of participation.`,
-      ar: `${legalNotice.ar}## الإقرار بالمخاطر
-قد تتضمن الجولات قيادة على الطرق الوعرة وسباحة في برك طبيعية ومشيًا على أرض غير مستوية وقيادة على الكثبان ورحلات بحرية وتعرّضًا للحرارة. وتؤكد أنك وجميع أفراد مجموعتك بصحة جيدة وقادرون على المشاركة، وأنك أفصحت عن أي حالة طبية قد تؤثر في المشاركة.
-
-## قواعد السلامة
-- اتبع تعليمات المرشد في جميع الأوقات؛ ويحق للمرشد إيقاف أي نشاط حفاظًا على السلامة.
-- اربط حزام الأمان؛ وابقَ جالسًا أثناء القيادة على الكثبان.
-- لا تدخل الأودية عند توقّع هطول الأمطار؛ فالسيول الجارفة خطيرة.
-- يجب ارتداء سترات النجاة في القوارب ويُنصح بها لضعاف السباحة في الأودية.
-- يجب أن يكون الأطفال تحت إشراف شخص بالغ طوال الوقت.
-
-## الإبراء
-إلى الحد الذي يسمح به القانون العُماني، تُبرئ ${company.ar} ومرشديها وسائقيها من أي مطالبات ناشئة عن إهمالك أو عدم اتباعك للتعليمات أو حالاتك الطبية السابقة أو القوة القاهرة.
-
-## رفق الحيوان
-لا نقدّم أنشطة تضر بالحيوانات. وتتم لقاءات الإبل مع عائلات بدوية مرخّصة تعتني بحيواناتها؛ والركوب اختياري وقصير.
-
-## التأمين
-التأمين الشامل على السفر بما يشمل أنشطة المغامرة شرط للمشاركة.`,
+      en: POLICY_TEXTS.waiver.en,
+      ar: POLICY_TEXTS.waiver.ar,
     },
   },
   {
@@ -333,40 +242,8 @@ Comprehensive travel insurance including adventure activities is a condition of 
     requiredAtCheckout: true,
     title: { en: "Payment Terms", ar: "شروط الدفع" },
     body: {
-      en: `${legalNotice.en}## Accepted methods
-- **Thawani** — Omani and GCC debit/credit cards, charged in OMR.
-- **Stripe** — international Visa, Mastercard, American Express, Apple Pay and Google Pay, charged in USD, EUR or GBP.
-- **PayPal** — charged in USD.
-- **Bank transfer, cash at our office, or a staff-issued payment link** for bookings made by WhatsApp, phone or email.
-
-## Full payment and deposits
-Day tours and transfers require full payment at booking. Multi-day packages require a **30 % deposit**; the balance is due 7 days before departure and we send a payment link automatically. Unpaid balances may result in cancellation under the cancellation policy.
-
-## Currency
-All prices are set in Omani Rial (OMR). When you pay through Stripe or PayPal, the amount is converted at the rate shown on the checkout page at the time of payment. Your bank may apply its own fees.
-
-## Security
-Payments are processed on the providers' PCI-DSS-compliant hosted pages. We never see or store card numbers; we keep only the provider's transaction reference.
-
-## Receipts and invoices
-A receipt is emailed immediately after payment and a VAT-compliant invoice (5 % VAT included where applicable) is available in My Account → Payments.`,
-      ar: `${legalNotice.ar}## وسائل الدفع المقبولة
-- **ثواني** — بطاقات الخصم والائتمان العُمانية والخليجية، وتُحصَّل بالريال العُماني.
-- **سترايب** — بطاقات فيزا وماستركارد وأمريكان إكسبريس الدولية وApple Pay وGoogle Pay، وتُحصَّل بالدولار الأمريكي أو اليورو أو الجنيه الإسترليني.
-- **باي بال** — يُحصَّل بالدولار الأمريكي.
-- **التحويل البنكي أو الدفع نقدًا في مكتبنا أو رابط دفع يصدره فريقنا** للحجوزات عبر واتساب أو الهاتف أو البريد الإلكتروني.
-
-## الدفع الكامل والعربون
-تتطلب الجولات اليومية وخدمات النقل الدفع الكامل عند الحجز. وتتطلب الباقات متعددة الأيام **عربونًا بنسبة 30%**؛ ويُستحق الباقي قبل 7 أيام من الانطلاق ونرسل رابط الدفع تلقائيًا. وقد يؤدي عدم سداد الباقي إلى الإلغاء وفق سياسة الإلغاء.
-
-## العملة
-تُحدَّد جميع الأسعار بالريال العُماني. وعند الدفع عبر سترايب أو باي بال يُحوَّل المبلغ بسعر الصرف المعروض في صفحة الدفع وقت السداد. وقد يفرض بنكك رسومًا خاصة به.
-
-## الأمان
-تُعالَج المدفوعات على صفحات مستضافة لدى المزوّدين متوافقة مع معيار PCI-DSS. ولا نطّلع على أرقام البطاقات ولا نخزّنها؛ ونحتفظ فقط بمرجع المعاملة لدى المزوّد.
-
-## الإيصالات والفواتير
-يُرسل الإيصال بالبريد الإلكتروني فور الدفع، وتتوفر فاتورة متوافقة مع ضريبة القيمة المضافة (شاملة 5% حيثما تنطبق) في حسابي ← المدفوعات.`,
+      en: POLICY_TEXTS.payment.en,
+      ar: POLICY_TEXTS.payment.ar,
     },
   },
 ];

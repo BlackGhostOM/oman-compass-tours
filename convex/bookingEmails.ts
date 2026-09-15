@@ -179,7 +179,7 @@ export const sendBalanceDue = internalAction({
     const locale = b.locale;
     const l = links(b, locale);
     const title = locale === "ar" ? `المبلغ المتبقي مستحق — ${b.reference}` : `Balance due — ${b.reference}`;
-    const html = layout(locale, title, `<p>${locale === "ar" ? "يُستحق المبلغ المتبقي لحجزك قبل 7 أيام من الانطلاق." : "The balance for your booking is due 7 days before departure."}</p>${summaryTable(b, locale)}${button(l.checkout, locale === "ar" ? "ادفع المتبقي" : "Pay the balance")}`);
+    const html = layout(locale, title, `<p>${locale === "ar" ? "يُسدَّد المبلغ المتبقي لحجزك عند بداية الرحلة إلى مرشدك، نقدًا أو بالبطاقة. ويمكنك أيضًا تسويته عبر الإنترنت الآن:" : "The remaining balance for your booking is payable at the start of your trip to your guide, in cash or by card. You can also settle it online now:"}</p>${summaryTable(b, locale)}${button(l.checkout, locale === "ar" ? "ادفع المتبقي" : "Pay the balance")}`);
     const result = await sendEmail({ to: b.traveller.email, subject: title, html });
     await logEmail(ctx, "balance_due", b.traveller.email, locale, bookingId, result);
     return null;

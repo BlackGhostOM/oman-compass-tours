@@ -4,7 +4,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { CalendarDays, Clock, Mail, MapPin, Phone, ShieldCheck, UserRound } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { countryName } from "@/lib/countries";
-import { formatDate, formatHijri, pick } from "@/lib/content";
+import { formatDate, formatHijri, pick, cancellationWindow } from "@/lib/content";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -41,7 +41,7 @@ export function StepReview({ tour, state, update, quote, onBack, onNext }: { tou
       <div className="rounded-lg border border-success/30 bg-success/5 p-4 text-sm text-ink-900">
         <p className="flex items-center gap-2 font-medium"><ShieldCheck className="size-4 text-success" /> {t("policyHeadline")}</p>
         <p className="mt-1 text-ink-500">
-          {tour.freeCancellationHours > 0 ? tc("freeCancellation", { hours: tour.freeCancellationHours }) : tc("nonRefundable")}
+          {tour.freeCancellationHours > 0 ? tc("freeCancellation", { window: cancellationWindow(tour.freeCancellationHours, locale) }) : tc("nonRefundable")}
           {tour.depositPercent < 100 && ` · ${t("deposit", { percent: tour.depositPercent })}`}
         </p>
       </div>

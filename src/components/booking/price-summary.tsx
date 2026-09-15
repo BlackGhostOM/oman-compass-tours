@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
 import { CalendarDays, Clock, Users } from "lucide-react";
-import { formatDate, formatOmr, pick } from "@/lib/content";
+import { formatDate, formatOmr, pick, cancellationWindow } from "@/lib/content";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { BookingTour } from "@/components/booking/types";
@@ -106,7 +106,7 @@ export function PriceSummary({
             {quote.available === false && (
               <p className="mt-3 rounded-lg border border-danger/40 bg-danger/5 p-2 text-xs text-danger">{t("soldOut", { remaining: quote.remaining ?? 0 })}</p>
             )}
-            {tour.freeCancellationHours > 0 && <p className="mt-3 text-xs text-success">{tc("freeCancellation", { hours: tour.freeCancellationHours })}</p>}
+            {tour.freeCancellationHours > 0 && <p className="mt-3 text-xs text-success">{tc("freeCancellation", { window: cancellationWindow(tour.freeCancellationHours, locale) })}</p>}
           </>
         )}
       </div>

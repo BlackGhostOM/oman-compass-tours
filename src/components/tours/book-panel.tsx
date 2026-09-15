@@ -3,7 +3,7 @@
 import { useLocale, useTranslations } from "next-intl";
 import { CalendarDays, Clock, MessageCircle, ShieldCheck, Users } from "lucide-react";
 import { Link } from "@/i18n/navigation";
-import { pick, type LocalizedString } from "@/lib/content";
+import { pick, type LocalizedString, cancellationWindow } from "@/lib/content";
 import { whatsappLink, site } from "@/lib/site";
 import { Button } from "@/components/ui/button";
 import { PriceTag } from "@/components/tours/price-tag";
@@ -77,7 +77,7 @@ export function BookPanel({
         </li>
         {tour.freeCancellationHours > 0 ? (
           <li className="flex items-center gap-2.5 text-success">
-            <ShieldCheck className="size-4" /> {tc("freeCancellation", { hours: tour.freeCancellationHours })}
+            <ShieldCheck className="size-4" /> {tc("freeCancellation", { window: cancellationWindow(tour.freeCancellationHours, locale) })}
           </li>
         ) : (
           <li className="flex items-center gap-2.5">

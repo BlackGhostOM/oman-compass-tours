@@ -10,7 +10,7 @@ import { AlertTriangle, CalendarPlus, CheckCircle2, Clock, CreditCard, Download,
 import { api } from "../../../convex/_generated/api";
 import { Link } from "@/i18n/navigation";
 import { countryName } from "@/lib/countries";
-import { formatDate, formatHijri, formatOmr, pick } from "@/lib/content";
+import { formatDate, formatHijri, formatOmr, pick, cancellationWindow } from "@/lib/content";
 import { site } from "@/lib/site";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -152,7 +152,7 @@ export function ConfirmationView({ reference, token }: { reference: string; toke
         </div>
 
         {booking.tour && (
-          <p className="text-xs text-ink-500">{booking.tour.freeCancellationHours > 0 ? t("cancellationNote", { hours: booking.tour.freeCancellationHours }) : t("nonRefundableNote")}</p>
+          <p className="text-xs text-ink-500">{booking.tour.freeCancellationHours > 0 ? t("cancellationNote", { window: cancellationWindow(booking.tour.freeCancellationHours, locale) }) : t("nonRefundableNote")}</p>
         )}
       </div>
 

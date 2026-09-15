@@ -81,3 +81,13 @@ export function addDaysIso(iso: string, days: number): string {
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
+
+/** Human wording for a free-cancellation window: hours below two days, otherwise days ("72 h", "30 days"). */
+export function cancellationWindow(hours: number, locale: string): string {
+  if (hours >= 48 && hours % 24 === 0) {
+    const days = hours / 24;
+    if (locale === "ar") return days === 1 ? "يوم واحد" : days === 2 ? "يومين" : days <= 10 ? `${days} أيام` : `${days} يومًا`;
+    return `${days} days`;
+  }
+  return locale === "ar" ? `${hours} ساعة` : `${hours} h`;
+}
