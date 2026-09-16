@@ -21,6 +21,19 @@ const MAGIC_ENABLED = process.env.NEXT_PUBLIC_AUTH_MAGIC_LINK === "1";
 
 const passwordSchema = z.string().min(8).regex(/[0-9]/).regex(/[A-Za-z]/);
 
+/**
+ * Normalises the `?redirect=` target to an in-site, locale-less path.
+ * Older links (and the Convex Auth middleware before the fix) carried the
+ * locale prefix; the locale-aware router adds it again, so strip it here.
+ * Protocol-relative and absolute URLs are rejected to avoid open redirects.
+ */
+function safeRedirect(raw: string | null): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/account";
+  const stripped = raw.replace(/^\/(en|ar)(?=\/|$|\?)/, "");
+  if (stripped === "" || stripped.startsWith("?")) return `/${stripped}`;
+  return stripped.startsWith("/") ? stripped : "/account";
+}
+
 export function AuthForm({ mode }: { mode: "signIn" | "signUp" | "magic" }) {
   const t = useTranslations("auth");
   const locale = useLocale();
@@ -28,7 +41,7 @@ export function AuthForm({ mode }: { mode: "signIn" | "signUp" | "magic" }) {
   const params = useSearchParams();
   const { signIn } = useAuthActions();
   const claim = useMutation(api.bookings.claimGuestBookings);
-  const redirect = params.get("redirect") || "/account";
+  const redirect = safeRedirect(params.get("redirect"));
   const [email, setEmail] = useState(params.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -42,7 +55,7 @@ export function AuthForm({ mode }: { mode: "signIn" | "signUp" | "magic" }) {
     } catch {
       /* not signed in yet or nothing to claim */
     }
-    router.replace(redirect.startsWith("/") ? redirect : "/account");
+    router.replace(redirect);
   }
 
   async function submitPassword(e: React.FormEvent) {

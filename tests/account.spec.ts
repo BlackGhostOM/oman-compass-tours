@@ -14,7 +14,18 @@ async function signIn(page: Page) {
 test.describe("Customer account", () => {
   test("protected route redirects guests to sign-in", async ({ page }) => {
     await page.goto("/en/account");
-    await expect(page).toHaveURL(/\/en\/sign-in\?redirect=/);
+    // The redirect target is locale-less: the locale-aware router adds the prefix on the way back.
+    await expect(page).toHaveURL(/\/en\/sign-in\?redirect=%2Faccount$/);
+  });
+
+  test("deep link survives sign-in without doubling the locale prefix", async ({ page }) => {
+    await page.goto("/ar/account/wishlist");
+    await expect(page).toHaveURL(/\/ar\/sign-in\?redirect=%2Faccount%2Fwishlist$/);
+    await page.locator("#auth-email").fill(CUSTOMER.email);
+    await page.locator("#auth-password").fill(CUSTOMER.password);
+    await page.locator("#auth-password").press("Enter");
+    await page.waitForURL(/\/ar\/account\/wishlist$/);
+    await expect(page.getByText("404")).toHaveCount(0);
   });
 
   test("customer signs in, sees seeded bookings and downloads the voucher", async ({ page, request, context }) => {

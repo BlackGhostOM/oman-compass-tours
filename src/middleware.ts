@@ -24,7 +24,10 @@ export default convexAuthNextjsMiddleware(
     // (a redirect response would break the action's fetch).
     const isNavigation = request.method === "GET";
     if (isNavigation && isProtectedRoute(request) && !(await convexAuth.isAuthenticated())) {
-      const redirectTo = encodeURIComponent(pathname + request.nextUrl.search);
+      // The sign-in form navigates with the locale-aware router, so the target
+      // must be locale-less ("/admin", not "/ar/admin") or the prefix doubles.
+      const target = pathname.replace(/^\/(en|ar)(?=\/|$)/, "") || "/";
+      const redirectTo = encodeURIComponent(target + request.nextUrl.search);
       return nextjsMiddlewareRedirect(request, `/${locale}/sign-in?redirect=${redirectTo}`);
     }
     if (isNavigation && isAuthRoute(request) && (await convexAuth.isAuthenticated())) {
