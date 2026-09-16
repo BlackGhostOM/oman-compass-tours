@@ -168,7 +168,8 @@ export const bySlug = query({
     return {
       ...tour,
       category: category ? { key: category.key, name: category.name, slug: category.slug } : null,
-      gallery: gallery.map((g) => g.media),
+      // Resolve storage-backed media to URLs so uploads without a cached `url` still render.
+      gallery: await Promise.all(gallery.map(async (g) => ({ ...g.media, url: g.media.url ?? (g.media.storageId ? (await ctx.storage.getUrl(g.media.storageId)) ?? undefined : undefined) }))),
       destinations: destinations.filter((d): d is Doc<"destinations"> => !!d).map((d) => ({ key: d.key, name: d.name, slug: d.slug })),
       addOns: [...addOns, ...tourAddOns].filter((a) => a.isActive),
       reviews: reviews.map((r) => ({

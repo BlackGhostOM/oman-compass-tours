@@ -157,6 +157,15 @@ npx convex run migrations:syncCatalog2026 --prod
 which upserts by product code, keeps bookings, reviews and uploaded media, and
 archives retired codes (`RETIRED_TOUR_CODES`).
 
+Real photos are attached in bulk with `scripts/import-tour-media.mjs` (a JSON
+manifest lists the folder, the ordered files, bilingual alt text and the cover
+index; photos are auto-rotated, resized to 2400 px and uploaded to Convex
+storage, then written to `tourMedia` and the cover in one transaction):
+
+```bash
+node scripts/import-tour-media.mjs path/to/manifest.json --prod
+```
+
 Crons (`convex/crons.ts`) run automatically on the production deployment: hold
 expiry every 15 minutes, booking lifecycle hourly, reminders and abandoned-draft
 follow-ups, FX refresh daily.

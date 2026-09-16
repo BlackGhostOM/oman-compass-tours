@@ -51,6 +51,7 @@ import type * as lib_ids from "../lib/ids.js";
 import type * as lib_markdown from "../lib/markdown.js";
 import type * as lib_money from "../lib/money.js";
 import type * as lib_pricing from "../lib/pricing.js";
+import type * as mediaImport from "../mediaImport.js";
 import type * as migrations from "../migrations.js";
 import type * as newsletter from "../newsletter.js";
 import type * as newsletterSend from "../newsletterSend.js";
@@ -127,6 +128,7 @@ declare const fullApi: ApiFromModules<{
   "lib/markdown": typeof lib_markdown;
   "lib/money": typeof lib_money;
   "lib/pricing": typeof lib_pricing;
+  mediaImport: typeof mediaImport;
   migrations: typeof migrations;
   newsletter: typeof newsletter;
   newsletterSend: typeof newsletterSend;
