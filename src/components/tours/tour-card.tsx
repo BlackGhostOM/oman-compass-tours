@@ -66,7 +66,7 @@ export function TourCard({
       </Link>
 
       <div className="flex flex-1 flex-col p-4 sm:p-5">
-        <h3 className="font-heading text-base leading-snug sm:text-lg">
+        <h3 className="font-heading text-base font-bold leading-snug sm:text-lg">
           <Link href={href} className={cn("transition", dark ? "hover:text-gold-400" : "hover:text-gold-700")}>
             {pick(tour.title, locale)}
           </Link>
