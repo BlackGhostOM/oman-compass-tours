@@ -49,6 +49,7 @@ test.describe("Customer account", () => {
     await signIn(page);
     await page.goto("/en/tours/wadi-shab-bimmah-sinkhole-private");
     const heart = page.getByRole("button", { name: /Save to wishlist|Remove from wishlist/ });
+    await expect(heart).toHaveAttribute("aria-busy", "false"); // auth + saved list resolved
     const wasSaved = (await heart.getAttribute("aria-pressed")) === "true";
     await heart.click();
     await expect(heart).toHaveAttribute("aria-pressed", wasSaved ? "false" : "true");

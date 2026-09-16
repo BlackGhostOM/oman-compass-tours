@@ -1,6 +1,8 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
+import { syncCatalogFromSeed } from "./lib/catalogSync";
 import { POLICY_TEXTS } from "./seedData/policyTexts2026";
+import { RETIRED_TOUR_CODES } from "./seedData/tours";
 
 /**
  * One-off data migrations, run with `npx convex run migrations:<name> [--prod]`.
@@ -47,5 +49,28 @@ export const applyPolicyTerms = internalMutation({
       }
     }
     return { updated, total: tours.length };
+  },
+});
+
+/**
+ * Replaces the demo catalogue with the real Viator product list (September 2026):
+ * upserts categories, destinations and the 24 tours/services by code, and archives
+ * retired seed tours. Bookings, reviews and uploaded media on existing tours are kept.
+ */
+export const syncCatalog2026 = internalMutation({
+  args: {},
+  returns: v.object({ inserted: v.number(), updated: v.number(), archived: v.number(), categories: v.number(), destinations: v.number() }),
+  handler: async (ctx) => {
+    const now = Date.now();
+    const { categoryIds, destinationIds, inserted, updated } = await syncCatalogFromSeed(ctx, now);
+    let archived = 0;
+    for (const code of RETIRED_TOUR_CODES) {
+      const t = await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", code)).unique();
+      if (t && t.status !== "archived") {
+        await ctx.db.patch(t._id, { status: "archived", isFeatured: false, featuredOrder: undefined, updatedAt: now });
+        archived += 1;
+      }
+    }
+    return { inserted, updated, archived, categories: categoryIds.size, destinations: destinationIds.size };
   },
 });

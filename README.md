@@ -142,6 +142,21 @@ Checklist after the first deploy:
 4. `vercel.json` sets the region (`fra1`); security headers (CSP, HSTS, frame
    and referrer policies) come from `next.config.ts`.
 
+### Catalogue
+
+The 24 tours and services mirror the company's Viator product list (September
+2026). They live in `convex/seedData/tours*.ts` (day tours, short and long
+journeys, services); prices are the Viator USD rates converted to OMR, and the
+three products without a public price carry the `price-placeholder` tag until
+staff set them in Admin → Products. After editing the seed files run
+
+```bash
+npx convex run migrations:syncCatalog2026 --prod
+```
+
+which upserts by product code, keeps bookings, reviews and uploaded media, and
+archives retired codes (`RETIRED_TOUR_CODES`).
+
 Crons (`convex/crons.ts`) run automatically on the production deployment: hold
 expiry every 15 minutes, booking lifecycle hourly, reminders and abandoned-draft
 follow-ups, FX refresh daily.

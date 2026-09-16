@@ -18,10 +18,13 @@ export function WishlistButton({ tourId, className, size = "md" }: { tourId: Id<
   const router = useRouter();
   const pathname = usePathname();
   const saved = ids?.includes(String(tourId)) ?? false;
+  // Auth state (and the saved list for signed-in users) is still loading.
+  const loading = viewer === undefined || (!!viewer && ids === undefined);
 
   async function onClick(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+    if (loading) return; // don't bounce a signed-in user to sign-in while auth resolves
     if (!viewer) {
       router.push(`/sign-in?redirect=${encodeURIComponent(pathname)}`);
       return;
@@ -35,6 +38,7 @@ export function WishlistButton({ tourId, className, size = "md" }: { tourId: Id<
       type="button"
       onClick={onClick}
       aria-pressed={saved}
+      aria-busy={loading}
       aria-label={saved ? t("remove") : t("save")}
       className={cn(
         "flex items-center justify-center rounded-full bg-navy-950/70 text-sand-50 ring-1 ring-gold-500/40 backdrop-blur transition hover:bg-navy-950",

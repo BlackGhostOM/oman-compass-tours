@@ -10,23 +10,11 @@ import type { Id } from "./_generated/dataModel";
 import { action, internalMutation } from "./_generated/server";
 import { omrToBaisa } from "./lib/money";
 import { generateBookingReference, generateToken } from "./lib/ids";
-import { categoriesSeed } from "./seedData/categories";
-import { destinationsSeed } from "./seedData/destinations";
-import { toursSeed } from "./seedData/tours";
+import { media, syncCatalogFromSeed } from "./lib/catalogSync";
 import { policiesSeed } from "./seedData/policies";
 import { reviewsSeed } from "./seedData/reviews";
 import { blogSeed } from "./seedData/blog";
 import { addOnsSeed, bannersSeed, couponsSeed, siteSettingsSeed, teamSeed } from "./seedData/misc";
-
-const placeholder = (key: string) => `/media/placeholders/${key}.jpg`;
-
-const media = (key: string, alt: { en: string; ar: string }) => ({
-  kind: "image" as const,
-  url: placeholder(key),
-  alt,
-  width: key.startsWith("reel") ? 1080 : 1600,
-  height: key.startsWith("reel") ? 1920 : 1000,
-});
 
 export const DEMO_ACCOUNTS = [
   { email: "owner@omancompasstours.com", password: "OmanCompass!2026", name: "Owner (demo)", role: "owner" as const },
@@ -40,111 +28,8 @@ export const seedContent = internalMutation({
   handler: async (ctx) => {
     const now = Date.now();
 
-    /* Categories */
-    const categoryIds = new Map<string, Id<"categories">>();
-    for (const [i, c] of categoriesSeed.entries()) {
-      const existing = await ctx.db.query("categories").withIndex("by_key", (q) => q.eq("key", c.key)).unique();
-      const doc = { key: c.key, name: c.name, slug: c.slug, description: c.description, icon: c.icon, order: i + 1, isActive: true };
-      const id = existing ? (await ctx.db.patch(existing._id, doc), existing._id) : await ctx.db.insert("categories", doc);
-      categoryIds.set(c.key, id);
-    }
-
-    /* Destinations */
-    const destinationIds = new Map<string, Id<"destinations">>();
-    for (const [i, d] of destinationsSeed.entries()) {
-      const existing = await ctx.db.query("destinations").withIndex("by_key", (q) => q.eq("key", d.key)).unique();
-      const doc = {
-        key: d.key,
-        name: d.name,
-        slug: d.slug,
-        tagline: d.tagline,
-        description: d.description,
-        region: d.region,
-        image: media(d.image, d.name),
-        lat: d.lat,
-        lng: d.lng,
-        order: i + 1,
-        isActive: true,
-      };
-      const id = existing ? (await ctx.db.patch(existing._id, doc), existing._id) : await ctx.db.insert("destinations", doc);
-      destinationIds.set(d.key, id);
-    }
-
-    /* Tours */
-    const tourIds = new Map<string, Id<"tours">>();
-    for (const t of toursSeed) {
-      const existing = await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", t.code)).unique();
-      const priceGroup = t.priceGroupOmr !== undefined ? omrToBaisa(t.priceGroupOmr) : undefined;
-      const priceAdult = t.priceAdultOmr !== undefined ? omrToBaisa(t.priceAdultOmr) : undefined;
-      const priceChild = t.priceChildOmr !== undefined ? omrToBaisa(t.priceChildOmr) : undefined;
-      const priceFrom = t.pricingModel === "per_group" ? priceGroup! : priceAdult!;
-      const doc = {
-        code: t.code,
-        kind: t.kind,
-        title: t.title,
-        slug: t.slug,
-        summary: t.summary,
-        description: t.description,
-        highlights: t.highlights,
-        itinerary: t.itinerary,
-        inclusions: t.inclusions,
-        exclusions: t.exclusions,
-        faqs: t.faqs,
-        categoryId: categoryIds.get(t.category)!,
-        secondaryCategoryIds: (t.secondaryCategories ?? []).map((k) => categoryIds.get(k)!),
-        destinationIds: t.destinations.map((k) => destinationIds.get(k)!),
-        durationLabel: t.durationLabel,
-        durationMinutes: t.durationMinutes,
-        durationDays: t.durationDays,
-        startTimes: t.startTimes,
-        meetingPoint: t.meetingPoint,
-        pickupIncluded: t.pickupIncluded,
-        guideLanguages: t.guideLanguages,
-        minGroup: t.minGroup,
-        maxGroup: t.maxGroup,
-        defaultCapacityPerSlot: t.capacityPerSlot,
-        difficulty: t.difficulty,
-        pricingModel: t.pricingModel,
-        priceGroup,
-        priceAdult,
-        priceChild,
-        childAgeMax: t.childAgeMax,
-        infantAgeMax: 2,
-        priceFrom,
-        depositPercent: t.depositPercent,
-        freeCancellationHours: t.freeCancellationHours,
-        allowReserveNowPayLater: t.allowReserveNowPayLater,
-        holdHours: t.holdHours,
-        coverImage: media(t.image, t.title),
-        ratingAverage: t.ratingAverage,
-        ratingCount: 0,
-        externalReviewCount: t.externalReviewCount,
-        tripadvisorUrl:
-          "https://www.tripadvisor.com/Attraction_Review-g1940497-d26437481-Reviews-OMAN_COMPASS_TOURS-Muscat_Muscat_Governorate.html",
-        status: "published" as const,
-        isFeatured: t.isFeatured,
-        featuredOrder: t.featuredOrder,
-        tags: [...t.tags, ...(t.priceIsPlaceholder ? ["price-placeholder"] : [])],
-        seo: {
-          title: t.title,
-          description: t.summary,
-          ogImageUrl: placeholder(t.image),
-        },
-        searchText: `${t.title.en} ${t.title.ar} ${t.summary.en} ${t.summary.ar} ${t.tags.join(" ")}`,
-        updatedAt: now,
-      };
-      const id = existing ? (await ctx.db.patch(existing._id, doc), existing._id) : await ctx.db.insert("tours", doc);
-      tourIds.set(t.code, id);
-
-      // Gallery: cover + 2 extra placeholders
-      const gallery = await ctx.db.query("tourMedia").withIndex("by_tour_order", (q) => q.eq("tourId", id)).collect();
-      if (gallery.length === 0) {
-        const extras = [t.image, "muscat", "wahiba", "jebel-akhdar", "wadi-shab"].filter((k, i, a) => a.indexOf(k) === i).slice(0, 4);
-        for (const [i, key] of extras.entries()) {
-          await ctx.db.insert("tourMedia", { tourId: id, media: media(key, t.title), order: i });
-        }
-      }
-    }
+    /* Categories, destinations, tours (shared with migrations:syncCatalog2026) */
+    const { categoryIds, destinationIds, tourIds } = await syncCatalogFromSeed(ctx, now);
 
     /* Add-ons (global) */
     for (const [i, a] of addOnsSeed.entries()) {

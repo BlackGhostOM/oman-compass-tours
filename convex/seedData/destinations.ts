@@ -111,6 +111,48 @@ export const destinationsSeed = [
     lng: 59.2381,
     image: "wadi-shab",
   },
+  {
+    key: "jabal_shams",
+    name: { en: "Jabal Shams & Al Hamra", ar: "جبل شمس والحمراء" },
+    slug: { en: "jabal-shams", ar: "جبل-شمس" },
+    tagline: { en: "Oman's Grand Canyon and 400-year-old mud villages", ar: "أخدود عُمان الكبير وقرى الطين العريقة" },
+    description: {
+      en: "The highest mountain in Oman overlooks Wadi Ghul, the 'Grand Canyon of Arabia'. Nearby lie the terraced village of Misfat Al Abriyeen, the mud houses of Al Hamra and Al Hoota Cave.",
+      ar: "يطل أعلى جبال عُمان على وادي غول، «أخدود الجزيرة العربية الكبير». وبالقرب منه قرية مسفاة العبريين المدرّجة وبيوت الطين في الحمراء وكهف الهوتة.",
+    },
+    region: "Ad Dakhiliyah",
+    lat: 23.2372,
+    lng: 57.2601,
+    image: "jebel-akhdar",
+  },
+  {
+    key: "nakhal",
+    name: { en: "Nakhal & Wakan", ar: "نخل ووكان" },
+    slug: { en: "nakhal-wakan", ar: "نخل-ووكان" },
+    tagline: { en: "A fort on a rock, hot springs and a village of terraces", ar: "قلعة فوق صخرة وعيون حارة وقرية مدرّجة" },
+    description: {
+      en: "An hour from Muscat, Nakhal Fort rises from a rocky outcrop above date plantations and the Al Thowarah hot spring; higher up, the mountain village of Wakan hangs over Wadi Mistal at 2,000 m.",
+      ar: "على بعد ساعة من مسقط، تنهض قلعة نخل فوق نتوء صخري بين مزارع النخيل وعين الثوارة الحارة؛ وفي الأعلى تتعلّق قرية وكان الجبلية فوق وادي مستل على ارتفاع 2000 متر.",
+    },
+    region: "South Al Batinah",
+    lat: 23.395,
+    lng: 57.829,
+    image: "nizwa",
+  },
+  {
+    key: "daymaniyat",
+    name: { en: "Daymaniyat Islands", ar: "جزر الديمانيات" },
+    slug: { en: "daymaniyat-islands", ar: "جزر-الديمانيات" },
+    tagline: { en: "Turtles, reefs and the clearest water in the Gulf", ar: "سلاحف وشعاب وأصفى مياه الخليج" },
+    description: {
+      en: "A protected archipelago off the Batinah coast where coral gardens, green turtles and reef fish make for the best snorkelling in Oman.",
+      ar: "أرخبيل محمي قبالة ساحل الباطنة، حيث حدائق المرجان والسلاحف الخضراء وأسماك الشعاب تجعل منه أفضل مكان للغطس السطحي في عُمان.",
+    },
+    region: "Muscat Governorate",
+    lat: 23.85,
+    lng: 58.1,
+    image: "sur",
+  },
 ] as const;
 
 export type DestinationKey = (typeof destinationsSeed)[number]["key"];
