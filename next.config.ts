@@ -61,6 +61,17 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
     ],
   },
+  async redirects() {
+    // The Vercel alias stays reachable but always sends visitors to the canonical domain.
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "oman-compass-tours.vercel.app" }],
+        destination: "https://www.omancompasstours.com/:path*",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
