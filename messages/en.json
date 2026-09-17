@@ -876,7 +876,8 @@
     "openMenu": "Open menu",
     "signOut": "Sign out",
     "darkMode": "Dark mode",
-    "lightMode": "Light mode"
+    "lightMode": "Light mode",
+    "backHome": "Back to home page"
   },
   "account": {
     "title": "My Account",

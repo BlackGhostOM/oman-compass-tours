@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useQuery } from "convex/react";
-import { ExternalLink, LogOut, Menu, type LucideIcon } from "lucide-react";
+import { ExternalLink, Home, LogOut, Menu, type LucideIcon } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
@@ -95,7 +95,13 @@ export function DashboardShell({
                   <SheetHeader className="border-b border-navy-800 p-4">
                     <SheetTitle asChild><div><Logo variant="mark" markClassName="size-9" /><span className="ms-3 font-heading text-[13px] tracking-[0.12em] text-gold-400">OMAN COMPASS</span></div></SheetTitle>
                   </SheetHeader>
-                  <div className="p-3 [&_a]:text-sand-100/80 [&_a:hover]:bg-navy-900 [&_a[aria-current=page]]:bg-navy-900 [&_a[aria-current=page]]:text-gold-400">{nav}</div>
+                  <div className="p-3 [&_a]:text-sand-100/80 [&_a:hover]:bg-navy-900 [&_a[aria-current=page]]:bg-navy-900 [&_a[aria-current=page]]:text-gold-400">
+                    {/* Phones have no persistent site header inside the dashboard, so offer the way home first */}
+                    <Link href="/" onClick={() => setOpen(false)} className="mb-2 flex items-center gap-3 rounded-lg border border-gold-500/40 bg-navy-900/60 px-3 py-2.5 text-sm font-medium !text-gold-400 transition hover:border-gold-500">
+                      <Home className="size-4 shrink-0" /> {td("backHome")}
+                    </Link>
+                    {nav}
+                  </div>
                 </SheetContent>
               </Sheet>
               <h1 className="font-heading text-lg text-foreground">{title}</h1>
