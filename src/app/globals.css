@@ -350,6 +350,15 @@ html[lang="ar"] {
     letter-spacing: 0;
     margin-top: 0.1rem;
   }
+  /* Phones: the wordmark now shows next to the mark, so keep it compact */
+  @media (max-width: 639px) {
+    html[lang="ar"] .wordmark-name {
+      font-size: 1.05rem;
+      line-height: 1.1;
+      max-width: none;
+      white-space: nowrap;
+    }
+  }
   /* Amiri is a light Naskh face; bold keeps headings crisp at card and nav sizes */
   html[lang="ar"] .font-heading {
     font-weight: 700;

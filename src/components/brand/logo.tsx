@@ -38,7 +38,7 @@ export function Logo({
   }
 
   return (
-    <Link href="/" className={cn("group inline-flex shrink-0 items-center gap-3", className)}>
+    <Link href="/" className={cn("group inline-flex shrink-0 items-center gap-2 sm:gap-3", className)}>
       <span className="sr-only">{label}</span>
       <Image
         src="/brand/logo-mark.png"
@@ -49,11 +49,12 @@ export function Logo({
         className={cn("size-11 rounded-full ring-1 ring-gold-500/30 transition group-hover:ring-gold-500/70", markClassName)}
       />
       {variant === "lockup" && (
-        <span className="hidden flex-col leading-none whitespace-nowrap sm:flex lg:hidden xl:flex">
-          <span className="wordmark-name font-heading text-[0.95rem] font-semibold tracking-[0.14em] text-gold-400 sm:text-base">
+        <span className="flex flex-col leading-none lg:hidden xl:flex">
+          {/* Phones: two short lines ("OMAN COMPASS / TOURS") so the language, account and menu controls keep their room */}
+          <span className="wordmark-name font-heading max-w-[7.5rem] text-[0.72rem] leading-tight font-semibold tracking-[0.08em] text-gold-400 sm:max-w-none sm:text-base sm:leading-none sm:tracking-[0.14em] sm:whitespace-nowrap">
             {locale === "ar" ? "بوصلة عُمان للسياحة" : "OMAN COMPASS TOURS"}
           </span>
-          <span className="wordmark-sub mt-1 text-[0.6rem] font-medium tracking-[0.3em] text-sand-100/70 uppercase">
+          <span className="wordmark-sub mt-1 hidden text-[0.6rem] font-medium tracking-[0.3em] text-sand-100/70 uppercase sm:block">
             {locale === "ar" ? "شركة" : "Company"}
           </span>
         </span>
