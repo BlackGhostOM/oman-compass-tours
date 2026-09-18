@@ -214,3 +214,26 @@ export const setCoverByAlt = internalMutation({
     return { tourId: tour._id, matched: hit.media.alt.en };
   },
 });
+
+/**
+ * Points a destination's card/hero image at an existing tour gallery photo
+ * (matched by tour code + English alt substring). Reuses the stored file, so
+ * nothing is re-uploaded; the destination keeps its own bilingual alt text.
+ */
+export const setDestinationImage = internalMutation({
+  args: { destinationKey: v.string(), tourCode: v.string(), alt: v.string() },
+  returns: v.object({ destination: v.string(), matched: v.string() }),
+  handler: async (ctx, { destinationKey, tourCode, alt }) => {
+    const dest = await ctx.db.query("destinations").withIndex("by_key", (q) => q.eq("key", destinationKey)).unique();
+    if (!dest) throw new Error(`No destination with key ${destinationKey}`);
+    const tour = await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", tourCode)).unique();
+    if (!tour) throw new Error(`No tour with code ${tourCode}`);
+    const rows = await ctx.db.query("tourMedia").withIndex("by_tour_order", (q) => q.eq("tourId", tour._id)).take(200);
+    const needle = alt.toLowerCase();
+    const hit = rows.find((m) => m.media.kind === "image" && m.media.alt.en.toLowerCase().includes(needle));
+    if (!hit) throw new Error(`No gallery image in ${tourCode} whose alt contains "${alt}"`);
+    const url = hit.media.url ?? (hit.media.storageId ? (await ctx.storage.getUrl(hit.media.storageId)) ?? undefined : undefined);
+    await ctx.db.patch(dest._id, { image: { ...hit.media, url, alt: dest.name } });
+    return { destination: destinationKey, matched: hit.media.alt.en };
+  },
+});
