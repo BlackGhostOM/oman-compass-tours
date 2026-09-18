@@ -187,3 +187,30 @@ export const imageUrls = query({
     return [...urls];
   },
 });
+
+/**
+ * Makes an existing gallery photo the tour's cover, matched by its English alt
+ * text (case-insensitive substring), and moves it to the front of the gallery.
+ */
+export const setCoverByAlt = internalMutation({
+  args: { code: v.string(), alt: v.string() },
+  returns: v.object({ tourId: v.id("tours"), matched: v.string() }),
+  handler: async (ctx, { code, alt }) => {
+    const tour = await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", code)).unique();
+    if (!tour) throw new Error(`No tour with code ${code}`);
+    const rows = await ctx.db.query("tourMedia").withIndex("by_tour_order", (q) => q.eq("tourId", tour._id)).take(200);
+    const needle = alt.toLowerCase();
+    const hit = rows.find((m) => m.media.kind === "image" && m.media.alt.en.toLowerCase().includes(needle));
+    if (!hit) throw new Error(`No gallery image whose alt contains "${alt}"`);
+    const url = hit.media.url ?? (hit.media.storageId ? (await ctx.storage.getUrl(hit.media.storageId)) ?? undefined : undefined);
+    await ctx.db.patch(tour._id, {
+      coverImage: { ...hit.media, url },
+      seo: { ...(tour.seo ?? { title: tour.title, description: tour.summary }), ogImageUrl: url },
+      updatedAt: Date.now(),
+    });
+    // Cover first, then the rest in their current order
+    const ordered = [hit, ...rows.filter((m) => m._id !== hit._id).sort((a, b) => a.order - b.order)];
+    for (const [i, m] of ordered.entries()) if (m.order !== i) await ctx.db.patch(m._id, { order: i });
+    return { tourId: tour._id, matched: hit.media.alt.en };
+  },
+});
