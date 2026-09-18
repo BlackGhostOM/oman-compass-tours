@@ -96,3 +96,9 @@ try {
 }
 console.log(`${prod ? "PROD" : "DEV"} ${manifest.code}: added ${added}, removed ${removed} placeholders (tour ${tourId})`);
 fs.rmSync(tmp, { recursive: true, force: true });
+
+if (prod) {
+  // Pre-generate the optimized variants so the first visitor does not wait for the transcode.
+  const warm = spawnSync("node", ["scripts/warm-image-cache.mjs", "--prod", "--code", manifest.code], { stdio: "inherit", shell: true, windowsHide: true });
+  if (warm.status !== 0) console.warn("cache warm-up failed (the photos are live; they will be optimized on first view)");
+}

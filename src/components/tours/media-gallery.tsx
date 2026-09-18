@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Image from "next/image";
+import Image, { getImageProps } from "next/image";
 import { useLocale, useTranslations } from "next-intl";
-import { ChevronLeft, ChevronRight, Play, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Play, X } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { pick, type LocalizedString } from "@/lib/content";
 import { cn } from "@/lib/utils";
@@ -18,9 +18,19 @@ export type MediaItem = {
   blurDataUrl?: string;
 };
 
+const LIGHTBOX_SIZES = "(min-width: 1200px) 1152px, 96vw";
+
+/** `<link rel="preload">` for the optimized variant the lightbox will request for `item`. */
+function PreloadImage({ item }: { item: MediaItem }) {
+  if (item.kind !== "image" || !item.url) return null;
+  const { props } = getImageProps({ src: item.url, alt: "", fill: true, sizes: LIGHTBOX_SIZES });
+  return <link rel="preload" as="image" imageSrcSet={props.srcSet} imageSizes={props.sizes} fetchPriority="low" />;
+}
+
 /**
  * Responsive gallery (hero + thumbnails) with a swipeable lightbox
- * supporting images and videos.
+ * supporting images and videos. Neighbouring photos are preloaded and a
+ * spinner shows while the next one decodes, so stepping through feels instant.
  */
 export function MediaGallery({ items, title, className }: { items: MediaItem[]; title: string; className?: string }) {
   const locale = useLocale();
@@ -50,6 +60,15 @@ export function MediaGallery({ items, title, className }: { items: MediaItem[]; 
   // Touch swipe
   const [touchX, setTouchX] = useState<number | null>(null);
 
+  // Loading indicator for the large photo (cached photos resolve synchronously and never show it)
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const img = imgRef.current;
+    setLoading(!(img && img.complete && img.naturalWidth > 0));
+  }, [open, index]);
+
   // Filmstrip: keep the active thumbnail in view as the visitor moves through the gallery
   const stripRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -61,6 +80,7 @@ export function MediaGallery({ items, title, className }: { items: MediaItem[]; 
   if (count === 0) return null;
   const main = media[0];
   const current = media[index];
+  const neighbours = count > 1 ? [media[(index + 1) % count], media[(index - 1 + count) % count]].filter((m, i, a) => a.indexOf(m) === i && m !== current) : [];
 
   return (
     <div className={className}>
@@ -134,8 +154,22 @@ export function MediaGallery({ items, title, className }: { items: MediaItem[]; 
               {current.kind === "video" ? (
                 <video src={current.url} poster={current.posterUrl} controls autoPlay playsInline className="h-full w-full object-contain" />
               ) : (
-                <Image src={current.url!} alt={pick(current.alt, locale) || title} fill sizes="96vw" className="object-contain" />
+                <Image
+                  ref={imgRef}
+                  src={current.url!}
+                  alt={pick(current.alt, locale) || title}
+                  fill
+                  sizes={LIGHTBOX_SIZES}
+                  onLoad={() => setLoading(false)}
+                  className={cn("object-contain transition-opacity duration-200", loading && "opacity-50")}
+                />
               )}
+              {loading && current.kind !== "video" && (
+                <span className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-hidden>
+                  <Loader2 className="size-9 animate-spin text-gold-400 drop-shadow" />
+                </span>
+              )}
+              {open && neighbours.map((m, i) => <PreloadImage key={`${index}-${i}`} item={m} />)}
               {count > 1 && (
                 <>
                   <button type="button" onClick={prev} aria-label={t("prev")} className="absolute start-3 top-1/2 -translate-y-1/2 rounded-full bg-navy-900/80 p-2 hover:bg-navy-800">

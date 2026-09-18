@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { internalMutation } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { media, placeholder } from "./lib/catalogSync";
 import { toursSeed } from "./seedData/tours";
 
@@ -156,5 +156,29 @@ export const sweepOrphanedTourImages = internalMutation({
       deleted += 1;
     }
     return { scanned, deleted };
+  },
+});
+
+/** Every image URL shown for published tours (cover + gallery), for warming the image-optimizer cache. */
+export const imageUrls = internalQuery({
+  args: { code: v.optional(v.string()) },
+  returns: v.array(v.string()),
+  handler: async (ctx, { code }) => {
+    const tours = code
+      ? [await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", code)).unique()].filter((t) => !!t)
+      : await ctx.db.query("tours").withIndex("by_status", (q) => q.eq("status", "published")).take(500);
+    const urls = new Set<string>();
+    for (const t of tours) {
+      if (!t) continue;
+      const cover = t.coverImage?.url ?? (t.coverImage?.storageId ? await ctx.storage.getUrl(t.coverImage.storageId) : null);
+      if (cover?.startsWith("http")) urls.add(cover);
+      const rows = await ctx.db.query("tourMedia").withIndex("by_tour_order", (q) => q.eq("tourId", t._id)).take(100);
+      for (const m of rows) {
+        if (m.media.kind !== "image") continue;
+        const u = m.media.url ?? (m.media.storageId ? await ctx.storage.getUrl(m.media.storageId) : null);
+        if (u?.startsWith("http")) urls.add(u);
+      }
+    }
+    return [...urls];
   },
 });
