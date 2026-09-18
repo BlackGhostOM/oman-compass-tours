@@ -1830,7 +1830,7 @@
         "profileRemoved": "Company profile removed.",
         "profileNone": "No file uploaded yet.",
         "previewNoticeTitle": "“Website under construction” notice",
-        "previewNoticeHint": "Shows a one-time message to new visitors on the home, tours and services pages saying that online booking is not open yet and pointing them to WhatsApp, phone and email. Switch it off when the site is ready.",
+        "previewNoticeHint": "Shows a message to visitors on the home, tours and services pages saying that online booking is not open yet and pointing them to WhatsApp, phone and email. It appears once per visit: dismissed while they browse, shown again on their next visit. Switch it off when the site is ready.",
         "previewNoticeOn": "Notice enabled.",
         "previewNoticeOff": "Notice disabled."
       },

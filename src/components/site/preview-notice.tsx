@@ -11,15 +11,18 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const STORAGE_KEY = "oct_preview_notice_v1";
-/** Pages where a first-time visitor gets the notice (locale-less paths). */
+/** Pages where a visitor gets the notice (locale-less paths). */
 const ROUTES = new Set(["/", "/tours", "/services"]);
+/** A dismissed notice stays hidden for the rest of the visit; after this much time away it shows again. */
+const REPEAT_AFTER_MS = 30 * 60 * 1000;
 
 export type PreviewNoticeSetting = { enabled: boolean } | null;
 
 /**
- * One-time "site under construction" notice. Staff switch it off from
- * Admin → Settings → Company once bookings open; visitors who dismissed it
- * are remembered in localStorage.
+ * "Site under construction" notice, shown once per visit: dismissing it hides
+ * it while the visitor browses, and it returns on the next visit (new tab or
+ * browser session, or after 30 minutes away). Staff switch it off from
+ * Admin → Settings → Company once bookings open.
  */
 export function PreviewNotice() {
   const t = useTranslations("previewNotice");
@@ -31,18 +34,18 @@ export function PreviewNotice() {
 
   useEffect(() => {
     if (!enabled || !ROUTES.has(pathname)) return;
-    let seen = false;
+    let dismissedAt = 0;
     try {
-      seen = window.localStorage.getItem(STORAGE_KEY) === "1";
+      dismissedAt = Number(window.sessionStorage.getItem(STORAGE_KEY) ?? 0);
     } catch {
       /* private mode: show it, it simply will not be remembered */
     }
-    if (!seen) setOpen(true);
+    if (!dismissedAt || Date.now() - dismissedAt > REPEAT_AFTER_MS) setOpen(true);
   }, [enabled, pathname]);
 
   const dismiss = () => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, "1");
+      window.sessionStorage.setItem(STORAGE_KEY, String(Date.now()));
     } catch {
       /* ignore */
     }

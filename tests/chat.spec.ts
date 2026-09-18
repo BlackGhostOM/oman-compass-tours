@@ -4,7 +4,7 @@ import { HIDE_DEV_OVERLAY } from "./fixtures";
 test.describe("Live chat & consent", () => {
   test.beforeEach(async ({ context }) => {
     await context.addInitScript(HIDE_DEV_OVERLAY);
-    await context.addInitScript(() => { try { window.localStorage.setItem("oct_preview_notice_v1", "1"); } catch { /* ignore */ } });
+    await context.addInitScript(() => { try { window.sessionStorage.setItem("oct_preview_notice_v1", String(Date.now())); } catch { /* ignore */ } });
   });
 
   test("cookie banner: essential-only choice is remembered", async ({ page }) => {

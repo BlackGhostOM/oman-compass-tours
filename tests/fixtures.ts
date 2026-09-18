@@ -13,7 +13,7 @@ export const test = base.extend({
     await context.addInitScript(() => {
       try {
         window.localStorage.setItem("oct_consent", JSON.stringify({ v: 1, analytics: false, marketing: false, at: Date.now() }));
-        window.localStorage.setItem("oct_preview_notice_v1", "1"); // "site under construction" notice already dismissed
+        window.sessionStorage.setItem("oct_preview_notice_v1", String(Date.now())); // "site under construction" notice already dismissed this visit
       } catch {
         /* ignore */
       }
