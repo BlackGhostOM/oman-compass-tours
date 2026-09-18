@@ -174,6 +174,11 @@ published tour (for example after a redeploy of the image pipeline):
 node scripts/warm-image-cache.mjs --prod
 ```
 
+The same command runs every Monday 03:00 UTC via GitHub Actions
+(`.github/workflows/warm-image-cache.yml`, also triggerable from the Actions
+tab); it needs no secrets because the photo list comes from the public
+`mediaImport:imageUrls` query.
+
 Crons (`convex/crons.ts`) run automatically on the production deployment: hold
 expiry every 15 minutes, booking lifecycle hourly, reminders and abandoned-draft
 follow-ups, FX refresh daily.
