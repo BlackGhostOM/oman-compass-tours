@@ -26,7 +26,7 @@ const isPlaceholderMedia = (m?: { storageId?: Id<"_storage">; url?: string }) =>
  * Idempotent and safe on live data: tours are matched by `code`; ratings,
  * uploaded cover images/videos and draft status set by staff are preserved.
  */
-export async function syncCatalogFromSeed(ctx: MutationCtx, now: number) {
+export async function syncCatalogFromSeed(ctx: MutationCtx, now: number, opts: { codes?: string[] } = {}) {
   /* Categories */
   const categoryIds = new Map<string, Id<"categories">>();
   for (const [i, c] of categoriesSeed.entries()) {
@@ -62,6 +62,7 @@ export async function syncCatalogFromSeed(ctx: MutationCtx, now: number) {
   let inserted = 0;
   let updated = 0;
   for (const t of toursSeed) {
+    if (opts.codes && !opts.codes.includes(t.code)) continue;
     const existing = await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", t.code)).unique();
     const priceGroup = t.priceGroupOmr !== undefined ? omrToBaisa(t.priceGroupOmr) : undefined;
     const priceAdult = t.priceAdultOmr !== undefined ? omrToBaisa(t.priceAdultOmr) : undefined;

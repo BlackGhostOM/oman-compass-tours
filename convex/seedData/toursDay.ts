@@ -506,8 +506,8 @@ export const dayTours: TourSeed[] = [
     viatorCode: "425555P8",
     kind: "tour",
     title: {
-      en: "Friday Goat Market & Souq in Nizwa with an Omani Guide",
-      ar: "سوق الجمعة وسوق الماشية في نزوى مع مرشد عُماني",
+      en: "Friday Goat Market & Souq in Nizwa with an Omani Guide (Sharing Trip)",
+      ar: "سوق الجمعة وسوق الماشية في نزوى مع مرشد عُماني (رحلة مشتركة)",
     },
     slug: { en: "nizwa-friday-market-tour", ar: "سوق-الجمعة-في-نزوى" },
     summary: {

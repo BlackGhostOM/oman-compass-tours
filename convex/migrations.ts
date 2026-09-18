@@ -74,3 +74,16 @@ export const syncCatalog2026 = internalMutation({
     return { inserted, updated, archived, categories: categoryIds.size, destinations: destinationIds.size };
   },
 });
+
+/**
+ * Re-syncs one tour from its seed entry (title, texts, prices, logistics) after
+ * editing `convex/seedData/tours*.ts`. Photos, ratings, status and bookings are kept.
+ */
+export const syncTourFromSeed = internalMutation({
+  args: { code: v.string() },
+  returns: v.object({ inserted: v.number(), updated: v.number() }),
+  handler: async (ctx, { code }) => {
+    const { inserted, updated } = await syncCatalogFromSeed(ctx, Date.now(), { codes: [code] });
+    return { inserted, updated };
+  },
+});
