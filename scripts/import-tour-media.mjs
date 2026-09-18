@@ -68,7 +68,31 @@ for (const [i, p] of prepared.entries()) {
   console.log(`uploaded ${p.file} → ${storageId}`);
 }
 
-const payload = Buffer.from(JSON.stringify({ code: manifest.code, items, coverIndex: manifest.coverIndex ?? 0, replacePlaceholders: manifest.replacePlaceholders ?? true }), "utf8").toString("base64");
-const result = convexRun("mediaImport:attachMany", { payload });
-console.log(`${prod ? "PROD" : "DEV"} ${manifest.code}: added ${result.added}, removed ${result.removed} placeholders (tour ${result.tourId})`);
+// Windows limits a command line to ~8 KB, so the gallery is attached in batches.
+const BATCH = 10;
+const coverIndex = manifest.coverIndex ?? 0;
+let added = 0;
+let removed = 0;
+let tourId = "";
+try {
+  for (let start = 0; start < items.length; start += BATCH) {
+    const chunk = items.slice(start, start + BATCH);
+    const coverInChunk = coverIndex >= start && coverIndex < start + chunk.length ? coverIndex - start : -1;
+    const payload = Buffer.from(
+      JSON.stringify({ code: manifest.code, items: chunk, coverIndex: coverInChunk, replacePlaceholders: start === 0 && (manifest.replacePlaceholders ?? true) }),
+      "utf8",
+    ).toString("base64");
+    const result = convexRun("mediaImport:attachMany", { payload });
+    added += result.added;
+    removed += result.removed;
+    tourId = result.tourId;
+  }
+} catch (err) {
+  console.error("attach failed; discarding the uploaded files so they do not linger in storage");
+  for (let start = 0; start < items.length; start += 25) {
+    convexRun("mediaImport:discard", { storageIds: items.slice(start, start + 25).map((i) => i.storageId) });
+  }
+  throw err;
+}
+console.log(`${prod ? "PROD" : "DEV"} ${manifest.code}: added ${added}, removed ${removed} placeholders (tour ${tourId})`);
 fs.rmSync(tmp, { recursive: true, force: true });

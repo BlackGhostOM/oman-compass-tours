@@ -115,3 +115,46 @@ export const restorePlaceholders = internalMutation({
     return { tourId: tour._id, removed: rows.length, restored: extras.length };
   },
 });
+
+/** Deletes uploaded files that never got attached (called by the import script when attaching fails). */
+export const discard = internalMutation({
+  args: { storageIds: v.array(v.id("_storage")) },
+  returns: v.number(),
+  handler: async (ctx, { storageIds }) => {
+    let n = 0;
+    for (const id of storageIds) {
+      await ctx.storage.delete(id).catch(() => {});
+      n += 1;
+    }
+    return n;
+  },
+});
+
+/**
+ * Removes image files uploaded after `since` (ms epoch) that no tour gallery or
+ * cover references — the leftovers of an import that failed half-way.
+ */
+export const sweepOrphanedTourImages = internalMutation({
+  args: { since: v.number() },
+  returns: v.object({ scanned: v.number(), deleted: v.number() }),
+  handler: async (ctx, { since }) => {
+    const referenced = new Set<string>();
+    for (const m of await ctx.db.query("tourMedia").take(5000)) if (m.media.storageId) referenced.add(m.media.storageId);
+    for (const t of await ctx.db.query("tours").take(500)) {
+      if (t.coverImage?.storageId) referenced.add(t.coverImage.storageId);
+      if (t.video?.storageId) referenced.add(t.video.storageId);
+      if (t.video?.posterStorageId) referenced.add(t.video.posterStorageId);
+    }
+    const files = await ctx.db.system.query("_storage").order("desc").take(1000);
+    let scanned = 0;
+    let deleted = 0;
+    for (const f of files) {
+      if (f._creationTime < since) break;
+      scanned += 1;
+      if (f.contentType !== "image/jpeg" || referenced.has(f._id)) continue;
+      await ctx.storage.delete(f._id);
+      deleted += 1;
+    }
+    return { scanned, deleted };
+  },
+});
