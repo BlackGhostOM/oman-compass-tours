@@ -2,6 +2,7 @@ import { setRequestLocale } from "next-intl/server";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SupportFab } from "@/components/layout/support-fab";
+import { PreviewNotice } from "@/components/site/preview-notice";
 
 export default async function SiteLayout({
   children,
@@ -26,6 +27,7 @@ export default async function SiteLayout({
       </main>
       <SiteFooter />
       <SupportFab />
+      <PreviewNotice />
     </>
   );
 }

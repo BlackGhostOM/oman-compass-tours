@@ -1828,7 +1828,11 @@
         "profileCurrent": "Open current file",
         "profileRemove": "Remove",
         "profileRemoved": "Company profile removed.",
-        "profileNone": "No file uploaded yet."
+        "profileNone": "No file uploaded yet.",
+        "previewNoticeTitle": "“Website under construction” notice",
+        "previewNoticeHint": "Shows a one-time message to new visitors on the home, tours and services pages saying that online booking is not open yet and pointing them to WhatsApp, phone and email. Switch it off when the site is ready.",
+        "previewNoticeOn": "Notice enabled.",
+        "previewNoticeOff": "Notice disabled."
       },
       "booking": {
         "title": "Booking & support rules",
@@ -2235,5 +2239,13 @@
         "generic": "Please check this field."
       }
     }
+  },
+  "previewNotice": {
+    "title": "Welcome to our new website",
+    "body": "Oman Compass Tours is building and testing this website. Online booking is not open yet, and prices and availability shown here are still being finalised. Thank you for your patience while we finish the work.",
+    "contact": "Until the site is complete, we would be glad to plan your trip through our usual channels:",
+    "email": "Email",
+    "cta": "Contact us",
+    "dismiss": "Continue browsing"
   }
 }

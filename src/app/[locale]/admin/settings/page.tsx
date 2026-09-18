@@ -36,6 +36,7 @@ function CompanyTab({ settings }: { settings: Record<string, unknown> }) {
   const setProfilePdf = useMutation(api.admin.settings.setProfilePdf);
   const [pdfBusy, setPdfBusy] = useState(false);
   const storedPdfUrl = typeof settings["company.profilePdfUrl"] === "string" ? (settings["company.profilePdfUrl"] as string) : "";
+  const previewNotice = (settings["site.previewNotice"] as { enabled: boolean } | undefined)?.enabled ?? true;
   async function uploadProfilePdf(file: File) {
     if (file.type !== "application/pdf") return toast.error(t("profileNotPdf"));
     if (file.size > 20 * 1024 * 1024) return toast.error(t("profileTooLarge"));
@@ -64,6 +65,13 @@ function CompanyTab({ settings }: { settings: Record<string, unknown> }) {
       </div>
       <Button size="sm" className="mt-4 bg-gold-gradient text-navy-950" onClick={async () => { await set({ key: "company.info", value: info }); await set({ key: "company.profilePdfUrl", value: info.profilePdfUrl }); toast.success(t("saved")); }}>{t("save")}</Button>
       <p className="mt-2 text-xs text-muted-foreground">{t("note")}</p>
+      <div className="mt-6 flex items-start justify-between gap-4 rounded-lg border border-warning/40 bg-warning/10 p-4">
+        <div>
+          <p className="font-medium text-foreground">{t("previewNoticeTitle")}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t("previewNoticeHint")}</p>
+        </div>
+        <Switch checked={previewNotice} aria-label={t("previewNoticeTitle")} onCheckedChange={async (on) => { await set({ key: "site.previewNotice", value: { enabled: on } }); toast.success(on ? t("previewNoticeOn") : t("previewNoticeOff")); }} />
+      </div>
       <div className="mt-6 rounded-lg border border-border bg-muted/30 p-4">
         <p className="font-medium text-foreground">{t("profileTitle")}</p>
         <p className="mt-1 text-xs text-muted-foreground">{t("profileHint")}</p>
