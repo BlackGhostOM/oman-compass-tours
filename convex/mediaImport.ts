@@ -173,6 +173,14 @@ export const imageUrls = query({
       ? [await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", code)).unique()].filter((t) => !!t)
       : await ctx.db.query("tours").withIndex("by_status", (q) => q.eq("status", "published")).take(500);
     const urls = new Set<string>();
+    // Destination cards/heroes (only when warming everything, not a single tour)
+    if (!code) {
+      for (const d of await ctx.db.query("destinations").take(50)) {
+        if (!d.isActive || !d.image) continue;
+        const u = d.image.url ?? (d.image.storageId ? await ctx.storage.getUrl(d.image.storageId) : null);
+        if (u?.startsWith("http")) urls.add(u);
+      }
+    }
     for (const t of tours) {
       if (!t || t.status !== "published") continue;
       const cover = t.coverImage?.url ?? (t.coverImage?.storageId ? await ctx.storage.getUrl(t.coverImage.storageId) : null);
