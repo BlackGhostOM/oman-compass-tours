@@ -166,6 +166,14 @@ storage, then written to `tourMedia` and the cover in one transaction):
 node scripts/import-tour-media.mjs path/to/manifest.json --prod
 ```
 
+On Vercel the first view of each photo size/format costs a 2–3 s transcode, so
+production imports finish by warming the optimizer cache. To warm every
+published tour (for example after a redeploy of the image pipeline):
+
+```bash
+node scripts/warm-image-cache.mjs --prod
+```
+
 Crons (`convex/crons.ts`) run automatically on the production deployment: hold
 expiry every 15 minutes, booking lifecycle hourly, reminders and abandoned-draft
 follow-ups, FX refresh daily.
