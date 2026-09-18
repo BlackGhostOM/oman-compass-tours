@@ -43,17 +43,16 @@ export default async function DestinationPage({ params }: Props) {
         </div>
       </section>
       <section className="surface-sand py-12">
-        <div className="container-brand grid gap-10 lg:grid-cols-[1fr_20rem]">
-          <div>
+        <div className="container-brand">
+          {/* Intro + map side by side; the catalogue below gets the full width, like the Tours page */}
+          <div className="grid gap-8 lg:grid-cols-[1fr_22rem] lg:items-start">
             {d.description && <p className="max-w-3xl text-lg leading-relaxed text-ink-500">{pick(d.description, locale)}</p>}
-            <h2 className="mt-10 mb-6 font-heading text-2xl text-navy-950">{t("toursIn", { name: pick(d.name, locale) })}</h2>
-            <Suspense>
-              <TourCatalog initialDestination={d.key} />
-            </Suspense>
+            <MapEmbed className="h-64 lg:h-56" title={pick(d.name, locale)} lat={d.lat ?? undefined} lng={d.lng ?? undefined} zoom={9} />
           </div>
-          <aside className="space-y-4">
-            <MapEmbed className="h-64" title={pick(d.name, locale)} lat={d.lat ?? undefined} lng={d.lng ?? undefined} zoom={9} />
-          </aside>
+          <h2 className="mt-12 mb-6 font-heading text-2xl text-navy-950">{t("toursIn", { name: pick(d.name, locale) })}</h2>
+          <Suspense>
+            <TourCatalog initialDestination={d.key} />
+          </Suspense>
         </div>
       </section>
     </>
