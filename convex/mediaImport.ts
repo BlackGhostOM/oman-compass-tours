@@ -1,6 +1,8 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { internalMutation } from "./_generated/server";
+import { media, placeholder } from "./lib/catalogSync";
+import { toursSeed } from "./seedData/tours";
 
 /**
  * Bulk photo import for a tour, driven from the CLI (scripts/import-tour-media.mjs):
@@ -79,5 +81,37 @@ export const attachMany = internalMutation({
       });
     }
     return { tourId: tour._id, added: items.length, removed };
+  },
+});
+
+/**
+ * Undoes a photo import: deletes every gallery row (and its stored file) for the
+ * tour and puts the seeded placeholder gallery and cover back.
+ */
+export const restorePlaceholders = internalMutation({
+  args: { code: v.string() },
+  returns: v.object({ tourId: v.id("tours"), removed: v.number(), restored: v.number() }),
+  handler: async (ctx, { code }) => {
+    const tour = await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", code)).unique();
+    if (!tour) throw new Error(`No tour with code ${code}`);
+    const seed = toursSeed.find((t) => t.code === code);
+    if (!seed) throw new Error(`No seed entry for ${code}`);
+
+    const rows = await ctx.db.query("tourMedia").withIndex("by_tour_order", (q) => q.eq("tourId", tour._id)).take(200);
+    for (const m of rows) {
+      if (m.media.storageId) await ctx.storage.delete(m.media.storageId).catch(() => {});
+      await ctx.db.delete(m._id);
+    }
+    const extras = [seed.image, "muscat", "wahiba", "jebel-akhdar", "wadi-shab"].filter((k, i, a) => a.indexOf(k) === i).slice(0, 4);
+    for (const [i, key] of extras.entries()) {
+      await ctx.db.insert("tourMedia", { tourId: tour._id, media: media(key, tour.title), order: i });
+    }
+    if (tour.coverImage?.storageId) await ctx.storage.delete(tour.coverImage.storageId).catch(() => {});
+    await ctx.db.patch(tour._id, {
+      coverImage: media(seed.image, tour.title),
+      seo: { ...(tour.seo ?? { title: tour.title, description: tour.summary }), ogImageUrl: placeholder(seed.image) },
+      updatedAt: Date.now(),
+    });
+    return { tourId: tour._id, removed: rows.length, restored: extras.length };
   },
 });
