@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
 import { ChevronLeft, ChevronRight, Play, X } from "lucide-react";
@@ -49,6 +49,14 @@ export function MediaGallery({ items, title, className }: { items: MediaItem[]; 
 
   // Touch swipe
   const [touchX, setTouchX] = useState<number | null>(null);
+
+  // Filmstrip: keep the active thumbnail in view as the visitor moves through the gallery
+  const stripRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const active = stripRef.current?.querySelector<HTMLElement>(`[data-index="${index}"]`);
+    active?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+  }, [open, index]);
 
   if (count === 0) return null;
   const main = media[0];
@@ -113,7 +121,7 @@ export function MediaGallery({ items, title, className }: { items: MediaItem[]; 
           }}
         >
           <DialogTitle className="sr-only">{title}</DialogTitle>
-          <div className="relative flex h-full flex-col">
+          <div className="relative flex h-full w-full min-w-0 flex-col overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 text-sm">
               <span className="text-sand-100/70">
                 {index + 1} / {count}
@@ -139,7 +147,34 @@ export function MediaGallery({ items, title, className }: { items: MediaItem[]; 
                 </>
               )}
             </div>
-            <p className="px-4 py-3 text-center text-sm text-sand-100/70">{pick(current.alt, locale)}</p>
+            <p className="px-4 py-2 text-center text-sm text-sand-100/70">{pick(current.alt, locale)}</p>
+            {count > 1 && (
+              <div
+                ref={stripRef}
+                role="tablist"
+                aria-label={t("thumbnails")}
+                className="flex w-full max-w-full gap-2 overflow-x-auto border-t border-navy-800 px-4 py-3 [scrollbar-width:thin] [scrollbar-color:var(--color-navy-700)_transparent]"
+              >
+                {media.map((m, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    role="tab"
+                    data-index={i}
+                    aria-selected={i === index}
+                    aria-label={t("openImage", { n: i + 1, total: count })}
+                    onClick={() => setIndex(i)}
+                    className={cn(
+                      "relative h-14 w-20 shrink-0 overflow-hidden rounded-md ring-2 transition sm:h-16 sm:w-24",
+                      i === index ? "ring-gold-500 opacity-100" : "ring-transparent opacity-60 hover:opacity-100",
+                    )}
+                  >
+                    <Image src={m.posterUrl ?? m.url!} alt="" fill sizes="96px" className="object-cover" />
+                    {m.kind === "video" && <PlayBadge small />}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

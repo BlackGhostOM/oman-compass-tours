@@ -280,7 +280,8 @@
     "openImage": "Open image {n} of {total}",
     "close": "Close gallery",
     "prev": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "thumbnails": "Gallery thumbnails"
   },
   "reviews": {
     "ratingLabel": "Rated {rating} out of 5",

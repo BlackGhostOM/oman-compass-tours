@@ -280,7 +280,8 @@
     "openImage": "فتح الصورة {n} من {total}",
     "close": "إغلاق المعرض",
     "prev": "السابق",
-    "next": "التالي"
+    "next": "التالي",
+    "thumbnails": "مصغّرات المعرض"
   },
   "reviews": {
     "ratingLabel": "التقييم {rating} من 5",
