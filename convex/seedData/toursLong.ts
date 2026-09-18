@@ -77,7 +77,7 @@ export const longJourneys: TourSeed[] = [
     code: "OCT-009",
     viatorCode: "425555P33",
     kind: "tour",
-    title: { en: "6-Day Oman Nature, Culture & Traditions – Small-Group Trip", ar: "6 أيام في طبيعة عُمان وثقافتها وتقاليدها: رحلة جماعية صغيرة" },
+    title: { en: "6-Day Oman Nature, Culture & Traditions – Sharing Group Trip", ar: "6 أيام في طبيعة عُمان وثقافتها وتقاليدها: رحلة جماعية مشتركة" },
     slug: { en: "oman-nature-culture-traditions-6-day", ar: "عمان-6-أيام-جولة-جماعية" },
     summary: {
       en: "Four fixed departures a year: Muscat and Daymaniyat snorkelling, Wadi Shab, turtles at Ras Al Jinz, the Wahiba Sands, Nizwa, Misfat and Al Hoota Cave, and a dhow cruise — hotels, camps and most meals included.",
