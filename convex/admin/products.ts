@@ -162,6 +162,24 @@ export const setStatus = mutation({
   },
 });
 
+/** Bulk visibility: hide (draft), show (published) or archive several products at once. */
+export const setStatusMany = mutation({
+  args: { ids: v.array(v.id("tours")), status: v.union(v.literal("draft"), v.literal("published"), v.literal("archived")) },
+  returns: v.number(),
+  handler: async (ctx, { ids, status }) => {
+    const staff = await requireStaff(ctx);
+    let changed = 0;
+    for (const id of ids.slice(0, 200)) {
+      const t = await ctx.db.get(id);
+      if (!t || t.status === status) continue;
+      await ctx.db.patch(id, { status, updatedAt: Date.now() });
+      await audit(ctx, staff, "tour.status", "tours", String(id), { status: t.status }, { status });
+      changed += 1;
+    }
+    return changed;
+  },
+});
+
 export const duplicate = mutation({
   args: { id: v.id("tours") },
   returns: v.id("tours"),
@@ -254,19 +272,38 @@ export const removeSeason = mutation({
 });
 
 export const setAvailability = mutation({
-  args: { tourId: v.id("tours"), date: v.string(), startTime: v.optional(v.string()), capacity: v.optional(v.number()), isBlackout: v.boolean(), note: v.optional(v.string()) },
-  returns: v.null(),
+  args: {
+    tourId: v.id("tours"),
+    date: v.string(),
+    /** Inclusive end of a date range (YYYY-MM-DD); omitted = single date. */
+    toDate: v.optional(v.string()),
+    startTime: v.optional(v.string()),
+    capacity: v.optional(v.number()),
+    isBlackout: v.boolean(),
+    note: v.optional(v.string()),
+  },
+  returns: v.number(),
   handler: async (ctx, args) => {
     const staff = await requireStaff(ctx);
     const tour = await ctx.db.get(args.tourId);
     if (!tour) throw new ConvexError({ code: "NOT_FOUND" });
-    const rows = await ctx.db.query("availability").withIndex("by_tour_date", (q) => q.eq("tourId", args.tourId).eq("date", args.date)).take(20);
-    const existing = rows.find((r) => (r.startTime ?? null) === (args.startTime ?? null));
-    const doc = { tourId: args.tourId, date: args.date, startTime: args.startTime, capacity: args.capacity ?? tour.defaultCapacityPerSlot, booked: existing?.booked ?? 0, isBlackout: args.isBlackout, note: args.note };
-    if (existing) await ctx.db.patch(existing._id, doc);
-    else await ctx.db.insert("availability", doc);
-    await audit(ctx, staff, "tour.availability", "tours", String(args.tourId), undefined, { date: args.date, startTime: args.startTime, isBlackout: args.isBlackout, capacity: doc.capacity });
-    return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(args.date)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "date" });
+    const last = args.toDate && args.toDate > args.date ? args.toDate : args.date;
+    const dates: string[] = [];
+    for (let d = new Date(`${args.date}T00:00:00Z`); dates.length < 366; d.setUTCDate(d.getUTCDate() + 1)) {
+      const iso = d.toISOString().slice(0, 10);
+      if (iso > last) break;
+      dates.push(iso);
+    }
+    for (const date of dates) {
+      const rows = await ctx.db.query("availability").withIndex("by_tour_date", (q) => q.eq("tourId", args.tourId).eq("date", date)).take(20);
+      const existing = rows.find((r) => (r.startTime ?? null) === (args.startTime ?? null));
+      const doc = { tourId: args.tourId, date, startTime: args.startTime, capacity: args.capacity ?? tour.defaultCapacityPerSlot, booked: existing?.booked ?? 0, isBlackout: args.isBlackout, note: args.note };
+      if (existing) await ctx.db.patch(existing._id, doc);
+      else await ctx.db.insert("availability", doc);
+    }
+    await audit(ctx, staff, "tour.availability", "tours", String(args.tourId), undefined, { date: args.date, toDate: last, startTime: args.startTime, isBlackout: args.isBlackout, capacity: args.capacity ?? tour.defaultCapacityPerSlot, days: dates.length });
+    return dates.length;
   },
 });
 

@@ -1328,7 +1328,7 @@
         "newEyebrow": "New product",
         "newTitle": "Create a product",
         "preview": "Preview",
-        "saveDraft": "Save draft",
+        "saveDraft": "Save as draft (hidden)",
         "publish": "Save & publish",
         "saving": "Saving…",
         "saved": "Saved.",
@@ -1425,9 +1425,22 @@
         "externalReviews": "External review count",
         "back": "Back to products",
         "saveFirst": "Save the product as a draft first; then you can upload gallery photos and videos and manage availability here.",
-        "saveDraftContinue": "Save draft & continue",
-        "missingRequired": "Fill in the required fields first: code, title and main category."
-      }
+        "saveDraftContinue": "Save as draft & continue",
+        "missingRequired": "Fill in the required fields first: code, title and main category.",
+        "toDate": "To date (optional)",
+        "blackoutDates": "Block these dates",
+        "pickDateFirst": "Pick a date first",
+        "appliedDays": "Applied to {days} day(s).",
+        "blackoutNote": "Blocking here only stops bookings on the chosen dates. To hide this product from the website entirely, use “Save as draft (hidden)” above, or tick several products in the list and choose “Hide from site”."
+      },
+      "selectAll": "Select all",
+      "selected": "{count} selected",
+      "bulkShow": "Show on site",
+      "bulkHide": "Hide from site",
+      "bulkArchive": "Archive",
+      "bulkDone": "{count} products updated.",
+      "visibilityHint": "Only products with status “Published” appear on the website. Tick several products to hide or show them at once.",
+      "clearSelection": "Clear"
     },
     "customers": {
       "eyebrow": "CRM",

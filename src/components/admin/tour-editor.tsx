@@ -102,7 +102,7 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [season, setSeason] = useState({ name: L(), startDate: "", endDate: "", priceAdultOmr: "", priceGroupOmr: "", priceChildOmr: "" });
-  const [avail, setAvail] = useState({ date: "", startTime: "", capacity: "", isBlackout: false, note: "" });
+  const [avail, setAvail] = useState({ date: "", toDate: "", startTime: "", capacity: "", isBlackout: false, note: "" });
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((s) => ({ ...s, [k]: v }));
 
   async function save(nextStatus?: "draft" | "published") {
@@ -353,14 +353,19 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
           {!tour && <SaveFirstNotice text={t("saveFirst")} cta={t("saveDraftContinue")} busy={busy} onSave={() => save("draft")} />}
           {tour && (
             <Panel title={t("availabilityTitle")}>
-              <p className="mb-3 text-xs text-muted-foreground">{t("availabilityHint", { capacity: tour.defaultCapacityPerSlot })}</p>
-              <div className="grid gap-3 sm:grid-cols-6">
-                <div className="space-y-1.5"><Label>{t("date")}</Label><Input type="date" value={avail.date} onChange={(e) => setAvail({ ...avail, date: e.target.value })} /></div>
+              <p className="mb-1 text-xs text-muted-foreground">{t("availabilityHint", { capacity: tour.defaultCapacityPerSlot })}</p>
+              <p className="mb-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground">{t("blackoutNote")}</p>
+              <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-7">
+                <div className="space-y-1.5"><Label>{t("date")}</Label><Input type="date" value={avail.date} onChange={(e) => setAvail({ ...avail, date: e.target.value, toDate: avail.toDate && avail.toDate < e.target.value ? "" : avail.toDate })} /></div>
+                <div className="space-y-1.5"><Label>{t("toDate")}</Label><Input type="date" min={avail.date || undefined} value={avail.toDate} onChange={(e) => setAvail({ ...avail, toDate: e.target.value })} /></div>
                 <div className="space-y-1.5"><Label>{t("time")}</Label><Select value={avail.startTime || "all"} onValueChange={(v) => setAvail({ ...avail, startTime: v === "all" ? "" : v })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">{t("allSlots")}</SelectItem>{tour.startTimes.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
                 <div className="space-y-1.5"><Label>{t("capacity")}</Label><Input type="number" value={avail.capacity} onChange={(e) => setAvail({ ...avail, capacity: e.target.value })} /></div>
-                <div className="flex items-end gap-2"><Switch id="bo" checked={avail.isBlackout} onCheckedChange={(v) => setAvail({ ...avail, isBlackout: v })} /><Label htmlFor="bo">{t("blackout")}</Label></div>
+                <div className="flex items-end gap-2"><Switch id="bo" checked={avail.isBlackout} onCheckedChange={(v) => setAvail({ ...avail, isBlackout: v })} /><Label htmlFor="bo">{t("blackoutDates")}</Label></div>
                 <div className="space-y-1.5"><Label>{t("note")}</Label><Input value={avail.note} onChange={(e) => setAvail({ ...avail, note: e.target.value })} /></div>
-                <div className="flex items-end"><Button size="sm" disabled={!avail.date} onClick={async () => { await setAvailability({ tourId: tour._id, date: avail.date, startTime: avail.startTime || undefined, capacity: avail.capacity ? Number(avail.capacity) : undefined, isBlackout: avail.isBlackout, note: avail.note || undefined }); toast.success(t("saved")); }}>{t("apply")}</Button></div>
+                <div className="flex flex-col justify-end gap-1">
+                  <Button size="sm" disabled={!avail.date} onClick={async () => { const days = await setAvailability({ tourId: tour._id, date: avail.date, toDate: avail.toDate || undefined, startTime: avail.startTime || undefined, capacity: avail.capacity ? Number(avail.capacity) : undefined, isBlackout: avail.isBlackout, note: avail.note || undefined }); toast.success(t("appliedDays", { days })); }}>{t("apply")}</Button>
+                  {!avail.date && <span className="text-[11px] text-warning">{t("pickDateFirst")}</span>}
+                </div>
               </div>
               <ul className="mt-4 divide-y divide-border text-sm">
                 {tour.availability.sort((a, b) => a.date.localeCompare(b.date)).map((a) => (
