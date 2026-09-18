@@ -7,8 +7,6 @@
  * Fetches every width the site's `sizes` attributes can select, in AVIF and
  * WebP, for the cover and gallery of every published tour (or one tour).
  */
-import { spawnSync } from "node:child_process";
-
 const args = process.argv.slice(2);
 const prod = args.includes("--prod");
 const arg = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : undefined);
@@ -20,14 +18,19 @@ const WIDTHS = [96, 256, 384, 640, 1080, 1200, 1920, 2048];
 const ACCEPTS = ["image/avif,image/webp,image/*,*/*;q=0.8", "image/webp,image/*,*/*;q=0.8"];
 const CONCURRENCY = 12;
 
-const quoted = '"' + JSON.stringify({ code }).replace(/"/g, '\\"') + '"';
-const res = spawnSync("npx", ["convex", "run", "mediaImport:imageUrls", quoted, ...(prod ? ["--prod"] : [])], { encoding: "utf8", shell: true, windowsHide: true });
-if (res.status !== 0) {
-  console.error(res.stderr || res.stdout);
+// Convex deployment URLs (prod / dev); overridable for CI via CONVEX_URL
+const convexUrl = process.env.CONVEX_URL ?? (prod ? "https://fantastic-sturgeon-674.convex.cloud" : "https://beloved-stork-706.convex.cloud");
+const listRes = await fetch(`${convexUrl}/api/query`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ path: "mediaImport:imageUrls", args: code ? { code } : {}, format: "json" }),
+});
+const list = await listRes.json();
+if (!listRes.ok || list.status !== "success") {
+  console.error("could not list image URLs:", JSON.stringify(list).slice(0, 300));
   process.exit(1);
 }
-const out = res.stdout;
-const urls = JSON.parse(out.slice(out.indexOf("[")));
+const urls = list.value;
 console.log(`${urls.length} images × ${WIDTHS.length} widths × ${ACCEPTS.length} formats = ${urls.length * WIDTHS.length * ACCEPTS.length} requests → ${site}`);
 
 const jobs = [];

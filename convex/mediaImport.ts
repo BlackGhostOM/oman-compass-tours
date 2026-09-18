@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { internalMutation, internalQuery } from "./_generated/server";
+import { internalMutation, query } from "./_generated/server";
 import { media, placeholder } from "./lib/catalogSync";
 import { toursSeed } from "./seedData/tours";
 
@@ -159,8 +159,13 @@ export const sweepOrphanedTourImages = internalMutation({
   },
 });
 
-/** Every image URL shown for published tours (cover + gallery), for warming the image-optimizer cache. */
-export const imageUrls = internalQuery({
+/**
+ * Every image URL shown for published tours (cover + gallery), for warming the
+ * image-optimizer cache. Public and unauthenticated on purpose: the weekly
+ * GitHub Actions warm-up calls it without a deploy key, and the URLs are the
+ * same ones already rendered in the public tour pages.
+ */
+export const imageUrls = query({
   args: { code: v.optional(v.string()) },
   returns: v.array(v.string()),
   handler: async (ctx, { code }) => {
@@ -169,7 +174,7 @@ export const imageUrls = internalQuery({
       : await ctx.db.query("tours").withIndex("by_status", (q) => q.eq("status", "published")).take(500);
     const urls = new Set<string>();
     for (const t of tours) {
-      if (!t) continue;
+      if (!t || t.status !== "published") continue;
       const cover = t.coverImage?.url ?? (t.coverImage?.storageId ? await ctx.storage.getUrl(t.coverImage.storageId) : null);
       if (cover?.startsWith("http")) urls.add(cover);
       const rows = await ctx.db.query("tourMedia").withIndex("by_tour_order", (q) => q.eq("tourId", t._id)).take(100);

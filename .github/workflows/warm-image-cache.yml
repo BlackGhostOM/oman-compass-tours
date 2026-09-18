@@ -1,0 +1,22 @@
+name: Warm image cache
+
+# Pre-generates the optimized variants of every tour photo on the production
+# site so visitors never wait for a cold transcode. The optimizer cache lives
+# 30 days; a weekly run keeps it warm. No secrets needed: the photo list comes
+# from a public Convex query and the site is fetched anonymously.
+on:
+  schedule:
+    - cron: "0 3 * * 1" # Mondays 03:00 UTC (07:00 Oman)
+  workflow_dispatch:
+
+jobs:
+  warm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Warm every published tour photo
+        run: node scripts/warm-image-cache.mjs --prod
