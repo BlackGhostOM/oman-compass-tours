@@ -87,3 +87,27 @@ export const syncTourFromSeed = internalMutation({
     return { inserted, updated };
   },
 });
+
+/** Turns legacy plain-string destination regions into bilingual {en, ar} objects. */
+export const localizeDestinationRegions = internalMutation({
+  args: {},
+  returns: v.object({ updated: v.number(), total: v.number() }),
+  handler: async (ctx) => {
+    const AR: Record<string, string> = {
+      "Muscat Governorate": "محافظة مسقط",
+      "Ad Dakhiliyah": "محافظة الداخلية",
+      "Ash Sharqiyah": "محافظة جنوب الشرقية",
+      "Dhofar": "محافظة ظفار",
+      "Musandam Governorate": "محافظة مسندم",
+      "South Al Batinah": "محافظة جنوب الباطنة",
+    };
+    const rows = await ctx.db.query("destinations").take(100);
+    let updated = 0;
+    for (const d of rows) {
+      if (typeof d.region !== "string") continue;
+      await ctx.db.patch(d._id, { region: { en: d.region, ar: AR[d.region] ?? d.region } });
+      updated += 1;
+    }
+    return { updated, total: rows.length };
+  },
+});

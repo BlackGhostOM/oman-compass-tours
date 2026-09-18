@@ -354,7 +354,7 @@ export const upsertCategory = mutation({
 });
 
 export const upsertDestination = mutation({
-  args: { id: v.optional(v.id("destinations")), key: v.string(), name: localized, slug: localizedOptional, tagline: localizedOptional, description: localizedOptional, region: v.optional(v.string()), image: v.optional(mediaValidator), lat: v.optional(v.number()), lng: v.optional(v.number()), order: v.number(), isActive: v.boolean() },
+  args: { id: v.optional(v.id("destinations")), key: v.string(), name: localized, slug: localizedOptional, tagline: localizedOptional, description: localizedOptional, region: localizedOptional, image: v.optional(mediaValidator), lat: v.optional(v.number()), lng: v.optional(v.number()), order: v.number(), isActive: v.boolean() },
   returns: v.id("destinations"),
   handler: async (ctx, args) => {
     await requireStaff(ctx);

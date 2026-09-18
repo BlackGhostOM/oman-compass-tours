@@ -37,7 +37,7 @@ export default async function DestinationPage({ params }: Props) {
         <Image src={d.image?.url ?? "/media/placeholders/hero.jpg"} alt={pick(d.image?.alt, locale) || pick(d.name, locale)} fill priority sizes="100vw" className="object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-950/60 to-navy-950/20" />
         <div className="container-brand relative">
-          <p className="eyebrow">{d.region ?? t("eyebrow")}</p>
+          <p className="eyebrow">{(typeof d.region === "string" ? d.region : pick(d.region, locale)) || t("eyebrow")}</p>
           <h1 className="heading-brand mt-3 font-heading text-4xl text-sand-50 sm:text-5xl">{pick(d.name, locale)}</h1>
           {d.tagline && <p className="mt-3 max-w-2xl font-editorial text-xl text-sand-100/85">{pick(d.tagline, locale)}</p>}
         </div>

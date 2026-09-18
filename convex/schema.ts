@@ -161,7 +161,7 @@ export default defineSchema({
     slug: localized,
     tagline: localizedOptional,
     description: localizedOptional,
-    region: v.optional(v.string()),
+    region: v.optional(v.union(localized, v.string())), // string = legacy seed rows, migrated to {en, ar}
     image: v.optional(mediaValidator),
     lat: v.optional(v.number()),
     lng: v.optional(v.number()),
