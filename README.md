@@ -166,6 +166,10 @@ storage, then written to `tourMedia` and the cover in one transaction):
 node scripts/import-tour-media.mjs path/to/manifest.json --prod
 ```
 
+To change a cover afterwards without re-importing, pick a gallery photo by its
+English alt text: `npx convex run --prod mediaImport:setCoverByAlt '{"code":"OCT-010","alt":"Sur lagoon"}'`
+(also moves it to the front of the gallery). `mediaImport:restorePlaceholders {code}` undoes an import entirely.
+
 On Vercel the first view of each photo size/format costs a 2–3 s transcode, so
 production imports finish by warming the optimizer cache. To warm every
 published tour (for example after a redeploy of the image pipeline):
