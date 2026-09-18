@@ -337,10 +337,10 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
                   <li key={m._id} className="group relative overflow-hidden rounded-lg border border-border">
                     {m.media.kind === "video" ? <video src={m.url ?? undefined} className="aspect-[4/3] w-full object-cover" muted /> : <img src={m.url ?? ""} alt="" className="aspect-[4/3] w-full object-cover" />}
                     <div className="absolute inset-x-0 bottom-0 flex justify-between gap-1 bg-navy-950/80 p-1">
-                      <Button size="icon-xs" variant="ghost" className="text-sand-50" onClick={() => reorderMedia({ tourId: tour._id, orderedIds: [...tour.media.slice(0, Math.max(0, i - 1)).map((x) => x._id), m._id, ...tour.media.filter((_, j) => j !== i).slice(Math.max(0, i - 1)).map((x) => x._id)] })} aria-label="up"><ArrowUp className="size-3" /></Button>
-                      <Button size="icon-xs" variant="ghost" className="text-sand-50" onClick={() => reorderMedia({ tourId: tour._id, orderedIds: [...tour.media.filter((_, j) => j !== i).slice(0, i + 1).map((x) => x._id), m._id, ...tour.media.filter((_, j) => j !== i).slice(i + 1).map((x) => x._id)] })} aria-label="down"><ArrowDown className="size-3" /></Button>
-                      <Button size="icon-xs" variant="ghost" className="text-gold-400" onClick={() => setCover({ tourId: tour._id, mediaId: m._id }).then(() => toast.success(t("coverSet")))} aria-label="cover"><Star className="size-3" /></Button>
-                      <Button size="icon-xs" variant="ghost" className="text-danger" onClick={() => removeMedia({ id: m._id })} aria-label="remove"><Trash2 className="size-3" /></Button>
+                      <Button size="icon-xs" variant="ghost" className="text-sand-50" onClick={() => reorderMedia({ tourId: tour._id, orderedIds: [...tour.media.slice(0, Math.max(0, i - 1)).map((x) => x._id), m._id, ...tour.media.filter((_, j) => j !== i).slice(Math.max(0, i - 1)).map((x) => x._id)] })} aria-label="up" title="up"><ArrowUp className="size-3" /></Button>
+                      <Button size="icon-xs" variant="ghost" className="text-sand-50" onClick={() => reorderMedia({ tourId: tour._id, orderedIds: [...tour.media.filter((_, j) => j !== i).slice(0, i + 1).map((x) => x._id), m._id, ...tour.media.filter((_, j) => j !== i).slice(i + 1).map((x) => x._id)] })} aria-label="down" title="down"><ArrowDown className="size-3" /></Button>
+                      <Button size="icon-xs" variant="ghost" className="text-gold-400" onClick={() => setCover({ tourId: tour._id, mediaId: m._id }).then(() => toast.success(t("coverSet")))} aria-label="cover" title="cover"><Star className="size-3" /></Button>
+                      <Button size="icon-xs" variant="ghost" className="text-danger" onClick={() => removeMedia({ id: m._id })} aria-label="remove" title="remove"><Trash2 className="size-3" /></Button>
                     </div>
                   </li>
                 ))}

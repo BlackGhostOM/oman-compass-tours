@@ -142,8 +142,8 @@ export default function TravellersPage() {
                   <p className="text-sm text-muted-foreground">{[tr.relationship, tr.nationality ? countryName(tr.nationality, locale) : null, tr.dateOfBirth].filter(Boolean).join(" · ")}</p>
                 </div>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="icon-sm" aria-label={t("edit")} onClick={() => startEdit(tr)}><Pencil className="size-4" /></Button>
-                  <Button variant="ghost" size="icon-sm" aria-label={t("delete")} className="text-danger" onClick={async () => { await remove({ id: tr._id }); toast.success(t("deleted")); }}><Trash2 className="size-4" /></Button>
+                  <Button variant="ghost" size="icon-sm" aria-label={t("edit")} title={t("edit")} onClick={() => startEdit(tr)}><Pencil className="size-4" /></Button>
+                  <Button variant="ghost" size="icon-sm" aria-label={t("delete")} title={t("delete")} className="text-danger" onClick={async () => { await remove({ id: tr._id }); toast.success(t("deleted")); }}><Trash2 className="size-4" /></Button>
                 </div>
               </div>
               <dl className="mt-3 space-y-1 text-xs text-muted-foreground">

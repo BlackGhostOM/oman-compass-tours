@@ -87,7 +87,7 @@ export function DashboardShell({
             <div className="flex items-center gap-2">
               <Sheet open={open} onOpenChange={setOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="lg:hidden" aria-label={td("openMenu")}>
+                  <Button variant="ghost" size="icon" className="lg:hidden" aria-label={td("openMenu")} title={td("openMenu")}>
                     <Menu className="size-5" />
                   </Button>
                 </SheetTrigger>
@@ -110,7 +110,7 @@ export function DashboardShell({
               <LanguageSwitcher className="text-foreground hover:bg-muted hover:text-foreground" />
               <ThemeToggle />
               {viewer && (
-                <div className="ms-2 flex items-center gap-2">
+                <div className="ms-2 flex items-center gap-2" title={viewer.name ?? viewer.email ?? undefined}>
                   <Avatar className="size-8">
                     {viewer.image && <AvatarImage src={viewer.image} alt="" />}
                     <AvatarFallback className="bg-gold-500/20 text-xs text-gold-700">{initials}</AvatarFallback>
@@ -121,7 +121,7 @@ export function DashboardShell({
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label={td("signOut")}
+                aria-label={td("signOut")} title={td("signOut")}
                 onClick={async () => {
                   await signOut();
                   router.replace("/");

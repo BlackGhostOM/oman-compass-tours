@@ -23,9 +23,9 @@ function Counter({ id, label, hint, value, min, max, onChange }: { id: string; l
         {hint && <p className="text-xs text-ink-500">{hint}</p>}
       </div>
       <div className="flex items-center gap-2" dir="ltr">
-        <Button type="button" variant="outline" size="icon-sm" onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} aria-label="−"><Minus className="size-3.5" /></Button>
+        <Button type="button" variant="outline" size="icon-sm" onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} aria-label="−" title="−"><Minus className="size-3.5" /></Button>
         <input id={id} type="number" readOnly value={value} className="w-8 bg-transparent text-center font-heading text-lg text-navy-950" aria-live="polite" />
-        <Button type="button" variant="outline" size="icon-sm" onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} aria-label="+"><Plus className="size-3.5" /></Button>
+        <Button type="button" variant="outline" size="icon-sm" onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} aria-label="+" title="+"><Plus className="size-3.5" /></Button>
       </div>
     </div>
   );

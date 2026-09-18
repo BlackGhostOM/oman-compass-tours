@@ -53,7 +53,7 @@ export function NewsletterForm({ source = "footer" }: { source?: string }) {
           type="submit"
           disabled={busy}
           className="shrink-0 bg-gold-gradient text-navy-950"
-          aria-label={t("subscribe")}
+          aria-label={t("subscribe")} title={t("subscribe")}
         >
           <Send className="size-4 rtl-flip" />
           <span className="hidden sm:inline">{t("subscribe")}</span>

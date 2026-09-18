@@ -89,7 +89,7 @@ export function MediaGallery({ items, title, className }: { items: MediaItem[]; 
           type="button"
           onClick={() => show(0)}
           className="group relative col-span-4 aspect-[16/10] overflow-hidden rounded-xl sm:col-span-3 sm:aspect-auto sm:h-[26rem]"
-          aria-label={t("openImage", { n: 1, total: count })}
+          aria-label={t("openImage", { n: 1, total: count })} title={t("openImage", { n: 1, total: count })}
         >
           <Image
             src={main.posterUrl ?? main.url!}
@@ -108,7 +108,7 @@ export function MediaGallery({ items, title, className }: { items: MediaItem[]; 
               type="button"
               onClick={() => show(i + 1)}
               className="group relative aspect-[4/3] overflow-hidden rounded-lg sm:aspect-auto sm:h-[calc((26rem-2.25rem)/4)]"
-              aria-label={t("openImage", { n: i + 2, total: count })}
+              aria-label={t("openImage", { n: i + 2, total: count })} title={t("openImage", { n: i + 2, total: count })}
             >
               <Image
                 src={m.posterUrl ?? m.url!}
@@ -146,7 +146,7 @@ export function MediaGallery({ items, title, className }: { items: MediaItem[]; 
               <span className="text-sand-100/70">
                 {index + 1} / {count}
               </span>
-              <button type="button" onClick={() => setOpen(false)} aria-label={t("close")} className="rounded-full p-2 hover:bg-navy-800">
+              <button type="button" onClick={() => setOpen(false)} aria-label={t("close")} title={t("close")} className="rounded-full p-2 hover:bg-navy-800">
                 <X className="size-5" />
               </button>
             </div>
@@ -172,10 +172,10 @@ export function MediaGallery({ items, title, className }: { items: MediaItem[]; 
               {open && neighbours.map((m, i) => <PreloadImage key={`${index}-${i}`} item={m} />)}
               {count > 1 && (
                 <>
-                  <button type="button" onClick={prev} aria-label={t("prev")} className="absolute start-3 top-1/2 -translate-y-1/2 rounded-full bg-navy-900/80 p-2 hover:bg-navy-800">
+                  <button type="button" onClick={prev} aria-label={t("prev")} title={t("prev")} className="absolute start-3 top-1/2 -translate-y-1/2 rounded-full bg-navy-900/80 p-2 hover:bg-navy-800">
                     <ChevronLeft className="size-6 rtl-flip" />
                   </button>
-                  <button type="button" onClick={next} aria-label={t("next")} className="absolute end-3 top-1/2 -translate-y-1/2 rounded-full bg-navy-900/80 p-2 hover:bg-navy-800">
+                  <button type="button" onClick={next} aria-label={t("next")} title={t("next")} className="absolute end-3 top-1/2 -translate-y-1/2 rounded-full bg-navy-900/80 p-2 hover:bg-navy-800">
                     <ChevronRight className="size-6 rtl-flip" />
                   </button>
                 </>
@@ -196,7 +196,7 @@ export function MediaGallery({ items, title, className }: { items: MediaItem[]; 
                     role="tab"
                     data-index={i}
                     aria-selected={i === index}
-                    aria-label={t("openImage", { n: i + 1, total: count })}
+                    aria-label={t("openImage", { n: i + 1, total: count })} title={t("openImage", { n: i + 1, total: count })}
                     onClick={() => setIndex(i)}
                     className={cn(
                       "relative h-14 w-20 shrink-0 overflow-hidden rounded-md ring-2 transition sm:h-16 sm:w-24",

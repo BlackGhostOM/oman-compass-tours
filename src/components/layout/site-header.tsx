@@ -98,7 +98,7 @@ export function SiteHeader() {
             size="icon"
             className="text-sand-100 hover:bg-navy-800 hover:text-gold-400"
           >
-            <Link href={viewer ? "/account" : "/sign-in"} aria-label={viewer ? t("account") : t("signIn")}>
+            <Link href={viewer ? "/account" : "/sign-in"} aria-label={viewer ? t("account") : t("signIn")} title={viewer ? t("account") : t("signIn")}>
               <UserRound className="size-5" />
             </Link>
           </Button>
@@ -116,7 +116,7 @@ export function SiteHeader() {
                 variant="ghost"
                 size="icon"
                 className="text-sand-100 hover:bg-navy-800 hover:text-gold-400 lg:hidden"
-                aria-label={t("openMenu")}
+                aria-label={t("openMenu")} title={t("openMenu")}
               >
                 <Menu className="size-6" />
               </Button>

@@ -105,7 +105,7 @@ export default function AdminProductsPage() {
                   </TableCell>
                   <TableCell><DateTime value={tr.updatedAt} /></TableCell>
                   <TableCell className="text-end">
-                    <Button variant="ghost" size="icon-sm" aria-label={t("duplicate")} onClick={async () => { const id = await duplicate({ id: tr._id }); router.push(`/admin/products/${id}`); }}><Copy className="size-4" /></Button>
+                    <Button variant="ghost" size="icon-sm" aria-label={t("duplicate")} title={t("duplicate")} onClick={async () => { const id = await duplicate({ id: tr._id }); router.push(`/admin/products/${id}`); }}><Copy className="size-4" /></Button>
                   </TableCell>
                 </TableRow>
               ))}

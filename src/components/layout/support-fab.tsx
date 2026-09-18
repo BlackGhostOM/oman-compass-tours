@@ -66,7 +66,7 @@ export function SupportFab({ contextLabel }: { contextLabel?: string }) {
         <button
           type="button"
           aria-expanded={open}
-          aria-label={open ? t("close") : t("open")}
+          aria-label={open ? t("close") : t("open")} title={open ? t("close") : t("open")}
           onClick={() => setOpen((v) => !v)}
           className={cn(
             "flex size-14 items-center justify-center rounded-full bg-gold-gradient text-navy-950 shadow-gold transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-500",

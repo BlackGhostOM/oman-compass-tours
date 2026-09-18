@@ -55,7 +55,7 @@ export function Reel({ item, className }: { item: ReelItem; className?: string }
           <button
             type="button"
             onClick={toggle}
-            aria-label={playing ? t("pause") : t("play")}
+            aria-label={playing ? t("pause") : t("play")} title={playing ? t("pause") : t("play")}
             className="absolute inset-0 flex items-center justify-center"
           >
             <span className={cn("flex size-14 items-center justify-center rounded-full bg-navy-950/70 text-gold-400 ring-1 ring-gold-500/60 transition", playing && "opacity-0 group-hover:opacity-100")}>
@@ -65,7 +65,7 @@ export function Reel({ item, className }: { item: ReelItem; className?: string }
           <button
             type="button"
             onClick={() => setMuted((m) => !m)}
-            aria-label={muted ? t("unmute") : t("mute")}
+            aria-label={muted ? t("unmute") : t("mute")} title={muted ? t("unmute") : t("mute")}
             className="absolute end-3 top-3 rounded-full bg-navy-950/70 p-2 text-sand-50"
           >
             {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}

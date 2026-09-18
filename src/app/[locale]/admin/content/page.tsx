@@ -222,9 +222,9 @@ function ReelsTab() {
                       <label className="ms-auto inline-flex items-center gap-1.5 text-xs"><Switch checked={r.isActive} onCheckedChange={(v) => update({ id: r._id, isActive: v })} /> {t("active")}</label>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Button size="icon-xs" variant="ghost" aria-label={t("moveUp")} onClick={() => move(i, -1)}><ArrowUp className="size-3.5" /></Button>
-                      <Button size="icon-xs" variant="ghost" aria-label={t("moveDown")} onClick={() => move(i, 1)}><ArrowDown className="size-3.5" /></Button>
-                      <Button size="icon-xs" variant="ghost" className="ms-auto text-danger" aria-label={t("remove")} onClick={async () => { if (window.confirm(t("confirmRemove"))) { await remove({ id: r._id }); toast.success(t("removed")); } }}><Trash2 className="size-3.5" /></Button>
+                      <Button size="icon-xs" variant="ghost" aria-label={t("moveUp")} title={t("moveUp")} onClick={() => move(i, -1)}><ArrowUp className="size-3.5" /></Button>
+                      <Button size="icon-xs" variant="ghost" aria-label={t("moveDown")} title={t("moveDown")} onClick={() => move(i, 1)}><ArrowDown className="size-3.5" /></Button>
+                      <Button size="icon-xs" variant="ghost" className="ms-auto text-danger" aria-label={t("remove")} title={t("remove")} onClick={async () => { if (window.confirm(t("confirmRemove"))) { await remove({ id: r._id }); toast.success(t("removed")); } }}><Trash2 className="size-3.5" /></Button>
                     </div>
                     <p className="text-[11px] text-muted-foreground">{pick(r.caption ?? { en: "", ar: "" }, locale) || t("noCaption")}</p>
                   </div>
@@ -367,7 +367,7 @@ function NewsletterTab() {
                 <DateTime value={s.subscribedAt} withTime={false} />
                 <StatusBadge status={s.unsubscribedAt ? "cancelled" : "succeeded"} label={s.unsubscribedAt ? t("unsubscribed") : t("active")} />
                 <Button size="xs" variant="outline" onClick={() => setActive({ id: s._id, active: !!s.unsubscribedAt })}>{s.unsubscribedAt ? t("resubscribe") : t("unsubscribe")}</Button>
-                <Button size="icon-xs" variant="ghost" className="text-danger" aria-label={t("remove")} onClick={async () => { if (window.confirm(t("confirmRemove"))) { await removeSubscriber({ id: s._id }); } }}><Trash2 className="size-3.5" /></Button>
+                <Button size="icon-xs" variant="ghost" className="text-danger" aria-label={t("remove")} title={t("remove")} onClick={async () => { if (window.confirm(t("confirmRemove"))) { await removeSubscriber({ id: s._id }); } }}><Trash2 className="size-3.5" /></Button>
               </li>
             ))}
           </ul>
@@ -388,7 +388,7 @@ function NewsletterTab() {
                 {c.error && <span className="max-w-72 truncate text-xs text-danger" title={c.error}>{c.error}</span>}
                 <DateTime value={c.sentAt ?? c.updatedAt} />
                 {c.status === "draft" && <Button size="xs" variant="outline" onClick={() => setEditing({ id: c._id, subject: c.subject, body: c.body })}>{t("edit")}</Button>}
-                {c.status !== "sending" && <Button size="icon-xs" variant="ghost" className="text-danger" aria-label={t("remove")} onClick={async () => { if (window.confirm(t("confirmRemoveCampaign"))) await removeCampaign({ id: c._id }); }}><Trash2 className="size-3.5" /></Button>}
+                {c.status !== "sending" && <Button size="icon-xs" variant="ghost" className="text-danger" aria-label={t("remove")} title={t("remove")} onClick={async () => { if (window.confirm(t("confirmRemoveCampaign"))) await removeCampaign({ id: c._id }); }}><Trash2 className="size-3.5" /></Button>}
               </li>
             ))}
           </ul>

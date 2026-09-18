@@ -49,7 +49,7 @@ export function LanguageSwitcher({ className, variant = "ghost" }: { className?:
         <Button
           variant={variant}
           size="sm"
-          aria-label={`${t("switch")}: ${labels[locale].short}`}
+          aria-label={`${t("switch")}: ${labels[locale].short}`} title={`${t("switch")}: ${labels[locale].short}`}
           disabled={isPending}
           className={cn("gap-1.5 text-sand-100 hover:bg-navy-800 hover:text-gold-400", className)}
         >

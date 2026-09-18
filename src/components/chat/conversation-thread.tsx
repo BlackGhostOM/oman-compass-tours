@@ -207,7 +207,7 @@ export function ConversationThread({ conversationId, sessionKey, onStartNew, cla
               aria-label={t("placeholder")}
               className="max-h-32 min-h-10 flex-1 resize-none"
             />
-            <Button type="submit" size="icon" disabled={sending || !draft.trim()} aria-label={t("send")} className="bg-gold-gradient text-navy-950">
+            <Button type="submit" size="icon" disabled={sending || !draft.trim()} aria-label={t("send")} title={t("send")} className="bg-gold-gradient text-navy-950">
               <SendHorizontal className="size-4 rtl:-scale-x-100" />
             </Button>
           </div>

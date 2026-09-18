@@ -50,7 +50,7 @@ export function ThemeToggle({ className }: { className?: string }) {
   const { theme, toggle } = useDashboardTheme();
   const t = useTranslations("dashboard");
   return (
-    <Button variant="ghost" size="icon" onClick={toggle} aria-label={theme === "dark" ? t("lightMode") : t("darkMode")} className={className}>
+    <Button variant="ghost" size="icon" onClick={toggle} aria-label={theme === "dark" ? t("lightMode") : t("darkMode")} title={theme === "dark" ? t("lightMode") : t("darkMode")} className={className}>
       {theme === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
     </Button>
   );

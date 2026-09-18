@@ -39,7 +39,7 @@ export function WishlistButton({ tourId, className, size = "md" }: { tourId: Id<
       onClick={onClick}
       aria-pressed={saved}
       aria-busy={loading}
-      aria-label={saved ? t("remove") : t("save")}
+      aria-label={saved ? t("remove") : t("save")} title={saved ? t("remove") : t("save")}
       className={cn(
         "flex items-center justify-center rounded-full bg-navy-950/70 text-sand-50 ring-1 ring-gold-500/40 backdrop-blur transition hover:bg-navy-950",
         size === "lg" ? "size-11" : "size-9",

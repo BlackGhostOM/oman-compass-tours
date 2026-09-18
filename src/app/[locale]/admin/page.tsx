@@ -48,7 +48,7 @@ export default function AdminOverviewPage() {
                     <p className="text-xs text-muted-foreground">{d.reference} · {d.traveller} · {t("guests", { count: d.groupSize })}{d.pickup ? ` · ${d.pickup}` : ""}{d.guide ? ` · ${t("guide")}: ${d.guide}` : ""}</p>
                   </div>
                   <StatusBadge status={d.status} />
-                  <Button asChild variant="ghost" size="icon-sm" aria-label="WhatsApp"><a href={`https://wa.me/${d.phone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer"><Phone className="size-4 text-[#25D366]" /></a></Button>
+                  <Button asChild variant="ghost" size="icon-sm" aria-label="WhatsApp" title="WhatsApp"><a href={`https://wa.me/${d.phone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer"><Phone className="size-4 text-[#25D366]" /></a></Button>
                 </li>
               ))}
             </ul>

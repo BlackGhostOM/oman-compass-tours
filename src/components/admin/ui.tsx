@@ -145,7 +145,7 @@ export function LocalizedListField({ label, value, onChange, addLabel }: { label
               <Input dir="ltr" value={item.en} placeholder="EN" onChange={(e) => onChange(value.map((x, j) => (j === i ? { ...x, en: e.target.value } : x)))} />
               <Input dir="rtl" value={item.ar} placeholder="AR" onChange={(e) => onChange(value.map((x, j) => (j === i ? { ...x, ar: e.target.value } : x)))} />
             </div>
-            <Button type="button" variant="ghost" size="icon-sm" className="text-danger" onClick={() => onChange(value.filter((_, j) => j !== i))} aria-label="remove"><Trash2 className="size-4" /></Button>
+            <Button type="button" variant="ghost" size="icon-sm" className="text-danger" onClick={() => onChange(value.filter((_, j) => j !== i))} aria-label="remove" title="remove"><Trash2 className="size-4" /></Button>
           </div>
         ))}
         <Button type="button" variant="outline" size="sm" onClick={() => onChange([...value, { en: "", ar: "" }])}><Plus className="size-4" /> {addLabel}</Button>

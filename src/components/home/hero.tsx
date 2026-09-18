@@ -79,7 +79,7 @@ export async function Hero({
 
       <a
         href="#featured"
-        aria-label={t("scroll")}
+        aria-label={t("scroll")} title={t("scroll")}
         className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 animate-bounce text-gold-500/80"
       >
         <ChevronDown className="size-7" />
