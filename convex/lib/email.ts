@@ -15,10 +15,10 @@ export const FROM = process.env.EMAIL_FROM ?? "Oman Compass Tours <onboarding@re
 export const STAFF_EMAIL = process.env.STAFF_NOTIFICATION_EMAIL ?? "omancompasstours@gmail.com";
 
 /** Wraps HTML body content in the branded email shell (RTL-aware). */
-export function layout(locale: Locale, title: string, body: string, footerNote?: string): string {
+export function layout(locale: Locale, title: string, body: string, footerNote?: string, head = ""): string {
   const dir = locale === "ar" ? "rtl" : "ltr";
   const align = locale === "ar" ? "right" : "left";
-  return `<!doctype html><html lang="${locale}" dir="${dir}"><body style="margin:0;background:${BRAND.navy};font-family:Inter,Arial,'Segoe UI',Tahoma,sans-serif;color:${BRAND.sand};padding:32px 16px">
+  return `<!doctype html><html lang="${locale}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${head}</head><body style="margin:0;background:${BRAND.navy};font-family:Inter,Arial,'Segoe UI',Tahoma,sans-serif;color:${BRAND.sand};padding:32px 16px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:${BRAND.navy900};border:1px solid ${BRAND.navy800};border-radius:12px;overflow:hidden">
 <tr><td style="padding:28px 32px 8px;text-align:center;letter-spacing:.14em;font-size:13px;color:${BRAND.gold};font-family:Cinzel,Georgia,serif">OMAN COMPASS TOURS</td></tr>
 <tr><td style="padding:0 32px"><div style="height:1px;background:linear-gradient(90deg,transparent,${BRAND.gold},transparent)"></div></td></tr>

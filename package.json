@@ -64,6 +64,7 @@
     "remark-gfm": "^4.0.1",
     "resend": "^6.27.0",
     "shadcn": "^4.21.0",
+    "sharp": "^0.35.4",
     "sonner": "^2.0.8",
     "stripe": "^22.6.2",
     "tailwind-merge": "^3.6.0",
@@ -82,7 +83,6 @@
     "eslint-config-next": "15.5.25",
     "prettier": "^3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",
-    "sharp": "^0.35.4",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
     "typescript": "^5"

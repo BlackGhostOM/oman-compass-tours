@@ -4,6 +4,7 @@ import type { Doc } from "./_generated/dataModel";
 import { internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { layout, sendBatch, sendEmail, type Locale } from "./lib/email";
 import { markdownToEmailHtml } from "./lib/markdown";
+import { renderWelcomeEmail, type WelcomeTour } from "./lib/welcomeEmail";
 import { localeValidator, localized } from "./schema";
 
 const SITE_URL = () => process.env.SITE_URL ?? "http://localhost:3000";
@@ -44,8 +45,8 @@ export const finish = internalMutation({
 export const WELCOME_DEFAULTS = {
   subject: { en: "Welcome to Oman Compass Tours", ar: "أهلًا بك في بوصلة عُمان للسياحة" },
   body: {
-    en: "Marhaba, and thank you for joining us.\n\nYou are now on the list for our travel notes: seasonal tips on the best time for each wadi, desert and mountain, new private tours as we launch them, and subscriber-only offers. Expect a note every few weeks, never spam.\n\nMeanwhile, here are a few of our most-loved private days out:",
-    ar: "مرحبًا بك، وشكرًا لانضمامك إلينا.\n\nأصبحت الآن ضمن قائمة رسائل السفر: نصائح موسمية عن أفضل وقت لكل وادٍ وصحراء وجبل، وجولات خاصة جديدة فور إطلاقها، وعروض للمشتركين فقط. تصلك رسالة كل بضعة أسابيع، ولا رسائل مزعجة.\n\nوإلى ذلك الحين، هذه بعض جولاتنا الخاصة الأكثر حبًا لدى ضيوفنا:",
+    en: "Marhaba, and thank you for joining us.\n\nYou are now on the list for our travel notes: seasonal tips on the best time for each wadi, desert and mountain, new private tours as we launch them, and subscriber-only offers. Expect a note every few weeks, never spam.",
+    ar: "مرحبًا بك، وشكرًا لانضمامك إلينا.\n\nأصبحت الآن ضمن قائمة رسائل السفر: نصائح موسمية عن أفضل وقت لكل وادٍ وصحراء وجبل، وجولات خاصة جديدة فور إطلاقها، وعروض للمشتركين فقط. تصلك رسالة كل بضعة أسابيع، ولا رسائل مزعجة.",
   },
 };
 
@@ -54,18 +55,82 @@ export const getSubscriber = internalQuery({
   handler: async (ctx, { subscriberId }): Promise<Doc<"newsletterSubscribers"> | null> => ctx.db.get(subscriberId),
 });
 
+/** Featured journey and recommended tours in the welcome email; staff can override the codes in the `newsletter.welcome` setting. */
+const DEFAULT_HERO_CODE = "OCT-010"; // 8-Day Oman Nature & Culture with an Omani Guide – 4WD
+const DEFAULT_RECOMMENDED_CODES = ["OCT-008", "OCT-017", "OCT-019"]; // 3-day, 2-day Wahiba camp, 5-day
+
+const welcomeTourValidator = v.object({
+  code: v.string(),
+  title: localized,
+  slug: localized,
+  summary: localized,
+  highlights: v.array(localized),
+  durationLabel: localized,
+  durationDays: v.number(),
+  maxGroup: v.number(),
+  freeCancellationHours: v.number(),
+  priceFrom: v.number(),
+  pricingModel: v.string(),
+  ratingAverage: v.number(),
+  ratingCount: v.number(),
+  externalReviewCount: v.optional(v.number()),
+  coverUrl: v.optional(v.string()),
+});
+
 export const welcomeContext = internalQuery({
   args: {},
   returns: v.object({
     welcome: v.union(v.object({ subject: localized, body: localized }), v.null()),
-    tours: v.array(v.object({ title: localized, slug: localized, priceFrom: v.number(), pricingModel: v.string(), durationLabel: localized })),
+    hero: v.union(welcomeTourValidator, v.null()),
+    tours: v.array(welcomeTourValidator),
   }),
   handler: async (ctx) => {
     const setting = await ctx.db.query("siteSettings").withIndex("by_key", (q) => q.eq("key", "newsletter.welcome")).unique();
-    const value = setting?.value as { subject?: { en: string; ar: string }; body?: { en: string; ar: string } } | undefined;
+    const value = setting?.value as { subject?: { en: string; ar: string }; body?: { en: string; ar: string }; heroCode?: string; recommendedCodes?: string[] } | undefined;
     const welcome = value?.subject && value?.body ? { subject: value.subject, body: value.body } : null;
-    const rows = await ctx.db.query("tours").withIndex("by_featured", (q) => q.eq("status", "published").eq("isFeatured", true)).take(3);
-    return { welcome, tours: rows.map((t) => ({ title: t.title, slug: t.slug, priceFrom: t.priceFrom, pricingModel: t.pricingModel, durationLabel: t.durationLabel })) };
+    const heroCode = value?.heroCode ?? DEFAULT_HERO_CODE;
+    const recommended = (value?.recommendedCodes ?? DEFAULT_RECOMMENDED_CODES).filter((c) => c !== heroCode);
+
+    const load = async (code: string): Promise<WelcomeTour | null> => {
+      const t = await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", code)).unique();
+      if (!t || t.status !== "published") return null;
+      const cover = t.coverImage;
+      const coverUrl = cover?.url ?? (cover?.storageId ? await ctx.storage.getUrl(cover.storageId) : null);
+      return {
+        code: t.code,
+        title: t.title,
+        slug: t.slug,
+        summary: t.summary,
+        highlights: t.highlights,
+        durationLabel: t.durationLabel,
+        durationDays: t.durationDays,
+        maxGroup: t.maxGroup,
+        freeCancellationHours: t.freeCancellationHours,
+        priceFrom: t.priceFrom,
+        pricingModel: t.pricingModel,
+        ratingAverage: t.ratingAverage,
+        ratingCount: t.ratingCount,
+        externalReviewCount: t.externalReviewCount,
+        coverUrl: coverUrl ?? undefined,
+      };
+    };
+    const hero = await load(heroCode);
+    const tours: WelcomeTour[] = [];
+    for (const code of recommended) {
+      const t = await load(code);
+      if (t) tours.push(t);
+    }
+    // Top up from the featured list if a recommended tour is unpublished
+    if (tours.length < 3) {
+      const featured = await ctx.db.query("tours").withIndex("by_featured", (q) => q.eq("status", "published").eq("isFeatured", true)).take(12);
+      for (const f of featured) {
+        if (tours.length >= 3) break;
+        if (f.code === heroCode || tours.some((t) => t.code === f.code)) continue;
+        const t = await load(f.code);
+        if (t) tours.push(t);
+      }
+    }
+    return { welcome, hero, tours: tours.slice(0, 3) };
   },
 });
 
@@ -78,23 +143,24 @@ export const sendWelcome = internalAction({
     const recipient = to ?? sub?.email;
     const locale: Locale = localeArg ?? sub?.locale ?? "en";
     if (!recipient) return null;
-    const { welcome, tours } = (await ctx.runQuery(internal.newsletterSend.welcomeContext, {})) as {
+    const { welcome, hero, tours } = (await ctx.runQuery(internal.newsletterSend.welcomeContext, {})) as {
       welcome: { subject: { en: string; ar: string }; body: { en: string; ar: string } } | null;
-      tours: { title: { en: string; ar: string }; slug: { en: string; ar: string }; priceFrom: number; pricingModel: string; durationLabel: { en: string; ar: string } }[];
+      hero: WelcomeTour | null;
+      tours: WelcomeTour[];
     };
     const text = welcome ?? WELCOME_DEFAULTS;
     const subject = text.subject[locale] || text.subject.en;
-    const price = (baisa: number) => `OMR ${(baisa / 1000).toFixed(baisa % 1000 === 0 ? 0 : 3)}`;
-    const tourLines = tours.map((t) => `- [${t.title[locale]}](${SITE_URL()}/${locale}/tours/${t.slug[locale]}) — ${t.durationLabel[locale]} · ${price(t.priceFrom)}${t.pricingModel === "per_group" ? (locale === "ar" ? " للمجموعة الخاصة" : " per private group") : (locale === "ar" ? " للبالغ" : " per adult")}`).join("\n");
-    const closing = locale === "ar"
-      ? `\n\n[تصفح كل الجولات](${SITE_URL()}/ar/tours)\n\nولأي سؤال، راسلنا على واتساب: +968 9225 5028`
-      : `\n\n[Browse all tours](${SITE_URL()}/en/tours)\n\nQuestions? WhatsApp us any time on +968 9225 5028`;
-    const body = `${text.body[locale] || text.body.en}${tourLines ? `\n\n${tourLines}` : ""}${closing}`;
     const unsubscribeUrl = `${SITE_URL()}/${locale}/newsletter/unsubscribe?token=${sub?.token ?? "test"}`;
-    const footer = locale === "ar"
-      ? `تصلك هذه الرسالة لأنك اشتركت في نشرة بوصلة عُمان للسياحة. <a href="${unsubscribeUrl}" style="color:#DDB97A">إلغاء الاشتراك</a>`
-      : `You receive this because you subscribed to Oman Compass Tours travel notes. <a href="${unsubscribeUrl}" style="color:#DDB97A">Unsubscribe</a>`;
-    const html = layout(locale, subject, markdownToEmailHtml(body, locale === "ar" ? "right" : "left"), footer);
+    const html = renderWelcomeEmail({
+      locale,
+      siteUrl: SITE_URL(),
+      subject,
+      intro: text.body[locale] || text.body.en,
+      hero,
+      tours,
+      unsubscribeUrl,
+      whatsapp: { display: "+968 9225 5028", e164: "+96892255028" },
+    });
     const result = await sendEmail({ to: recipient, subject: to ? `[TEST] ${subject}` : subject, html, headers: { "List-Unsubscribe": `<${unsubscribeUrl}>` } });
     await ctx.runMutation(internal.notifications.log, { channel: "email", template: "newsletter_welcome", to: recipient, locale, status: result.status, providerMessageId: result.id, error: result.error, payload: { subscriberId } });
     return null;
