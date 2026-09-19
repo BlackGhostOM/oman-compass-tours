@@ -44,11 +44,9 @@ export default async function DestinationPage({ params }: Props) {
       </section>
       <section className="surface-sand py-12">
         <div className="container-brand">
-          {/* Intro + map side by side; the catalogue below gets the full width, like the Tours page */}
-          <div className="grid gap-8 lg:grid-cols-[1fr_22rem] lg:items-start">
-            {d.description && <p className="max-w-3xl text-lg leading-relaxed text-ink-500">{pick(d.description, locale)}</p>}
-            <MapEmbed className="h-64 lg:h-56" title={pick(d.name, locale)} lat={d.lat ?? undefined} lng={d.lng ?? undefined} zoom={9} />
-          </div>
+          {/* Intro on top, then a wide map across the content width; the catalogue below stays full width like the Tours page */}
+          {d.description && <p className="max-w-3xl text-lg leading-relaxed text-ink-500">{pick(d.description, locale)}</p>}
+          <MapEmbed className="mt-8 h-72 lg:h-80" title={pick(d.name, locale)} lat={d.lat ?? undefined} lng={d.lng ?? undefined} zoom={9} />
           <h2 className="mt-12 mb-6 font-heading text-2xl text-navy-950">{t("toursIn", { name: pick(d.name, locale) })}</h2>
           <Suspense>
             <TourCatalog initialDestination={d.key} />
