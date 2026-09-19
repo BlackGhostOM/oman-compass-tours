@@ -34,10 +34,10 @@ const C = { navy: "#0E0B2E", ink: "#1B1830", ink500: "#6B6880", sand: "#F6EFE2",
 const GOLD_GRADIENT = "linear-gradient(135deg,#DDB97A,#C9A15C,#A8843F)";
 const SERIF = "Cinzel,Georgia,'Times New Roman',serif";
 const SANS = "Inter,Arial,'Segoe UI',Tahoma,sans-serif";
-// Owner asked for text twice as large (2026-09-20). The three cards are ~286px wide, so they scale 1.5× instead,
-// otherwise their lines would hold three or four words.
-const SCALE = 2;
-const CARD_SCALE = 1.5;
+// Text scale: the owner found 1× too small and 2× too large in a 960px email (2026-09-20), so 1.5×.
+// The three cards are ~286px wide and scale less, otherwise their lines would hold only a few words.
+const SCALE = 1.5;
+const CARD_SCALE = 1.25;
 const fs = (n: number, s = SCALE) => `${Math.round(n * s)}px`;
 
 const T = {
@@ -141,9 +141,9 @@ function card(t: WelcomeTour, locale: Locale, siteUrl: string): string {
 ${src ? `<tr><td><a href="${url}"><img src="${src}" width="290" alt="${escapeHtml(pick(t.title, locale))}" style="display:block;width:100%;height:auto;border:0"></a></td></tr>` : ""}
 <tr><td style="padding:10px 12px 0;text-align:${align}">${pill(dur, CARD_SCALE)}</td></tr>
 <tr><td style="padding:6px 12px 0;font-family:${SANS};font-size:${fs(11, CARD_SCALE)};text-align:${align}">${stars(t)}</td></tr>
-<tr><td height="124" valign="top" style="padding:6px 12px 0;height:124px;font-family:${SERIF};font-size:${fs(15, CARD_SCALE)};line-height:1.35;font-weight:700;text-align:${align}"><a href="${url}" style="color:${C.navy};text-decoration:none">${escapeHtml(pick(t.title, locale))}</a></td></tr>
-<tr><td height="108" valign="top" style="padding:6px 12px 0;height:108px;font-family:${SANS};font-size:${fs(12, CARD_SCALE)};line-height:1.5;color:${C.ink500};text-align:${align}">${escapeHtml(clip(pick(t.summary, locale), 84))}</td></tr>
-<tr><td height="78" valign="top" style="padding:8px 12px 0;height:78px;font-family:${SANS};font-size:${fs(11, CARD_SCALE)};line-height:1.5;color:${C.ink500};text-align:${align}">${dur} · ${tr.upTo(t.maxGroup)}${t.freeCancellationHours > 0 ? `<br><span style="color:${C.green};font-weight:600">✓ ${tr.freeCancel}</span>` : ""}</td></tr>
+<tr><td height="104" valign="top" style="padding:6px 12px 0;height:104px;font-family:${SERIF};font-size:${fs(15, CARD_SCALE)};line-height:1.35;font-weight:700;text-align:${align}"><a href="${url}" style="color:${C.navy};text-decoration:none">${escapeHtml(pick(t.title, locale))}</a></td></tr>
+<tr><td height="72" valign="top" style="padding:6px 12px 0;height:72px;font-family:${SANS};font-size:${fs(12, CARD_SCALE)};line-height:1.5;color:${C.ink500};text-align:${align}">${escapeHtml(clip(pick(t.summary, locale), 84))}</td></tr>
+<tr><td height="64" valign="top" style="padding:8px 12px 0;height:64px;font-family:${SANS};font-size:${fs(11, CARD_SCALE)};line-height:1.5;color:${C.ink500};text-align:${align}">${dur} · ${tr.upTo(t.maxGroup)}${t.freeCancellationHours > 0 ? `<br><span style="color:${C.green};font-weight:600">✓ ${tr.freeCancel}</span>` : ""}</td></tr>
 <tr><td style="padding:10px 12px 0;text-align:${align}">${price(t, locale, false, CARD_SCALE)}</td></tr>
 <tr><td style="padding:10px 12px 12px">${button(url, tr.view, "sm", CARD_SCALE)}</td></tr>
 </table>
