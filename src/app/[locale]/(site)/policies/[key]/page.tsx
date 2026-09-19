@@ -42,8 +42,9 @@ export default async function PolicyPage({ params }: Props) {
       </section>
       <section className="surface-sand py-12">
         <div className="container-brand grid gap-10 lg:grid-cols-[16rem_1fr]">
-          <nav aria-label={t("eyebrow")} className="lg:sticky lg:top-24 lg:self-start">
-            <ul className="scrollbar-none flex gap-2 overflow-x-auto pb-2 lg:flex-col lg:gap-1">
+          {/* min-w-0: without it the non-wrapping tab strip widens the grid column (and the whole page) on phones */}
+          <nav aria-label={t("eyebrow")} className="min-w-0 lg:sticky lg:top-24 lg:self-start">
+            <ul className="scrollbar-none flex max-w-full gap-2 overflow-x-auto pb-2 lg:flex-col lg:gap-1">
               {(all ?? []).map((p) => (
                 <li key={p.key} className="shrink-0">
                   <Link
