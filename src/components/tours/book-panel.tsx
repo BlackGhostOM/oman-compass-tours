@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { CalendarDays, Clock, MessageCircle, ShieldCheck, Users } from "lucide-react";
 import { Link } from "@/i18n/navigation";
@@ -110,8 +111,27 @@ export function BookPanel({
 export function MobileBookBar({ tour }: { tour: { slug: LocalizedString; priceFrom: number; pricingModel: "per_group" | "per_person" } }) {
   const locale = useLocale();
   const t = useTranslations("tour");
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Publish the bar's height as --bottom-bar so the other fixed elements (support
+  // button, consent banner) sit above it instead of covering the Book button.
+  // On lg+ the bar is display:none, which the observer reports as 0.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const root = document.documentElement;
+    const apply = () => root.style.setProperty("--bottom-bar", `${el.offsetHeight}px`);
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty("--bottom-bar");
+    };
+  }, []);
+
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-sand-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
+    <div ref={ref} className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t border-sand-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
       <PriceTag baisa={tour.priceFrom} pricingModel={tour.pricingModel} size="sm" />
       <Button asChild className="bg-gold-gradient font-semibold text-navy-950">
         <Link href={`/book/${pick(tour.slug, locale)}`}>{t("bookNow")}</Link>

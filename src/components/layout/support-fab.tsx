@@ -27,7 +27,7 @@ export function SupportFab({ contextLabel }: { contextLabel?: string }) {
 
   return (
     <>
-      <div className="fixed bottom-5 end-5 z-40 flex flex-col items-end gap-3">
+      <div className="fixed bottom-[calc(1.25rem_+_var(--bottom-bar,0px))] end-5 z-40 flex flex-col items-end gap-3">
         {open && (
           <div className="flex flex-col gap-2 animate-fade-up">
             <a

@@ -51,7 +51,7 @@ export function ConsentBanner() {
   };
 
   return (
-    <div role="dialog" aria-labelledby="consent-title" aria-describedby="consent-body" className="consent-banner fixed inset-x-3 bottom-3 z-50 max-w-md rounded-xl border border-gold-500/40 bg-navy-950 p-4 text-sand-50 shadow-2xl sm:start-5 sm:inset-x-auto">
+    <div role="dialog" aria-labelledby="consent-title" aria-describedby="consent-body" className="consent-banner fixed inset-x-3 bottom-[calc(0.75rem_+_var(--bottom-bar,0px))] z-50 max-w-md rounded-xl border border-gold-500/40 bg-navy-950 p-4 text-sand-50 shadow-2xl sm:start-5 sm:inset-x-auto">
       <div className="flex items-start gap-3">
         <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-gold-gradient text-navy-950" aria-hidden><Cookie className="size-4" /></span>
         <div className="min-w-0 flex-1">
