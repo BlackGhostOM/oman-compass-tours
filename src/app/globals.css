@@ -249,10 +249,14 @@ html[lang="ar"] {
     @apply font-sans antialiased;
     scroll-behavior: smooth;
     -webkit-text-size-adjust: 100%;
+    /* Never let stray content widen the page: phone browsers otherwise zoom the whole site out
+       (and stretch the fixed header) to fit it. `clip` keeps position:sticky working, unlike `hidden`. */
+    overflow-x: clip;
   }
   body {
     @apply bg-background text-foreground;
     min-height: 100dvh;
+    overflow-x: clip;
   }
   h1,
   h2,
