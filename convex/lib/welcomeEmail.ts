@@ -34,6 +34,11 @@ const C = { navy: "#0E0B2E", ink: "#1B1830", ink500: "#6B6880", sand: "#F6EFE2",
 const GOLD_GRADIENT = "linear-gradient(135deg,#DDB97A,#C9A15C,#A8843F)";
 const SERIF = "Cinzel,Georgia,'Times New Roman',serif";
 const SANS = "Inter,Arial,'Segoe UI',Tahoma,sans-serif";
+// Owner asked for text twice as large (2026-09-20). The three cards are ~286px wide, so they scale 1.5× instead,
+// otherwise their lines would hold three or four words.
+const SCALE = 2;
+const CARD_SCALE = 1.5;
+const fs = (n: number, s = SCALE) => `${Math.round(n * s)}px`;
 
 const T = {
   en: {
@@ -85,18 +90,19 @@ function stars(t: WelcomeTour): string {
   return `<span style="color:${C.gold};letter-spacing:1px">${"★".repeat(n)}</span> <span style="font-weight:700;color:${C.ink}">${(t.ratingAverage || 5).toFixed(1)}</span>${count ? ` <span style="color:${C.ink500}">(${count})</span>` : ""}`;
 }
 
-function price(t: WelcomeTour, locale: Locale, big: boolean): string {
+function price(t: WelcomeTour, locale: Locale, big: boolean, s = SCALE): string {
   const tr = T[locale];
-  return `<div style="font-family:${SANS};font-size:11px;color:${C.ink500}">${tr.from}</div>
-<div dir="ltr" style="display:inline-block;font-family:${SERIF};font-size:${big ? 24 : 17}px;line-height:1.2;font-weight:700;color:${C.navy}">OMR ${omr(t.priceFrom)}</div>
-<div style="font-family:${SANS};font-size:11px;color:${C.ink500}">${t.pricingModel === "per_group" ? tr.perGroup : tr.perAdult} · <span dir="ltr">≈ $${usd(t.priceFrom)}</span></div>`;
+  return `<div style="font-family:${SANS};font-size:${fs(11, s)};color:${C.ink500}">${tr.from}</div>
+<div dir="ltr" style="display:inline-block;font-family:${SERIF};font-size:${fs(big ? 24 : 17, s)};line-height:1.2;font-weight:700;color:${C.navy}">OMR ${omr(t.priceFrom)}</div>
+<div style="font-family:${SANS};font-size:${fs(11, s)};color:${C.ink500}">${t.pricingModel === "per_group" ? tr.perGroup : tr.perAdult} · <span dir="ltr">≈ $${usd(t.priceFrom)}</span></div>`;
 }
 
-function button(href: string, label: string, size: "sm" | "lg"): string {
-  return `<a href="${href}" style="display:block;text-align:center;padding:${size === "lg" ? "13px 20px" : "9px 10px"};border-radius:10px;background:${C.gold};background-image:${GOLD_GRADIENT};color:${C.navy};font-family:${SANS};font-weight:700;font-size:${size === "lg" ? 15 : 12}px;text-decoration:none">${label}</a>`;
+function button(href: string, label: string, size: "sm" | "lg", s = SCALE): string {
+  const pad = size === "lg" ? `${fs(13, s)} ${fs(20, s)}` : `${fs(9, s)} ${fs(10, s)}`;
+  return `<a href="${href}" style="display:block;text-align:center;padding:${pad};border-radius:10px;background:${C.gold};background-image:${GOLD_GRADIENT};color:${C.navy};font-family:${SANS};font-weight:700;font-size:${fs(size === "lg" ? 15 : 12, s)};text-decoration:none">${label}</a>`;
 }
 
-const pill = (text: string) => `<span style="display:inline-block;padding:3px 10px;border-radius:999px;background:${C.navy};color:${C.sand};font-family:${SANS};font-size:11px;font-weight:600">${text}</span>`;
+const pill = (text: string, s = SCALE) => `<span style="display:inline-block;padding:${fs(3, s)} ${fs(10, s)};border-radius:999px;background:${C.navy};color:${C.sand};font-family:${SANS};font-size:${fs(11, s)};font-weight:600">${text}</span>`;
 
 function hero(t: WelcomeTour, locale: Locale, siteUrl: string): string {
   const tr = T[locale];
@@ -107,17 +113,17 @@ function hero(t: WelcomeTour, locale: Locale, siteUrl: string): string {
   const dur = escapeHtml(pick(t.durationLabel, locale));
   const highlights = t.highlights
     .slice(0, 4)
-    .map((h) => `<tr><td style="padding:3px 0;font-family:${SANS};font-size:13px;line-height:1.5;color:${C.ink};text-align:${align}"><span style="color:${C.gold}">◆</span>&nbsp; ${escapeHtml(pick(h, locale))}</td></tr>`)
+    .map((h) => `<tr><td style="padding:3px 0;font-family:${SANS};font-size:${fs(13)};line-height:1.5;color:${C.ink};text-align:${align}"><span style="color:${C.gold}">◆</span>&nbsp; ${escapeHtml(pick(h, locale))}</td></tr>`)
     .join("");
   return `
-<div style="text-align:center;margin:6px 0 12px"><span style="display:inline-block;padding:5px 14px;border-radius:999px;background:${C.gold};color:${C.navy};font-family:${SANS};font-size:11px;font-weight:700;letter-spacing:.06em">★ ${tr.kicker}</span></div>
+<div style="text-align:center;margin:6px 0 12px"><span style="display:inline-block;padding:5px 14px;border-radius:999px;background:${C.gold};color:${C.navy};font-family:${SANS};font-size:${fs(11)};font-weight:700;letter-spacing:.06em">★ ${tr.kicker}</span></div>
 <table role="presentation"${D} width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid ${C.sand200};border-radius:14px;overflow:hidden">
 ${src ? `<tr><td><a href="${url}"><img src="${src}" width="896" alt="${escapeHtml(pick(t.title, locale))}" style="display:block;width:100%;height:auto;border:0"></a></td></tr>` : ""}
 <tr><td style="padding:16px 20px 0;text-align:${align}">${pill(dur)} &nbsp; ${stars(t)}</td></tr>
-<tr><td style="padding:10px 20px 0;font-family:${SERIF};font-size:22px;line-height:1.3;font-weight:700;text-align:${align}"><a href="${url}" style="color:${C.navy};text-decoration:none">${escapeHtml(pick(t.title, locale))}</a></td></tr>
-<tr><td style="padding:8px 20px 0;font-family:${SANS};font-size:14px;line-height:1.6;color:${C.ink500};text-align:${align}">${escapeHtml(pick(t.summary, locale))}</td></tr>
+<tr><td style="padding:10px 20px 0;font-family:${SERIF};font-size:${fs(22)};line-height:1.3;font-weight:700;text-align:${align}"><a href="${url}" style="color:${C.navy};text-decoration:none">${escapeHtml(pick(t.title, locale))}</a></td></tr>
+<tr><td style="padding:8px 20px 0;font-family:${SANS};font-size:${fs(14)};line-height:1.6;color:${C.ink500};text-align:${align}">${escapeHtml(pick(t.summary, locale))}</td></tr>
 ${highlights ? `<tr><td style="padding:10px 20px 0"><table role="presentation"${D} width="100%" cellpadding="0" cellspacing="0">${highlights}</table></td></tr>` : ""}
-<tr><td style="padding:12px 20px 0;font-family:${SANS};font-size:12px;color:${C.ink500};text-align:${align}">${dur} · ${tr.upTo(t.maxGroup)}${t.freeCancellationHours > 0 ? ` · <span style="color:${C.green};font-weight:600">✓ ${tr.freeCancel}</span>` : ""}</td></tr>
+<tr><td style="padding:12px 20px 0;font-family:${SANS};font-size:${fs(12)};color:${C.ink500};text-align:${align}">${dur} · ${tr.upTo(t.maxGroup)}${t.freeCancellationHours > 0 ? ` · <span style="color:${C.green};font-weight:600">✓ ${tr.freeCancel}</span>` : ""}</td></tr>
 <tr><td style="padding:14px 20px 0;text-align:${align}">${price(t, locale, true)}</td></tr>
 <tr><td style="padding:16px 20px 20px">${button(url, tr.seeItinerary, "lg")}</td></tr>
 </table>`;
@@ -130,16 +136,16 @@ function card(t: WelcomeTour, locale: Locale, siteUrl: string): string {
   const url = tourUrl(siteUrl, locale, t);
   const src = img(siteUrl, t.coverUrl, 576, 384); // 3:2 like the site's cards, 2× a ~290px column
   const dur = escapeHtml(pick(t.durationLabel, locale));
-  return `<div class="oc-card"${D} style="display:inline-block;width:32%;vertical-align:top;margin:0 0.5% 12px;text-align:${align};font-size:13px">
+  return `<div class="oc-card"${D} style="display:inline-block;width:32%;vertical-align:top;margin:0 0.5% 12px;text-align:${align};font-size:${fs(13, CARD_SCALE)}">
 <table role="presentation"${D} width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid ${C.sand200};border-radius:12px;overflow:hidden">
 ${src ? `<tr><td><a href="${url}"><img src="${src}" width="290" alt="${escapeHtml(pick(t.title, locale))}" style="display:block;width:100%;height:auto;border:0"></a></td></tr>` : ""}
-<tr><td style="padding:10px 12px 0;text-align:${align}">${pill(dur)}</td></tr>
-<tr><td style="padding:6px 12px 0;font-family:${SANS};font-size:11px;text-align:${align}">${stars(t)}</td></tr>
-<tr><td height="60" valign="top" style="padding:6px 12px 0;height:60px;font-family:${SERIF};font-size:15px;line-height:1.35;font-weight:700;text-align:${align}"><a href="${url}" style="color:${C.navy};text-decoration:none">${escapeHtml(pick(t.title, locale))}</a></td></tr>
-<tr><td height="40" valign="top" style="padding:6px 12px 0;height:40px;font-family:${SANS};font-size:12px;line-height:1.5;color:${C.ink500};text-align:${align}">${escapeHtml(clip(pick(t.summary, locale), 84))}</td></tr>
-<tr><td height="36" valign="top" style="padding:8px 12px 0;height:36px;font-family:${SANS};font-size:11px;line-height:1.5;color:${C.ink500};text-align:${align}">${dur} · ${tr.upTo(t.maxGroup)}${t.freeCancellationHours > 0 ? `<br><span style="color:${C.green};font-weight:600">✓ ${tr.freeCancel}</span>` : ""}</td></tr>
-<tr><td style="padding:10px 12px 0;text-align:${align}">${price(t, locale, false)}</td></tr>
-<tr><td style="padding:10px 12px 12px">${button(url, tr.view, "sm")}</td></tr>
+<tr><td style="padding:10px 12px 0;text-align:${align}">${pill(dur, CARD_SCALE)}</td></tr>
+<tr><td style="padding:6px 12px 0;font-family:${SANS};font-size:${fs(11, CARD_SCALE)};text-align:${align}">${stars(t)}</td></tr>
+<tr><td height="124" valign="top" style="padding:6px 12px 0;height:124px;font-family:${SERIF};font-size:${fs(15, CARD_SCALE)};line-height:1.35;font-weight:700;text-align:${align}"><a href="${url}" style="color:${C.navy};text-decoration:none">${escapeHtml(pick(t.title, locale))}</a></td></tr>
+<tr><td height="108" valign="top" style="padding:6px 12px 0;height:108px;font-family:${SANS};font-size:${fs(12, CARD_SCALE)};line-height:1.5;color:${C.ink500};text-align:${align}">${escapeHtml(clip(pick(t.summary, locale), 84))}</td></tr>
+<tr><td height="78" valign="top" style="padding:8px 12px 0;height:78px;font-family:${SANS};font-size:${fs(11, CARD_SCALE)};line-height:1.5;color:${C.ink500};text-align:${align}">${dur} · ${tr.upTo(t.maxGroup)}${t.freeCancellationHours > 0 ? `<br><span style="color:${C.green};font-weight:600">✓ ${tr.freeCancel}</span>` : ""}</td></tr>
+<tr><td style="padding:10px 12px 0;text-align:${align}">${price(t, locale, false, CARD_SCALE)}</td></tr>
+<tr><td style="padding:10px 12px 12px">${button(url, tr.view, "sm", CARD_SCALE)}</td></tr>
 </table>
 </div>`;
 }
@@ -162,11 +168,11 @@ export function renderWelcomeEmail(opts: {
   const body = `
 <div${D}>${markdownToEmailHtml(opts.intro, align)}</div>
 ${opts.hero ? hero(opts.hero, locale, siteUrl) : ""}
-${cards ? `<div${D} style="margin:26px 0 12px;font-family:${SERIF};font-size:18px;color:${C.sand};text-align:${align}">${tr.more}</div>
+${cards ? `<div${D} style="margin:26px 0 12px;font-family:${SERIF};font-size:${fs(18)};color:${C.sand};text-align:${align}">${tr.more}</div>
 <div${D} style="font-size:0;text-align:center">${cards}</div>` : ""}
-<div style="margin:18px 0 0"><a href="${siteUrl}/${locale}/tours" style="display:block;text-align:center;padding:12px 20px;border:1px solid ${C.gold};border-radius:10px;color:${C.sand};font-family:${SANS};font-weight:600;font-size:14px;text-decoration:none">${tr.browse}</a></div>
-<p${D} style="margin:18px 0 0;font-family:${SANS};font-size:14px;line-height:1.6;color:${C.sand};text-align:${align}">${tr.questions} <a href="https://wa.me/${opts.whatsapp.e164.replace(/\D/g, "")}" style="color:#DDB97A" dir="ltr">${opts.whatsapp.display}</a></p>`;
+<div style="margin:18px 0 0"><a href="${siteUrl}/${locale}/tours" style="display:block;text-align:center;padding:${fs(12)} ${fs(20)};border:1px solid ${C.gold};border-radius:10px;color:${C.sand};font-family:${SANS};font-weight:600;font-size:${fs(14)};text-decoration:none">${tr.browse}</a></div>
+<p${D} style="margin:18px 0 0;font-family:${SANS};font-size:${fs(14)};line-height:1.6;color:${C.sand};text-align:${align}">${tr.questions} <a href="https://wa.me/${opts.whatsapp.e164.replace(/\D/g, "")}" style="color:#DDB97A" dir="ltr">${opts.whatsapp.display}</a></p>`;
   // On phones the three cards stack at full width, like the site's cards
   const head = `<style>@media only screen and (max-width:520px){.oc-card{width:100%!important;max-width:100%!important;margin:0 0 12px!important}.oc-card td{height:auto!important}}</style>`;
-  return layout(locale, opts.subject, body, tr.footer(opts.unsubscribeUrl), head, 960);
+  return layout(locale, opts.subject, body, tr.footer(opts.unsubscribeUrl), head, 960, SCALE);
 }
