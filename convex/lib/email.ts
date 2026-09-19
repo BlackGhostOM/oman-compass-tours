@@ -15,15 +15,15 @@ export const FROM = process.env.EMAIL_FROM ?? "Oman Compass Tours <onboarding@re
 export const STAFF_EMAIL = process.env.STAFF_NOTIFICATION_EMAIL ?? "omancompasstours@gmail.com";
 
 /** Wraps HTML body content in the branded email shell (RTL-aware). */
-export function layout(locale: Locale, title: string, body: string, footerNote?: string, head = ""): string {
+export function layout(locale: Locale, title: string, body: string, footerNote?: string, head = "", maxWidth = 560): string {
   const dir = locale === "ar" ? "rtl" : "ltr";
   const align = locale === "ar" ? "right" : "left";
   return `<!doctype html><html lang="${locale}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${head}</head><body style="margin:0;background:${BRAND.navy};font-family:Inter,Arial,'Segoe UI',Tahoma,sans-serif;color:${BRAND.sand};padding:32px 16px">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:${BRAND.navy900};border:1px solid ${BRAND.navy800};border-radius:12px;overflow:hidden">
+<table role="presentation" dir="${dir}" width="100%" cellpadding="0" cellspacing="0" style="max-width:${maxWidth}px;margin:0 auto;background:${BRAND.navy900};border:1px solid ${BRAND.navy800};border-radius:12px;overflow:hidden">
 <tr><td style="padding:28px 32px 8px;text-align:center;letter-spacing:.14em;font-size:13px;color:${BRAND.gold};font-family:Cinzel,Georgia,serif">OMAN COMPASS TOURS</td></tr>
 <tr><td style="padding:0 32px"><div style="height:1px;background:linear-gradient(90deg,transparent,${BRAND.gold},transparent)"></div></td></tr>
 <tr><td style="padding:20px 32px 0;text-align:${align};font-size:20px;font-weight:600;line-height:1.4">${title}</td></tr>
-<tr><td style="padding:12px 32px 28px;text-align:${align};font-size:15px;line-height:1.7">${body}</td></tr>
+<tr><td dir="${dir}" style="padding:12px 32px 28px;text-align:${align};font-size:15px;line-height:1.7"><div dir="${dir}">${body}</div></td></tr>
 <tr><td style="padding:16px 32px 24px;text-align:${align};font-size:12px;line-height:1.6;color:${BRAND.ink300};border-top:1px solid ${BRAND.navy800}">
 ${footerNote ?? ""}<br>Oman Compass Tours Company · Bawshar, Muscat, Sultanate of Oman · +968 9225 5028 · omancompasstours@gmail.com<br>Ministry of Heritage &amp; Tourism licence no. 1440944</td></tr>
 </table></body></html>`;
