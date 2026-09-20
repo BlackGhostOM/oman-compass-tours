@@ -228,6 +228,32 @@ export const setCoverByAlt = internalMutation({
  * (matched by tour code + English alt substring). Reuses the stored file, so
  * nothing is re-uploaded; the destination keeps its own bilingual alt text.
  */
+/**
+ * Points a site setting at an existing tour gallery photo, so a page can show a
+ * real photo instead of a seeded placeholder. Stores { url, alt, width, height }
+ * under the given key, reusing the stored file. Storage URLs are per-deployment,
+ * so run this on dev and on prod.
+ */
+export const setSettingImageByAlt = internalMutation({
+  args: { key: v.string(), tourCode: v.string(), alt: v.string() },
+  returns: v.object({ key: v.string(), matched: v.string(), url: v.string() }),
+  handler: async (ctx, { key, tourCode, alt }) => {
+    const tour = await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", tourCode)).unique();
+    if (!tour) throw new Error(`No tour with code ${tourCode}`);
+    const rows = await ctx.db.query("tourMedia").withIndex("by_tour_order", (q) => q.eq("tourId", tour._id)).take(200);
+    const needle = alt.toLowerCase();
+    const hit = rows.find((m) => m.media.kind === "image" && m.media.alt.en.toLowerCase().includes(needle));
+    if (!hit) throw new Error(`No gallery image in ${tourCode} whose alt contains "${alt}"`);
+    const url = hit.media.url ?? (hit.media.storageId ? (await ctx.storage.getUrl(hit.media.storageId)) ?? undefined : undefined);
+    if (!url) throw new Error(`Matched image "${hit.media.alt.en}" has no URL`);
+    const value = { url, alt: hit.media.alt, width: hit.media.width, height: hit.media.height };
+    const existing = await ctx.db.query("siteSettings").withIndex("by_key", (q) => q.eq("key", key)).unique();
+    if (existing) await ctx.db.patch(existing._id, { value, updatedAt: Date.now() });
+    else await ctx.db.insert("siteSettings", { key, value, updatedAt: Date.now() });
+    return { key, matched: hit.media.alt.en, url };
+  },
+});
+
 export const setDestinationImage = internalMutation({
   args: { destinationKey: v.string(), tourCode: v.string(), alt: v.string() },
   returns: v.object({ destination: v.string(), matched: v.string() }),

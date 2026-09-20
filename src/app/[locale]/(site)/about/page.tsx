@@ -25,6 +25,8 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
   const t = await getTranslations("about");
   const team = (await fetchPublic(api.content.team, {})) ?? [];
   const profilePdf = await fetchPublic(api.content.setting, { key: "company.profilePdfUrl" });
+  // Real story photo chosen from a tour gallery (mediaImport:setSettingImageByAlt); falls back to the seeded placeholder
+  const storyImage = (await fetchPublic(api.content.setting, { key: "about.storyImage" })) as { url?: string; alt?: { en: string; ar: string } } | null;
   const values = ["authenticity", "safety", "hospitality", "sustainability"] as const;
   const timeline = ["2014", "2017", "2020", "2023", "2026"] as const;
 
@@ -61,7 +63,14 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
             </div>
           </div>
           <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-navy-800">
-            <Image src="/media/placeholders/about.jpg" alt={t("imageAlt")} fill priority sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover" />
+            <Image
+              src={storyImage?.url ?? "/media/placeholders/about.jpg"}
+              alt={storyImage?.alt ? pick(storyImage.alt, locale) : t("imageAlt")}
+              fill
+              priority
+              sizes="(min-width: 1024px) 50vw, 100vw"
+              className="object-cover"
+            />
             <Image src="/brand/logo-mark.png" alt="" width={522} height={522} className="absolute bottom-4 end-4 size-20 rounded-full ring-1 ring-gold-500/50" />
           </div>
         </div>
