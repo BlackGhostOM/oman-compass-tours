@@ -224,15 +224,11 @@ export const setCoverByAlt = internalMutation({
 });
 
 /**
- * Points a destination's card/hero image at an existing tour gallery photo
- * (matched by tour code + English alt substring). Reuses the stored file, so
- * nothing is re-uploaded; the destination keeps its own bilingual alt text.
- */
-/**
  * Points a site setting at an existing tour gallery photo, so a page can show a
- * real photo instead of a seeded placeholder. Stores { url, alt, width, height }
- * under the given key, reusing the stored file. Storage URLs are per-deployment,
- * so run this on dev and on prod.
+ * real photo instead of a seeded placeholder. Stores the whole media object
+ * (storageId included, so the photo can be re-resolved if its URL ever changes),
+ * reusing the stored file. Storage URLs are per-deployment, so run this on dev
+ * and on prod.
  */
 export const setSettingImageByAlt = internalMutation({
   args: { key: v.string(), tourCode: v.string(), alt: v.string() },
@@ -246,7 +242,7 @@ export const setSettingImageByAlt = internalMutation({
     if (!hit) throw new Error(`No gallery image in ${tourCode} whose alt contains "${alt}"`);
     const url = hit.media.url ?? (hit.media.storageId ? (await ctx.storage.getUrl(hit.media.storageId)) ?? undefined : undefined);
     if (!url) throw new Error(`Matched image "${hit.media.alt.en}" has no URL`);
-    const value = { url, alt: hit.media.alt, width: hit.media.width, height: hit.media.height };
+    const value = { ...hit.media, url };
     const existing = await ctx.db.query("siteSettings").withIndex("by_key", (q) => q.eq("key", key)).unique();
     if (existing) await ctx.db.patch(existing._id, { value, updatedAt: Date.now() });
     else await ctx.db.insert("siteSettings", { key, value, updatedAt: Date.now() });
@@ -254,6 +250,11 @@ export const setSettingImageByAlt = internalMutation({
   },
 });
 
+/**
+ * Points a destination's card/hero image at an existing tour gallery photo
+ * (matched by tour code + English alt substring). Reuses the stored file, so
+ * nothing is re-uploaded; the destination keeps its own bilingual alt text.
+ */
 export const setDestinationImage = internalMutation({
   args: { destinationKey: v.string(), tourCode: v.string(), alt: v.string() },
   returns: v.object({ destination: v.string(), matched: v.string() }),
