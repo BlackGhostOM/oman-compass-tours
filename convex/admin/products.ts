@@ -4,6 +4,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { mutation, query } from "../_generated/server";
 import { assertInt, audit, requireStaff } from "../lib/access";
 import { faqValidator, itineraryDayValidator, localized, localizedOptional, mediaValidator, pricingModelValidator, seoValidator } from "../schema";
+import { releaseStorageRefs } from "../lib/mediaRefs";
 
 const slugify = (s: string) =>
   s
@@ -219,6 +220,8 @@ export const removeMedia = mutation({
     if (!m) return null;
     if (m.media.storageId) await ctx.storage.delete(m.media.storageId).catch(() => {});
     await ctx.db.delete(id);
+    // A destination card, blog cover, tour cover or site setting may point at this same file
+    if (m.media.storageId) await releaseStorageRefs(ctx, [m.media.storageId]);
     return null;
   },
 });

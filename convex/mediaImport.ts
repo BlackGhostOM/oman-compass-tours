@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { internalMutation, query, type MutationCtx } from "./_generated/server";
 import { media, placeholder } from "./lib/catalogSync";
+import { collectMediaRefs, releaseStorageRefs } from "./lib/mediaRefs";
 import { toursSeed } from "./seedData/tours";
 
 /**
@@ -98,20 +99,29 @@ export const restorePlaceholders = internalMutation({
     if (!seed) throw new Error(`No seed entry for ${code}`);
 
     const rows = await ctx.db.query("tourMedia").withIndex("by_tour_order", (q) => q.eq("tourId", tour._id)).take(200);
+    const deleted: Id<"_storage">[] = [];
     for (const m of rows) {
-      if (m.media.storageId) await ctx.storage.delete(m.media.storageId).catch(() => {});
+      if (m.media.storageId) {
+        await ctx.storage.delete(m.media.storageId).catch(() => {});
+        deleted.push(m.media.storageId);
+      }
       await ctx.db.delete(m._id);
     }
     const extras = [seed.image, "muscat", "wahiba", "jebel-akhdar", "wadi-shab"].filter((k, i, a) => a.indexOf(k) === i).slice(0, 4);
     for (const [i, key] of extras.entries()) {
       await ctx.db.insert("tourMedia", { tourId: tour._id, media: media(key, tour.title), order: i });
     }
-    if (tour.coverImage?.storageId) await ctx.storage.delete(tour.coverImage.storageId).catch(() => {});
+    if (tour.coverImage?.storageId) {
+      await ctx.storage.delete(tour.coverImage.storageId).catch(() => {});
+      deleted.push(tour.coverImage.storageId);
+    }
     await ctx.db.patch(tour._id, {
       coverImage: media(seed.image, tour.title),
       seo: { ...(tour.seo ?? { title: tour.title, description: tour.summary }), ogImageUrl: placeholder(seed.image) },
       updatedAt: Date.now(),
     });
+    // Destination cards, blog covers and site settings may point at the photos just deleted
+    await releaseStorageRefs(ctx, deleted);
     return { tourId: tour._id, removed: rows.length, restored: extras.length };
   },
 });
@@ -138,13 +148,11 @@ export const sweepOrphanedTourImages = internalMutation({
   args: { since: v.number() },
   returns: v.object({ scanned: v.number(), deleted: v.number() }),
   handler: async (ctx, { since }) => {
-    const referenced = new Set<string>();
-    for (const m of await ctx.db.query("tourMedia").take(5000)) if (m.media.storageId) referenced.add(m.media.storageId);
-    for (const t of await ctx.db.query("tours").take(500)) {
-      if (t.coverImage?.storageId) referenced.add(t.coverImage.storageId);
-      if (t.video?.storageId) referenced.add(t.video.storageId);
-      if (t.video?.posterStorageId) referenced.add(t.video.posterStorageId);
-    }
+    // Every table that can hold a photo, matched by storage id AND by resolved URL: the admin
+    // upload widget keeps only the URL, so an id-only check would treat those files as orphans.
+    const refs = await collectMediaRefs(ctx);
+    const referenced = new Set<string>(refs.flatMap((r) => r.ids.map(String)));
+    const referencedUrls = new Set<string>(refs.flatMap((r) => r.urls));
     const files = await ctx.db.system.query("_storage").order("desc").take(1000);
     let scanned = 0;
     let deleted = 0;
@@ -152,6 +160,10 @@ export const sweepOrphanedTourImages = internalMutation({
       if (f._creationTime < since) break;
       scanned += 1;
       if (f.contentType !== "image/jpeg" || referenced.has(f._id)) continue;
+      if (referencedUrls.size > 0) {
+        const url = await ctx.storage.getUrl(f._id);
+        if (url && referencedUrls.has(url)) continue;
+      }
       await ctx.storage.delete(f._id);
       deleted += 1;
     }
