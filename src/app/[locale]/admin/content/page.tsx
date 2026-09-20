@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { CsvButton, DateTime, LocalizedField, PageHeader, Panel, StatusBadge } from "@/components/admin/ui";
 import { MediaUrlField } from "@/components/admin/media-url-field";
+import { BlockEditor, EmailPreview, TourSelect, useDebounced, type Block, type TourOption } from "@/components/admin/newsletter-composer";
 import { cn } from "@/lib/utils";
 
 const L = (en = "", ar = ""): LocalizedString => ({ en, ar });
@@ -321,6 +322,7 @@ function NewsletterTab() {
   const locale = useLocale();
   const subs = useQuery(api.admin.newsletter.subscribers);
   const campaigns = useQuery(api.admin.newsletter.campaigns);
+  const tourOptions = useQuery(api.admin.newsletter.tourOptions);
   const addSubscriber = useMutation(api.admin.newsletter.addSubscriber);
   const setActive = useMutation(api.admin.newsletter.setSubscriberActive);
   const removeSubscriber = useMutation(api.admin.newsletter.removeSubscriber);
@@ -331,7 +333,11 @@ function NewsletterTab() {
   const [newEmail, setNewEmail] = useState("");
   const [newLocale, setNewLocale] = useState<"en" | "ar">(locale === "ar" ? "ar" : "en");
   const [search, setSearch] = useState("");
-  const [editing, setEditing] = useState<{ id?: Id<"newsletterCampaigns">; subject: LocalizedString; body: LocalizedString } | null>(null);
+  const [editing, setEditing] = useState<{ id?: Id<"newsletterCampaigns">; subject: LocalizedString; body: LocalizedString; blocks: Block[] } | null>(null);
+  const [previewLocale, setPreviewLocale] = useState<"en" | "ar">(locale === "ar" ? "ar" : "en");
+  // The preview re-renders once typing pauses, not on every keystroke
+  const debounced = useDebounced(editing ? { subject: editing.subject, body: editing.body, blocks: editing.blocks } : null, 500);
+  const preview = useQuery(api.admin.newsletter.previewCampaign, debounced ? { locale: previewLocale, ...debounced } : "skip");
   const active = subs?.filter((s) => !s.unsubscribedAt) ?? [];
   const activeAr = active.filter((s) => s.locale === "ar").length;
   const visible = (subs ?? []).filter((s) => !search || s.email.includes(search.toLowerCase()));
@@ -339,11 +345,13 @@ function NewsletterTab() {
   async function saveCampaign(): Promise<Id<"newsletterCampaigns"> | null> {
     if (!editing) return null;
     if (!editing.subject.en.trim() && !editing.subject.ar.trim()) { toast.error(t("subjectRequired")); return null; }
-    const id = await upsertCampaign({ id: editing.id, subject: editing.subject, body: editing.body });
+    const id = await upsertCampaign({ id: editing.id, subject: editing.subject, body: editing.body, blocks: editing.blocks });
     setEditing({ ...editing, id });
     toast.success(t("saved"));
     return id;
   }
+  /** Older campaigns hold Markdown only; they open as a single text block. */
+  const openCampaign = (c: Doc<"newsletterCampaigns">) => setEditing({ id: c._id, subject: c.subject, body: c.body, blocks: c.blocks ?? (c.body.en || c.body.ar ? [{ type: "text", body: c.body }] : []) });
 
   return (
     <div className="space-y-6">
@@ -374,9 +382,9 @@ function NewsletterTab() {
         )}
       </Panel>
 
-      <WelcomePanel />
+      <WelcomePanel tourOptions={tourOptions ?? []} />
 
-      <Panel title={t("campaigns")} actions={<Button size="sm" onClick={() => setEditing({ subject: { en: "", ar: "" }, body: { en: "", ar: "" } })}><Plus className="size-4" /> {t("newCampaign")}</Button>}>
+      <Panel title={t("campaigns")} actions={<Button size="sm" onClick={() => setEditing({ subject: L(), body: L(), blocks: [] })}><Plus className="size-4" /> {t("newCampaign")}</Button>}>
         <p className="text-xs text-muted-foreground">{t("campaignsHint")}</p>
         {campaigns && campaigns.length > 0 && (
           <ul className="mt-3 divide-y divide-border text-sm">
@@ -387,22 +395,25 @@ function NewsletterTab() {
                 {c.stats && <span className="text-xs text-muted-foreground">{t("stats", { sent: c.stats.sent, targeted: c.stats.targeted, failed: c.stats.failed })}</span>}
                 {c.error && <span className="max-w-72 truncate text-xs text-danger" title={c.error}>{c.error}</span>}
                 <DateTime value={c.sentAt ?? c.updatedAt} />
-                {c.status === "draft" && <Button size="xs" variant="outline" onClick={() => setEditing({ id: c._id, subject: c.subject, body: c.body })}>{t("edit")}</Button>}
+                {c.status === "draft" && <Button size="xs" variant="outline" onClick={() => openCampaign(c)}>{t("edit")}</Button>}
                 {c.status !== "sending" && <Button size="icon-xs" variant="ghost" className="text-danger" aria-label={t("remove")} title={t("remove")} onClick={async () => { if (window.confirm(t("confirmRemoveCampaign"))) await removeCampaign({ id: c._id }); }}><Trash2 className="size-3.5" /></Button>}
               </li>
             ))}
           </ul>
         )}
         {editing && (
-          <div className="mt-4 space-y-4 rounded-xl border border-border bg-muted/30 p-4">
-            <LocalizedField label={t("subject")} value={editing.subject} onChange={(v) => setEditing({ ...editing, subject: v })} required />
-            <LocalizedField label={t("body")} value={editing.body} onChange={(v) => setEditing({ ...editing, body: v })} multiline rows={10} />
-            <MediaUrlField label={t("insertImage")} kind="image" value="" onChange={(url) => { if (!url) return; const md = `\n\n![](${url})\n`; setEditing({ ...editing, body: { en: editing.body.en + md, ar: editing.body.ar + md } }); }} placeholder={t("insertImageHint")} />
-            <p className="text-xs text-muted-foreground">{t("bodyHint")}</p>
-            <div className="flex flex-wrap justify-end gap-2">
+          <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4" data-testid="campaign-editor">
+            <div className="grid gap-6 xl:grid-cols-2">
+              <div className="space-y-4">
+                <LocalizedField label={t("subject")} value={editing.subject} onChange={(v) => setEditing({ ...editing, subject: v })} required />
+                <BlockEditor blocks={editing.blocks} onChange={(blocks) => setEditing({ ...editing, blocks })} tours={tourOptions ?? []} locale={locale} />
+              </div>
+              <EmailPreview html={preview} locale={previewLocale} onLocale={setPreviewLocale} />
+            </div>
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
               <Button variant="ghost" onClick={() => setEditing(null)}>{t("cancel")}</Button>
               <Button variant="outline" onClick={() => void saveCampaign()}>{t("saveDraft")}</Button>
-              <Button variant="outline" onClick={async () => { const id = await saveCampaign(); if (id) { await sendTest({ id, locale: locale === "ar" ? "ar" : "en" }); toast.success(t("testSent")); } }}>{t("sendTest")}</Button>
+              <Button variant="outline" onClick={async () => { const id = await saveCampaign(); if (id) { await sendTest({ id, locale: previewLocale }); toast.success(t("testSent")); } }}>{t("sendTest")}</Button>
               <Button className="bg-gold-gradient text-navy-950" onClick={async () => { const id = await saveCampaign(); if (id && window.confirm(t("confirmSend", { count: active.length }))) { await sendCampaign({ id }); setEditing(null); toast.success(t("sending")); } }}>{t("send")}</Button>
             </div>
           </div>
@@ -412,26 +423,42 @@ function NewsletterTab() {
   );
 }
 
-function WelcomePanel() {
+function WelcomePanel({ tourOptions }: { tourOptions: TourOption[] }) {
   const t = useTranslations("admin.content.newsletter");
   const locale = useLocale();
   const saved = useQuery(api.admin.newsletter.welcome);
   const setWelcome = useMutation(api.admin.newsletter.setWelcome);
   const sendWelcomeTest = useMutation(api.admin.newsletter.sendWelcomeTest);
-  const [draft, setDraft] = useState<{ subject: LocalizedString; body: LocalizedString } | null>(null);
-  const defaults = { subject: { en: "Welcome to Oman Compass Tours", ar: "أهلًا بك في بوصلة عُمان للسياحة" }, body: { en: "Marhaba, and thank you for joining us.\n\nYou are now on the list for our travel notes: seasonal tips on the best time for each wadi, desert and mountain, new private tours as we launch them, and subscriber-only offers. Expect a note every few weeks, never spam.\n\nMeanwhile, here are a few of our most-loved private days out:", ar: "مرحبًا بك، وشكرًا لانضمامك إلينا.\n\nأصبحت الآن ضمن قائمة رسائل السفر: نصائح موسمية عن أفضل وقت لكل وادٍ وصحراء وجبل، وجولات خاصة جديدة فور إطلاقها، وعروض للمشتركين فقط. تصلك رسالة كل بضعة أسابيع، ولا رسائل مزعجة.\n\nوإلى ذلك الحين، هذه بعض جولاتنا الخاصة الأكثر حبًا لدى ضيوفنا:" } };
-  const value = draft ?? saved ?? defaults;
+  const [draft, setDraft] = useState<{ subject: LocalizedString; body: LocalizedString; heroCode: string; recommendedCodes: string[] } | null>(null);
+  const [previewLocale, setPreviewLocale] = useState<"en" | "ar">(locale === "ar" ? "ar" : "en");
+  const value = draft ?? (saved ? { subject: saved.subject, body: saved.body, heroCode: saved.heroCode, recommendedCodes: saved.recommendedCodes } : null);
+  const debounced = useDebounced(value, 500);
+  const preview = useQuery(api.admin.newsletter.previewWelcome, debounced ? { locale: previewLocale, ...debounced } : "skip");
   return (
-    <Panel title={t("welcomeTitle")} actions={<Button size="sm" variant="outline" onClick={async () => { await sendWelcomeTest({ locale: locale === "ar" ? "ar" : "en" }); toast.success(t("testSent")); }}>{t("sendTest")}</Button>}>
+    <Panel title={t("welcomeTitle")} actions={<Button size="sm" variant="outline" onClick={async () => { await sendWelcomeTest({ locale: previewLocale }); toast.success(t("testSent")); }}>{t("sendTest")}</Button>}>
       <p className="text-xs text-muted-foreground">{t("welcomeHint")}</p>
-      <div className="mt-3 space-y-3">
-        <LocalizedField label={t("subject")} value={value.subject} onChange={(v) => setDraft({ ...value, subject: v })} />
-        <LocalizedField label={t("body")} value={value.body} onChange={(v) => setDraft({ ...value, body: v })} multiline rows={6} />
-        <div className="flex justify-end gap-2">
-          {draft && <Button variant="ghost" onClick={() => setDraft(null)}>{t("cancel")}</Button>}
-          <Button size="sm" disabled={!draft} onClick={async () => { if (!draft) return; await setWelcome(draft); setDraft(null); toast.success(t("saved")); }}>{t("saveWelcome")}</Button>
+      {value && (
+        <div className="mt-3 grid gap-6 xl:grid-cols-2">
+          <div className="space-y-3">
+            <LocalizedField label={t("subject")} value={value.subject} onChange={(v) => setDraft({ ...value, subject: v })} />
+            <LocalizedField label={t("body")} value={value.body} onChange={(v) => setDraft({ ...value, body: v })} multiline rows={6} />
+            <div className="space-y-1.5"><Label>{t("heroTour")}</Label><TourSelect value={value.heroCode} onChange={(heroCode) => setDraft({ ...value, heroCode })} options={tourOptions} locale={locale} /></div>
+            <div className="space-y-1.5">
+              <Label>{t("recommendedTours")}</Label>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {[0, 1, 2].map((slot) => (
+                  <TourSelect key={slot} value={value.recommendedCodes[slot] ?? ""} allowNone options={tourOptions} locale={locale} onChange={(code) => { const codes = [...value.recommendedCodes]; codes[slot] = code; setDraft({ ...value, recommendedCodes: codes.filter(Boolean) }); }} />
+                ))}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              {draft && <Button variant="ghost" onClick={() => setDraft(null)}>{t("cancel")}</Button>}
+              <Button size="sm" disabled={!draft} onClick={async () => { if (!draft) return; await setWelcome(draft); setDraft(null); toast.success(t("saved")); }}>{t("saveWelcome")}</Button>
+            </div>
+          </div>
+          <EmailPreview html={preview} locale={previewLocale} onLocale={setPreviewLocale} />
         </div>
-      </div>
+      )}
     </Panel>
   );
 }

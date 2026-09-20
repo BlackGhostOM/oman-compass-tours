@@ -1,23 +1,36 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
-import { internalAction, internalMutation, internalQuery } from "./_generated/server";
-import { layout, sendBatch, sendEmail, type Locale } from "./lib/email";
-import { markdownToEmailHtml } from "./lib/markdown";
-import { renderWelcomeEmail, type WelcomeTour } from "./lib/welcomeEmail";
+import { internalAction, internalMutation, internalQuery, type ActionCtx } from "./_generated/server";
+import { sendBatch, sendEmail, type Locale } from "./lib/email";
+import { emailTourValidator, loadEmailTour, loadEmailTours } from "./lib/emailTours";
+import { codesInBlocks, renderCampaignEmail, renderWelcomeEmail, WELCOME_DEFAULTS, WELCOME_HERO_CODE, WELCOME_RECOMMENDED_CODES, type EmailTour } from "./lib/newsletterEmail";
 import { localeValidator, localized } from "./schema";
 
 const SITE_URL = () => process.env.SITE_URL ?? "http://localhost:3000";
 
-function render(campaign: Doc<"newsletterCampaigns">, locale: Locale, unsubscribeUrl: string) {
-  const subject = campaign.subject[locale] || campaign.subject.en || campaign.subject.ar;
-  const body = campaign.body[locale] || campaign.body.en || campaign.body.ar;
-  const align = locale === "ar" ? "right" : "left";
-  const footer = locale === "ar"
-    ? `تصلك هذه الرسالة لأنك اشتركت في نشرة بوصلة عُمان للسياحة. <a href="${unsubscribeUrl}" style="color:#DDB97A">إلغاء الاشتراك</a>`
-    : `You receive this because you subscribed to Oman Compass Tours travel notes. <a href="${unsubscribeUrl}" style="color:#DDB97A">Unsubscribe</a>`;
-  return { subject, html: layout(locale, subject, markdownToEmailHtml(body, align), footer) };
+type Rendered = { subject: string; html: string };
+
+/** Tours referenced by the campaign's blocks, loaded once per send. */
+async function campaignTours(ctx: ActionCtx, campaign: Doc<"newsletterCampaigns">): Promise<Record<string, EmailTour>> {
+  const codes = codesInBlocks(campaign.blocks ?? []);
+  if (codes.length === 0) return {};
+  const tours = (await ctx.runQuery(internal.newsletterSend.toursByCodes, { codes })) as EmailTour[];
+  return Object.fromEntries(tours.map((t) => [t.code, t]));
 }
+
+function render(campaign: Doc<"newsletterCampaigns">, locale: Locale, unsubscribeUrl: string, tours: Record<string, EmailTour>): Rendered {
+  const subject = campaign.subject[locale] || campaign.subject.en || campaign.subject.ar;
+  // Older campaigns hold Markdown only; it renders as a single text block
+  const blocks = campaign.blocks?.length ? campaign.blocks : [{ type: "text" as const, body: campaign.body }];
+  return { subject, html: renderCampaignEmail({ locale, siteUrl: SITE_URL(), subject, blocks, tours, unsubscribeUrl }) };
+}
+
+export const toursByCodes = internalQuery({
+  args: { codes: v.array(v.string()) },
+  returns: v.array(emailTourValidator),
+  handler: async (ctx, { codes }) => loadEmailTours(ctx, codes),
+});
 
 export const getCampaign = internalQuery({
   args: { campaignId: v.id("newsletterCampaigns") },
@@ -42,91 +55,32 @@ export const finish = internalMutation({
   },
 });
 
-export const WELCOME_DEFAULTS = {
-  subject: { en: "Welcome to Oman Compass Tours", ar: "أهلًا بك في بوصلة عُمان للسياحة" },
-  body: {
-    en: "Marhaba, and thank you for joining us.\n\nYou are now on the list for our travel notes: seasonal tips on the best time for each wadi, desert and mountain, new private tours as we launch them, and subscriber-only offers. Expect a note every few weeks, never spam.",
-    ar: "مرحبًا بك، وشكرًا لانضمامك إلينا.\n\nأصبحت الآن ضمن قائمة رسائل السفر: نصائح موسمية عن أفضل وقت لكل وادٍ وصحراء وجبل، وجولات خاصة جديدة فور إطلاقها، وعروض للمشتركين فقط. تصلك رسالة كل بضعة أسابيع، ولا رسائل مزعجة.",
-  },
-};
-
 export const getSubscriber = internalQuery({
   args: { subscriberId: v.id("newsletterSubscribers") },
   handler: async (ctx, { subscriberId }): Promise<Doc<"newsletterSubscribers"> | null> => ctx.db.get(subscriberId),
-});
-
-/** Featured journey and recommended tours in the welcome email; staff can override the codes in the `newsletter.welcome` setting. */
-const DEFAULT_HERO_CODE = "OCT-010"; // 8-Day Oman Nature & Culture with an Omani Guide – 4WD
-const DEFAULT_RECOMMENDED_CODES = ["OCT-008", "OCT-017", "OCT-019"]; // 3-day, 2-day Wahiba camp, 5-day
-
-const welcomeTourValidator = v.object({
-  code: v.string(),
-  title: localized,
-  slug: localized,
-  summary: localized,
-  highlights: v.array(localized),
-  durationLabel: localized,
-  durationDays: v.number(),
-  maxGroup: v.number(),
-  freeCancellationHours: v.number(),
-  priceFrom: v.number(),
-  pricingModel: v.string(),
-  ratingAverage: v.number(),
-  ratingCount: v.number(),
-  externalReviewCount: v.optional(v.number()),
-  coverUrl: v.optional(v.string()),
 });
 
 export const welcomeContext = internalQuery({
   args: {},
   returns: v.object({
     welcome: v.union(v.object({ subject: localized, body: localized }), v.null()),
-    hero: v.union(welcomeTourValidator, v.null()),
-    tours: v.array(welcomeTourValidator),
+    hero: v.union(emailTourValidator, v.null()),
+    tours: v.array(emailTourValidator),
   }),
   handler: async (ctx) => {
     const setting = await ctx.db.query("siteSettings").withIndex("by_key", (q) => q.eq("key", "newsletter.welcome")).unique();
     const value = setting?.value as { subject?: { en: string; ar: string }; body?: { en: string; ar: string }; heroCode?: string; recommendedCodes?: string[] } | undefined;
     const welcome = value?.subject && value?.body ? { subject: value.subject, body: value.body } : null;
-    const heroCode = value?.heroCode ?? DEFAULT_HERO_CODE;
-    const recommended = (value?.recommendedCodes ?? DEFAULT_RECOMMENDED_CODES).filter((c) => c !== heroCode);
-
-    const load = async (code: string): Promise<WelcomeTour | null> => {
-      const t = await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", code)).unique();
-      if (!t || t.status !== "published") return null;
-      const cover = t.coverImage;
-      const coverUrl = cover?.url ?? (cover?.storageId ? await ctx.storage.getUrl(cover.storageId) : null);
-      return {
-        code: t.code,
-        title: t.title,
-        slug: t.slug,
-        summary: t.summary,
-        highlights: t.highlights,
-        durationLabel: t.durationLabel,
-        durationDays: t.durationDays,
-        maxGroup: t.maxGroup,
-        freeCancellationHours: t.freeCancellationHours,
-        priceFrom: t.priceFrom,
-        pricingModel: t.pricingModel,
-        ratingAverage: t.ratingAverage,
-        ratingCount: t.ratingCount,
-        externalReviewCount: t.externalReviewCount,
-        coverUrl: coverUrl ?? undefined,
-      };
-    };
-    const hero = await load(heroCode);
-    const tours: WelcomeTour[] = [];
-    for (const code of recommended) {
-      const t = await load(code);
-      if (t) tours.push(t);
-    }
+    const heroCode = value?.heroCode ?? WELCOME_HERO_CODE;
+    const hero = await loadEmailTour(ctx, heroCode);
+    const tours = await loadEmailTours(ctx, (value?.recommendedCodes ?? WELCOME_RECOMMENDED_CODES).filter((c) => c !== heroCode));
     // Top up from the featured list if a recommended tour is unpublished
     if (tours.length < 3) {
       const featured = await ctx.db.query("tours").withIndex("by_featured", (q) => q.eq("status", "published").eq("isFeatured", true)).take(12);
       for (const f of featured) {
         if (tours.length >= 3) break;
         if (f.code === heroCode || tours.some((t) => t.code === f.code)) continue;
-        const t = await load(f.code);
+        const t = await loadEmailTour(ctx, f.code);
         if (t) tours.push(t);
       }
     }
@@ -145,8 +99,8 @@ export const sendWelcome = internalAction({
     if (!recipient) return null;
     const { welcome, hero, tours } = (await ctx.runQuery(internal.newsletterSend.welcomeContext, {})) as {
       welcome: { subject: { en: string; ar: string }; body: { en: string; ar: string } } | null;
-      hero: WelcomeTour | null;
-      tours: WelcomeTour[];
+      hero: EmailTour | null;
+      tours: EmailTour[];
     };
     const text = welcome ?? WELCOME_DEFAULTS;
     const subject = text.subject[locale] || text.subject.en;
@@ -159,7 +113,6 @@ export const sendWelcome = internalAction({
       hero,
       tours,
       unsubscribeUrl,
-      whatsapp: { display: "+968 9225 5028", e164: "+96892255028" },
     });
     const result = await sendEmail({ to: recipient, subject: to ? `[TEST] ${subject}` : subject, html, headers: { "List-Unsubscribe": `<${unsubscribeUrl}>` } });
     await ctx.runMutation(internal.notifications.log, { channel: "email", template: "newsletter_welcome", to: recipient, locale, status: result.status, providerMessageId: result.id, error: result.error, payload: { subscriberId } });
@@ -173,7 +126,8 @@ export const sendTest = internalAction({
   handler: async (ctx, { campaignId, to, locale }): Promise<null> => {
     const campaign = (await ctx.runQuery(internal.newsletterSend.getCampaign, { campaignId })) as Doc<"newsletterCampaigns"> | null;
     if (!campaign) return null;
-    const { subject, html } = render(campaign, locale, `${SITE_URL()}/${locale}/newsletter/unsubscribe?token=test`);
+    const tours = await campaignTours(ctx, campaign);
+    const { subject, html } = render(campaign, locale, `${SITE_URL()}/${locale}/newsletter/unsubscribe?token=test`, tours);
     const result = await sendEmail({ to, subject: `[TEST] ${subject}`, html });
     await ctx.runMutation(internal.notifications.log, { channel: "email", template: "newsletter_test", to, locale, status: result.status, providerMessageId: result.id, error: result.error, payload: { campaignId } });
     return null;
@@ -190,10 +144,11 @@ export const run = internalAction({
     let sent = 0;
     let failed = 0;
     let lastError: string | undefined;
-    const rendered: Record<Locale, { subject: string; html: string } | null> = { en: null, ar: null };
+    const tours = await campaignTours(ctx, campaign);
+    const rendered: Record<Locale, Rendered | null> = { en: null, ar: null };
     const messages = subs.map((s) => {
       const unsubscribeUrl = `${SITE_URL()}/${s.locale}/newsletter/unsubscribe?token=${s.token}`;
-      const base = rendered[s.locale] ?? (rendered[s.locale] = render(campaign, s.locale, "__UNSUB__"));
+      const base = rendered[s.locale] ?? (rendered[s.locale] = render(campaign, s.locale, "__UNSUB__", tours));
       return { to: s.email, subject: base.subject, html: base.html.replace("__UNSUB__", unsubscribeUrl), headers: { "List-Unsubscribe": `<${unsubscribeUrl}>` } };
     });
     for (let i = 0; i < messages.length; i += 100) {

@@ -19,6 +19,16 @@ export const roleValidator = v.union(
 
 export const localeValidator = v.union(v.literal("en"), v.literal("ar"));
 
+/** Ordered content blocks of a newsletter campaign (rendered by convex/lib/newsletterEmail.ts). */
+export const newsletterBlockValidator = v.union(
+  v.object({ type: v.literal("text"), body: localized }), // Markdown
+  v.object({ type: v.literal("image"), url: v.string(), alt: localized, link: v.optional(v.string()), caption: v.optional(localized) }),
+  v.object({ type: v.literal("tour"), code: v.string() }), // one journey as a full-width card
+  v.object({ type: v.literal("tours"), codes: v.array(v.string()) }), // one to three tour cards in a row
+  v.object({ type: v.literal("button"), label: localized, url: v.string() }),
+  v.object({ type: v.literal("divider") }),
+);
+
 export const currencyValidator = v.union(
   v.literal("OMR"),
   v.literal("USD"),
@@ -759,7 +769,8 @@ export default defineSchema({
 
   newsletterCampaigns: defineTable({
     subject: localized,
-    body: localized, // Markdown
+    body: localized, // Markdown (older campaigns; `blocks` takes precedence when present)
+    blocks: v.optional(v.array(newsletterBlockValidator)),
     status: v.union(v.literal("draft"), v.literal("sending"), v.literal("sent"), v.literal("failed")),
     createdBy: v.id("users"),
     sentAt: v.optional(v.number()),

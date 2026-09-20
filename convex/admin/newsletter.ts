@@ -5,7 +5,9 @@ import type { Doc } from "../_generated/dataModel";
 import { mutation, query } from "../_generated/server";
 import { audit, requireStaff } from "../lib/access";
 import { generateToken } from "../lib/ids";
-import { localeValidator, localized } from "../schema";
+import { loadEmailTour, loadEmailTours } from "../lib/emailTours";
+import { codesInBlocks, renderCampaignEmail, renderWelcomeEmail, siteUrl, WELCOME_DEFAULTS, WELCOME_HERO_CODE, WELCOME_RECOMMENDED_CODES, type NewsletterBlock } from "../lib/newsletterEmail";
+import { localeValidator, localized, newsletterBlockValidator } from "../schema";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -76,20 +78,20 @@ export const campaigns = query({
 });
 
 export const upsertCampaign = mutation({
-  args: { id: v.optional(v.id("newsletterCampaigns")), subject: localized, body: localized },
+  args: { id: v.optional(v.id("newsletterCampaigns")), subject: localized, body: localized, blocks: v.optional(v.array(newsletterBlockValidator)) },
   returns: v.id("newsletterCampaigns"),
-  handler: async (ctx, { id, subject, body }) => {
+  handler: async (ctx, { id, subject, body, blocks }) => {
     const staff = await requireStaff(ctx);
     if (!subject.en.trim() && !subject.ar.trim()) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "subject" });
     if (id) {
       const c = await ctx.db.get(id);
       if (!c) throw new ConvexError({ code: "NOT_FOUND" });
       if (c.status !== "draft") throw new ConvexError({ code: "INVALID_STATE" });
-      await ctx.db.patch(id, { subject, body, updatedAt: Date.now() });
+      await ctx.db.patch(id, { subject, body, blocks, updatedAt: Date.now() });
       await audit(ctx, staff, "newsletter.campaign_update", "newsletterCampaigns", String(id));
       return id;
     }
-    const newId = await ctx.db.insert("newsletterCampaigns", { subject, body, status: "draft", createdBy: staff._id, updatedAt: Date.now() });
+    const newId = await ctx.db.insert("newsletterCampaigns", { subject, body, blocks, status: "draft", createdBy: staff._id, updatedAt: Date.now() });
     await audit(ctx, staff, "newsletter.campaign_create", "newsletterCampaigns", String(newId));
     return newId;
   },
@@ -141,28 +143,89 @@ export const send = mutation({
 /* Welcome email                                                       */
 /* ------------------------------------------------------------------ */
 
+const WELCOME_SETTING = "newsletter.welcome";
+type WelcomeSetting = { subject?: { en: string; ar: string }; body?: { en: string; ar: string }; heroCode?: string; recommendedCodes?: string[] };
+
+/** Current welcome email text and tour choices (defaults when staff never saved them). */
 export const welcome = query({
   args: {},
-  returns: v.union(v.object({ subject: localized, body: localized }), v.null()),
+  returns: v.object({ subject: localized, body: localized, heroCode: v.string(), recommendedCodes: v.array(v.string()), custom: v.boolean() }),
   handler: async (ctx) => {
     await requireStaff(ctx);
-    const setting = await ctx.db.query("siteSettings").withIndex("by_key", (q) => q.eq("key", "newsletter.welcome")).unique();
-    const value = setting?.value as { subject?: { en: string; ar: string }; body?: { en: string; ar: string } } | undefined;
-    return value?.subject && value?.body ? { subject: value.subject, body: value.body } : null;
+    const setting = await ctx.db.query("siteSettings").withIndex("by_key", (q) => q.eq("key", WELCOME_SETTING)).unique();
+    const value = (setting?.value ?? {}) as WelcomeSetting;
+    return {
+      subject: value.subject ?? WELCOME_DEFAULTS.subject,
+      body: value.body ?? WELCOME_DEFAULTS.body,
+      heroCode: value.heroCode ?? WELCOME_HERO_CODE,
+      recommendedCodes: value.recommendedCodes ?? WELCOME_RECOMMENDED_CODES,
+      custom: !!(value.subject && value.body),
+    };
   },
 });
 
 export const setWelcome = mutation({
-  args: { subject: localized, body: localized },
+  args: { subject: localized, body: localized, heroCode: v.optional(v.string()), recommendedCodes: v.optional(v.array(v.string())) },
   returns: v.null(),
-  handler: async (ctx, { subject, body }) => {
+  handler: async (ctx, { subject, body, heroCode, recommendedCodes }) => {
     const staff = await requireStaff(ctx);
-    const existing = await ctx.db.query("siteSettings").withIndex("by_key", (q) => q.eq("key", "newsletter.welcome")).unique();
-    const value = { subject, body };
+    const existing = await ctx.db.query("siteSettings").withIndex("by_key", (q) => q.eq("key", WELCOME_SETTING)).unique();
+    const value = { subject, body, heroCode: heroCode || undefined, recommendedCodes: recommendedCodes?.filter(Boolean).slice(0, 3) };
     if (existing) await ctx.db.patch(existing._id, { value, updatedBy: staff._id, updatedAt: Date.now() });
-    else await ctx.db.insert("siteSettings", { key: "newsletter.welcome", value, updatedBy: staff._id, updatedAt: Date.now() });
-    await audit(ctx, staff, "newsletter.welcome_update", "siteSettings", "newsletter.welcome");
+    else await ctx.db.insert("siteSettings", { key: WELCOME_SETTING, value, updatedBy: staff._id, updatedAt: Date.now() });
+    await audit(ctx, staff, "newsletter.welcome_update", "siteSettings", WELCOME_SETTING);
     return null;
+  },
+});
+
+/** Published tours staff can place in emails, featured ones first. */
+export const tourOptions = query({
+  args: {},
+  returns: v.array(v.object({ code: v.string(), title: localized, durationLabel: localized, kind: v.string() })),
+  handler: async (ctx) => {
+    await requireStaff(ctx);
+    const rows = await ctx.db.query("tours").withIndex("by_status", (q) => q.eq("status", "published")).take(200);
+    rows.sort((a, b) => Number(b.isFeatured) - Number(a.isFeatured) || (a.featuredOrder ?? 99) - (b.featuredOrder ?? 99) || a.code.localeCompare(b.code));
+    return rows.map((t) => ({ code: t.code, title: t.title, durationLabel: t.durationLabel, kind: t.kind }));
+  },
+});
+
+/** The welcome email exactly as it will be sent, for the editor's live preview (unsaved values allowed). */
+export const previewWelcome = query({
+  args: { locale: localeValidator, subject: localized, body: localized, heroCode: v.string(), recommendedCodes: v.array(v.string()) },
+  returns: v.string(),
+  handler: async (ctx, { locale, subject, body, heroCode, recommendedCodes }) => {
+    await requireStaff(ctx);
+    const hero = heroCode ? await loadEmailTour(ctx, heroCode) : null;
+    const tours = await loadEmailTours(ctx, recommendedCodes.filter((c) => c && c !== heroCode).slice(0, 3));
+    return renderWelcomeEmail({
+      locale,
+      siteUrl: siteUrl(),
+      subject: subject[locale] || subject.en || WELCOME_DEFAULTS.subject[locale],
+      intro: body[locale] || body.en || WELCOME_DEFAULTS.body[locale],
+      hero,
+      tours,
+      unsubscribeUrl: `${siteUrl()}/${locale}/newsletter/unsubscribe?token=preview`,
+    });
+  },
+});
+
+/** A campaign draft exactly as it will be sent, for the editor's live preview. */
+export const previewCampaign = query({
+  args: { locale: localeValidator, subject: localized, body: localized, blocks: v.array(newsletterBlockValidator) },
+  returns: v.string(),
+  handler: async (ctx, { locale, subject, body, blocks: given }) => {
+    await requireStaff(ctx);
+    const blocks: NewsletterBlock[] = given.length ? given : [{ type: "text", body }];
+    const tours = await loadEmailTours(ctx, codesInBlocks(blocks));
+    return renderCampaignEmail({
+      locale,
+      siteUrl: siteUrl(),
+      subject: subject[locale] || subject.en || subject.ar || "…",
+      blocks,
+      tours: Object.fromEntries(tours.map((t) => [t.code, t])),
+      unsubscribeUrl: `${siteUrl()}/${locale}/newsletter/unsubscribe?token=preview`,
+    });
   },
 });
 

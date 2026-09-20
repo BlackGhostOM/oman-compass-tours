@@ -22,9 +22,9 @@ const size = (raw: string | null) => {
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const w = size(url.searchParams.get("w"));
-  const h = size(url.searchParams.get("h"));
+  const h = size(url.searchParams.get("h")); // optional: without it the photo is resized to the width, keeping its aspect
   const src = url.searchParams.get("src") ?? "";
-  if (!w || !h) return new Response("Bad size", { status: 400 });
+  if (!w) return new Response("Bad size", { status: 400 });
 
   let source: URL;
   if (src.startsWith("/") && !src.startsWith("//")) {
@@ -47,7 +47,7 @@ export async function GET(req: Request) {
   try {
     const out = await sharp(input)
       .rotate() // honour EXIF orientation
-      .resize(w, h, { fit: "cover", position: sharp.strategy.attention })
+      .resize(h ? { width: w, height: h, fit: "cover", position: sharp.strategy.attention } : { width: w, withoutEnlargement: true })
       .jpeg({ quality: 80, mozjpeg: true })
       .toBuffer();
     return new Response(new Uint8Array(out), {
