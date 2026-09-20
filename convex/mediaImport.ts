@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { internalMutation, query } from "./_generated/server";
+import { internalMutation, query, type MutationCtx } from "./_generated/server";
 import { media, placeholder } from "./lib/catalogSync";
 import { toursSeed } from "./seedData/tours";
 
@@ -197,6 +197,24 @@ export const imageUrls = query({
 });
 
 /**
+ * Finds one photo in a tour's gallery by a case-insensitive substring of its
+ * English alt text and resolves its URL. Shared by the mutations below, which
+ * all point something at an EXISTING gallery photo, reusing the stored file
+ * rather than re-uploading it.
+ */
+async function findGalleryImage(ctx: MutationCtx, tourCode: string, alt: string) {
+  const tour = await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", tourCode)).unique();
+  if (!tour) throw new Error(`No tour with code ${tourCode}`);
+  const rows = await ctx.db.query("tourMedia").withIndex("by_tour_order", (q) => q.eq("tourId", tour._id)).take(200);
+  const needle = alt.toLowerCase();
+  const hit = rows.find((m) => m.media.kind === "image" && m.media.alt.en.toLowerCase().includes(needle));
+  if (!hit) throw new Error(`No gallery image in ${tourCode} whose alt contains "${alt}"`);
+  const url = hit.media.url ?? (hit.media.storageId ? (await ctx.storage.getUrl(hit.media.storageId)) ?? undefined : undefined);
+  if (!url) throw new Error(`Matched image "${hit.media.alt.en}" has no URL`);
+  return { tour, rows, hit, media: { ...hit.media, url }, url };
+}
+
+/**
  * Makes an existing gallery photo the tour's cover, matched by its English alt
  * text (case-insensitive substring), and moves it to the front of the gallery.
  */
@@ -204,15 +222,9 @@ export const setCoverByAlt = internalMutation({
   args: { code: v.string(), alt: v.string() },
   returns: v.object({ tourId: v.id("tours"), matched: v.string() }),
   handler: async (ctx, { code, alt }) => {
-    const tour = await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", code)).unique();
-    if (!tour) throw new Error(`No tour with code ${code}`);
-    const rows = await ctx.db.query("tourMedia").withIndex("by_tour_order", (q) => q.eq("tourId", tour._id)).take(200);
-    const needle = alt.toLowerCase();
-    const hit = rows.find((m) => m.media.kind === "image" && m.media.alt.en.toLowerCase().includes(needle));
-    if (!hit) throw new Error(`No gallery image whose alt contains "${alt}"`);
-    const url = hit.media.url ?? (hit.media.storageId ? (await ctx.storage.getUrl(hit.media.storageId)) ?? undefined : undefined);
+    const { tour, rows, hit, media, url } = await findGalleryImage(ctx, code, alt);
     await ctx.db.patch(tour._id, {
-      coverImage: { ...hit.media, url },
+      coverImage: media,
       seo: { ...(tour.seo ?? { title: tour.title, description: tour.summary }), ogImageUrl: url },
       updatedAt: Date.now(),
     });
@@ -226,34 +238,46 @@ export const setCoverByAlt = internalMutation({
 /**
  * Points a site setting at an existing tour gallery photo, so a page can show a
  * real photo instead of a seeded placeholder. Stores the whole media object
- * (storageId included, so the photo can be re-resolved if its URL ever changes),
- * reusing the stored file. Storage URLs are per-deployment, so run this on dev
- * and on prod.
+ * (storageId included, so the photo can be re-resolved if its URL ever changes).
+ * Storage URLs are per-deployment, so run this on dev and on prod.
  */
 export const setSettingImageByAlt = internalMutation({
   args: { key: v.string(), tourCode: v.string(), alt: v.string() },
   returns: v.object({ key: v.string(), matched: v.string(), url: v.string() }),
   handler: async (ctx, { key, tourCode, alt }) => {
-    const tour = await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", tourCode)).unique();
-    if (!tour) throw new Error(`No tour with code ${tourCode}`);
-    const rows = await ctx.db.query("tourMedia").withIndex("by_tour_order", (q) => q.eq("tourId", tour._id)).take(200);
-    const needle = alt.toLowerCase();
-    const hit = rows.find((m) => m.media.kind === "image" && m.media.alt.en.toLowerCase().includes(needle));
-    if (!hit) throw new Error(`No gallery image in ${tourCode} whose alt contains "${alt}"`);
-    const url = hit.media.url ?? (hit.media.storageId ? (await ctx.storage.getUrl(hit.media.storageId)) ?? undefined : undefined);
-    if (!url) throw new Error(`Matched image "${hit.media.alt.en}" has no URL`);
-    const value = { ...hit.media, url };
+    const { hit, media, url } = await findGalleryImage(ctx, tourCode, alt);
     const existing = await ctx.db.query("siteSettings").withIndex("by_key", (q) => q.eq("key", key)).unique();
-    if (existing) await ctx.db.patch(existing._id, { value, updatedAt: Date.now() });
-    else await ctx.db.insert("siteSettings", { key, value, updatedAt: Date.now() });
+    if (existing) await ctx.db.patch(existing._id, { value: media, updatedAt: Date.now() });
+    else await ctx.db.insert("siteSettings", { key, value: media, updatedAt: Date.now() });
     return { key, matched: hit.media.alt.en, url };
   },
 });
 
 /**
+ * Gives a blog post its cover photo from an existing tour gallery, matched by
+ * the post's English slug. The photo keeps its own bilingual alt text, which the
+ * blog card prefers over the post title.
+ */
+export const setBlogCoverByAlt = internalMutation({
+  args: { slug: v.string(), tourCode: v.string(), alt: v.string() },
+  returns: v.object({ slug: v.string(), matched: v.string(), url: v.string() }),
+  handler: async (ctx, { slug, tourCode, alt }) => {
+    const post = await ctx.db.query("blogPosts").withIndex("by_slug_en", (q) => q.eq("slug.en", slug)).unique();
+    if (!post) throw new Error(`No blog post with English slug ${slug}`);
+    const { hit, media, url } = await findGalleryImage(ctx, tourCode, alt);
+    await ctx.db.patch(post._id, {
+      cover: media,
+      seo: { ...(post.seo ?? { title: post.title, description: post.excerpt }), ogImageUrl: url },
+      updatedAt: Date.now(),
+    });
+    return { slug, matched: hit.media.alt.en, url };
+  },
+});
+
+/**
  * Points a destination's card/hero image at an existing tour gallery photo
- * (matched by tour code + English alt substring). Reuses the stored file, so
- * nothing is re-uploaded; the destination keeps its own bilingual alt text.
+ * (matched by tour code + English alt substring). The destination keeps its own
+ * bilingual alt text.
  */
 export const setDestinationImage = internalMutation({
   args: { destinationKey: v.string(), tourCode: v.string(), alt: v.string() },
@@ -261,14 +285,8 @@ export const setDestinationImage = internalMutation({
   handler: async (ctx, { destinationKey, tourCode, alt }) => {
     const dest = await ctx.db.query("destinations").withIndex("by_key", (q) => q.eq("key", destinationKey)).unique();
     if (!dest) throw new Error(`No destination with key ${destinationKey}`);
-    const tour = await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", tourCode)).unique();
-    if (!tour) throw new Error(`No tour with code ${tourCode}`);
-    const rows = await ctx.db.query("tourMedia").withIndex("by_tour_order", (q) => q.eq("tourId", tour._id)).take(200);
-    const needle = alt.toLowerCase();
-    const hit = rows.find((m) => m.media.kind === "image" && m.media.alt.en.toLowerCase().includes(needle));
-    if (!hit) throw new Error(`No gallery image in ${tourCode} whose alt contains "${alt}"`);
-    const url = hit.media.url ?? (hit.media.storageId ? (await ctx.storage.getUrl(hit.media.storageId)) ?? undefined : undefined);
-    await ctx.db.patch(dest._id, { image: { ...hit.media, url, alt: dest.name } });
+    const { hit, media } = await findGalleryImage(ctx, tourCode, alt);
+    await ctx.db.patch(dest._id, { image: { ...media, alt: dest.name } });
     return { destination: destinationKey, matched: hit.media.alt.en };
   },
 });
