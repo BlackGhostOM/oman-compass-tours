@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { internalMutation, query, type MutationCtx } from "./_generated/server";
 import { media, placeholder } from "./lib/catalogSync";
-import { collectMediaRefs, releaseStorageRefs } from "./lib/mediaRefs";
+import { collectMediaRefs, releaseStorageRefs, type DeletedFile } from "./lib/mediaRefs";
 import { toursSeed } from "./seedData/tours";
 
 /**
@@ -99,11 +99,11 @@ export const restorePlaceholders = internalMutation({
     if (!seed) throw new Error(`No seed entry for ${code}`);
 
     const rows = await ctx.db.query("tourMedia").withIndex("by_tour_order", (q) => q.eq("tourId", tour._id)).take(200);
-    const deleted: Id<"_storage">[] = [];
+    const deleted: DeletedFile[] = [];
     for (const m of rows) {
       if (m.media.storageId) {
         await ctx.storage.delete(m.media.storageId).catch(() => {});
-        deleted.push(m.media.storageId);
+        deleted.push(m.media);
       }
       await ctx.db.delete(m._id);
     }
@@ -113,7 +113,7 @@ export const restorePlaceholders = internalMutation({
     }
     if (tour.coverImage?.storageId) {
       await ctx.storage.delete(tour.coverImage.storageId).catch(() => {});
-      deleted.push(tour.coverImage.storageId);
+      deleted.push(tour.coverImage);
     }
     await ctx.db.patch(tour._id, {
       coverImage: media(seed.image, tour.title),

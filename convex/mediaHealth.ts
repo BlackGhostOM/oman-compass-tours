@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
-import { collectMediaRefs } from "./lib/mediaRefs";
+import { collectMediaRefs, liveFiles } from "./lib/mediaRefs";
 
 /**
  * Daily safety net for photo references (see convex/lib/mediaRefs.ts).
@@ -12,35 +12,30 @@ import { collectMediaRefs } from "./lib/mediaRefs";
  * not. A cleared field makes the page show its placeholder, which is what the
  * render path already does for a row with no photo.
  *
+ * References are matched by storage id AND by resolved URL, so a row written by
+ * the admin upload widget (which keeps no id) is checked just like a CLI import.
+ *
  * It only ever clears references to files that are genuinely gone, so a healthy
  * deployment is left untouched. Run it by hand with:
  *   npx convex run mediaHealth:healDangling [--prod]
  */
 export const healDangling = internalMutation({
   args: {},
-  returns: v.object({ checked: v.number(), files: v.number(), cleared: v.array(v.string()), unverifiable: v.number() }),
+  returns: v.object({ checked: v.number(), files: v.number(), cleared: v.array(v.string()), unverifiable: v.number(), truncated: v.boolean() }),
   handler: async (ctx) => {
     const refs = await collectMediaRefs(ctx);
-    const exists = new Map<string, boolean>();
+    const live = await liveFiles(ctx);
     const cleared: string[] = [];
-
-    // Admin uploads keep only the resolved URL, with no storage id to look up, so those
-    // references cannot be checked here. They are counted, not touched. The sweeper no longer
-    // deletes their files, so in practice they only break if a file is removed by hand.
+    // A reference with neither an id nor a storage URL has nothing to check: it points at a
+    // static /media/placeholders/… file, which ships with the site and cannot go missing.
     let unverifiable = 0;
 
     for (const ref of refs) {
-      if (ref.ids.length === 0) {
-        unverifiable += 1;
-        continue;
-      }
-      let dangling = false;
-      for (const id of ref.ids) {
-        const key = String(id);
-        if (!exists.has(key)) exists.set(key, (await ctx.db.system.get(id)) !== null);
-        if (!exists.get(key)) dangling = true;
-      }
-      if (dangling) {
+      const idGone = ref.ids.some((id) => !live.ids.has(String(id)));
+      // A URL missing from a TRUNCATED listing proves nothing, so only trust a complete one.
+      const urlGone = live.complete && ref.urls.some((u) => !live.urls.has(u));
+      if (ref.ids.length === 0 && ref.urls.length > 0 && !live.complete) unverifiable += 1;
+      if (idGone || urlGone) {
         await ref.clear();
         cleared.push(ref.where);
       }
@@ -49,6 +44,7 @@ export const healDangling = internalMutation({
     if (cleared.length > 0) {
       console.warn(`[media] cleared ${cleared.length} reference(s) to deleted files: ${cleared.join(", ")}`);
     }
-    return { checked: refs.length, files: exists.size, cleared, unverifiable };
+    if (!live.complete) console.warn(`[media] storage listing hit the ${live.count}-file cap; URL-only references were left alone`);
+    return { checked: refs.length, files: live.count, cleared, unverifiable, truncated: !live.complete };
   },
 });

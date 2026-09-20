@@ -220,8 +220,9 @@ export const removeMedia = mutation({
     if (!m) return null;
     if (m.media.storageId) await ctx.storage.delete(m.media.storageId).catch(() => {});
     await ctx.db.delete(id);
-    // A destination card, blog cover, tour cover or site setting may point at this same file
-    if (m.media.storageId) await releaseStorageRefs(ctx, [m.media.storageId]);
+    // A destination card, blog cover, tour cover or site setting may point at this same file,
+    // by id or — for anything uploaded from the admin screens — by URL
+    await releaseStorageRefs(ctx, [m.media]);
     return null;
   },
 });
