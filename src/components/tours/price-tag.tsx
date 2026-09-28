@@ -15,7 +15,7 @@ export function PriceTag({
   tone = "light",
 }: {
   baisa: number;
-  pricingModel: "per_group" | "per_person";
+  pricingModel: "per_group" | "per_person" | "tiered" | "per_vehicle";
   compareAt?: number | null;
   size?: "sm" | "md" | "lg";
   className?: string;
@@ -38,7 +38,7 @@ export function PriceTag({
         </span>
       )}
       <span className={cn("block text-xs", dark ? "text-sand-100/60" : "text-ink-500")}>
-        {pricingModel === "per_group" ? t("perGroup") : t("perAdult")} ·{" "}
+        {pricingModel === "per_group" ? t("perGroup") : pricingModel === "per_vehicle" ? t("perVehicle") : pricingModel === "tiered" ? t("forFirstAdult") : t("perAdult")} ·{" "}
         <span dir="ltr">≈ {formatMoney((baisa / 1000) * USD_RATE, "USD", locale)}</span>
       </span>
     </div>

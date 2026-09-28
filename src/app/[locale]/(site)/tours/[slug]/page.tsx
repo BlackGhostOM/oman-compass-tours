@@ -227,6 +227,19 @@ export default async function TourPage({ params }: Props) {
                     <tbody className="divide-y divide-sand-200">
                       {tour.pricingModel === "per_group" ? (
                         <PriceRow label={t("privateGroup", { count: tour.maxGroup })} baisa={tour.priceGroup ?? tour.priceFrom} locale={locale} />
+                      ) : tour.pricingModel === "tiered" && tour.tieredPricing ? (
+                        <>
+                          <PriceRow label={t("tierFirstAdult")} baisa={tour.tieredPricing.firstAdult} locale={locale} />
+                          <PriceRow label={t("tierFirstTwo")} baisa={tour.tieredPricing.firstTwoAdults} locale={locale} />
+                          <PriceRow label={t("tierExtraAdult")} baisa={tour.tieredPricing.extraAdult} locale={locale} />
+                          <PriceRow label={`${t("tierExtraChild")} (${t("ages", { min: (tour.infantAgeMax ?? 2) + 1, max: tour.childAgeMax ?? 11 })})`} baisa={tour.tieredPricing.extraChild} locale={locale} />
+                          <tr><td className="px-4 py-3">{t("infants", { max: tour.infantAgeMax ?? 2 })}</td><td className="px-4 py-3 text-success" colSpan={2}>{t("free")}</td></tr>
+                        </>
+                      ) : tour.pricingModel === "per_vehicle" && tour.vehiclePricing ? (
+                        <>
+                          <PriceRow label={t("perVehicleRow", { maxAdults: tour.vehiclePricing.maxAdults, seats: tour.vehiclePricing.seats })} baisa={tour.vehiclePricing.pricePerVehicle} locale={locale} />
+                          <tr><td className="px-4 py-3">{t("infants", { max: tour.infantAgeMax ?? 2 })}</td><td className="px-4 py-3 text-success" colSpan={2}>{t("free")}</td></tr>
+                        </>
                       ) : (
                         <>
                           <PriceRow label={tc("perAdult")} baisa={tour.priceAdult ?? tour.priceFrom} locale={locale} />

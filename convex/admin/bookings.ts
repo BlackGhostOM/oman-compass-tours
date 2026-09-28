@@ -6,6 +6,7 @@ import { mutation, query } from "../_generated/server";
 import { assertInt, assertString, audit, requireStaff } from "../lib/access";
 import { generateBookingReference, generateToken } from "../lib/ids";
 import { bookingStatusValidator, travellerValidator } from "../schema";
+import { capacityUnits } from "../lib/pricing";
 
 type Status = Doc<"bookings">["status"];
 
@@ -189,12 +190,15 @@ export const createManual = mutation({
     let reference = generateBookingReference();
     while (await ctx.db.query("bookings").withIndex("by_reference", (q) => q.eq("reference", reference)).unique()) reference = generateBookingReference();
     const policies = await ctx.db.query("policies").take(50);
+    // Capacity is counted per listed departure; a blank or unknown time would make the booking invisible
+    // to it, letting the website sell the same seat or 4WD again. Fall back to the first departure.
+    const startTime = args.startTime && tour.startTimes.includes(args.startTime) ? args.startTime : tour.startTimes[0];
     const bookingId = await ctx.db.insert("bookings", {
       reference,
       tourId: tour._id,
       tourTitle: tour.title,
       date: args.date,
-      startTime: args.startTime,
+      startTime,
       adults: args.adults,
       children: args.children,
       infants: args.infants,
@@ -220,7 +224,18 @@ export const createManual = mutation({
       createdByStaffId: staff._id,
       updatedAt: now,
     });
-    await ctx.db.insert("bookingItems", { bookingId, kind: tour.pricingModel === "per_group" ? "group" : "adult", label: tour.pricingModel === "per_group" ? { en: "Private group", ar: "مجموعة خاصة" } : { en: "Guests", ar: "الضيوف" }, quantity: tour.pricingModel === "per_group" ? 1 : args.adults + args.children, unitPrice: tour.pricingModel === "per_group" ? total : Math.round(total / Math.max(1, args.adults + args.children)), total });
+    // Staff type one agreed total, so every model but per-person prints it as a single line on the voucher
+    const heads = args.adults + args.children;
+    const vehicles = tour.pricingModel === "per_vehicle" ? capacityUnits(tour, args.adults, args.children) : 0;
+    const item =
+      tour.pricingModel === "per_person"
+        ? { kind: "adult" as const, label: { en: "Guests", ar: "الضيوف" }, quantity: heads, unitPrice: Math.round(total / Math.max(1, heads)) }
+        : tour.pricingModel === "per_vehicle"
+          ? { kind: "group" as const, label: { en: "4WD vehicle", ar: "سيارة دفع رباعي" }, quantity: vehicles, unitPrice: Math.round(total / Math.max(1, vehicles)) }
+          : tour.pricingModel === "tiered"
+            ? { kind: "group" as const, label: { en: `Private tour (${args.adults} adults${args.children ? `, ${args.children} children` : ""})`, ar: `جولة خاصة (${args.adults} بالغين${args.children ? ` و${args.children} أطفال` : ""})` }, quantity: 1, unitPrice: total }
+            : { kind: "group" as const, label: { en: "Private group", ar: "مجموعة خاصة" }, quantity: 1, unitPrice: total };
+    await ctx.db.insert("bookingItems", { bookingId, ...item, total });
     if (paid > 0) {
       await ctx.db.insert("payments", { bookingId, provider: "manual", kind: paid >= total ? "full" : "deposit", amount: paid, currency: "OMR", amountOmr: paid, status: "succeeded", providerPaymentId: `manual_${reference}`, idempotencyKey: `manual_${bookingId}`, paidAt: now, refundedAmount: 0, createdByStaffId: staff._id, updatedAt: now });
     }
@@ -288,6 +303,23 @@ export const toursForSelect = query({
   handler: async (ctx) => {
     await requireStaff(ctx);
     const rows = await ctx.db.query("tours").take(500);
-    return rows.map((t) => ({ _id: t._id, code: t.code, title: t.title, status: t.status, startTimes: t.startTimes, pricingModel: t.pricingModel, priceFrom: t.priceFrom, maxGroup: t.maxGroup }));
+    // Everything the dialog needs to suggest a total with the same engine the website uses
+    return rows.map((t) => ({
+      _id: t._id,
+      code: t.code,
+      title: t.title,
+      status: t.status,
+      startTimes: t.startTimes,
+      pricingModel: t.pricingModel,
+      priceFrom: t.priceFrom,
+      priceGroup: t.priceGroup ?? null,
+      priceAdult: t.priceAdult ?? null,
+      priceChild: t.priceChild ?? null,
+      tieredPricing: t.tieredPricing ?? null,
+      vehiclePricing: t.vehiclePricing ?? null,
+      depositPercent: t.depositPercent,
+      minGroup: t.minGroup,
+      maxGroup: t.maxGroup,
+    }));
   },
 });

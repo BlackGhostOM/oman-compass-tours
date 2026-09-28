@@ -5,7 +5,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { assertInt, assertString, enforceRateLimit, getViewer, isStaff } from "./lib/access";
 import { generateBookingReference, generateToken } from "./lib/ids";
-import { computeQuote, isFreeCancellation, type PricingCoupon } from "./lib/pricing";
+import { capacityUnits, computeQuote, isFreeCancellation, type PricingCoupon } from "./lib/pricing";
 import { localeValidator, paymentProviderValidator, travellerValidator } from "./schema";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -67,8 +67,8 @@ async function remainingCapacity(ctx: QueryCtx | MutationCtx, tour: Doc<"tours">
   const capacity = slot?.capacity ?? tour.defaultCapacityPerSlot;
   const bookings = await ctx.db.query("bookings").withIndex("by_tour_date", (q) => q.eq("tourId", tour._id).eq("date", date)).take(500);
   const booked = bookings
-    .filter((b) => ["pending_payment", "confirmed", "in_progress"].includes(b.status) && (b.startTime ?? tour.startTimes[0]) === startTime)
-    .reduce((a, b) => a + (tour.pricingModel === "per_group" ? 1 : b.groupSize), 0);
+    .filter((b) => ["pending_payment", "confirmed", "in_progress"].includes(b.status) && (b.startTime || tour.startTimes[0]) === startTime)
+    .reduce((a, b) => a + capacityUnits(tour, b.adults, b.children), 0);
   return Math.max(0, capacity - booked);
 }
 
@@ -137,9 +137,9 @@ export const quote = query({
     const tour = await ctx.db.get(args.tourId);
     if (!tour || tour.status !== "published") return null;
     const { quote } = await buildQuote(ctx, tour, args);
-    const startTime = args.startTime ?? tour.startTimes[0];
+    const startTime = args.startTime || tour.startTimes[0];
     const remaining = DATE_RE.test(args.date) && tour.startTimes.includes(startTime) ? await remainingCapacity(ctx, tour, args.date, startTime) : 0;
-    const needed = tour.pricingModel === "per_group" ? 1 : quote.groupSize;
+    const needed = capacityUnits(tour, args.adults, args.children);
     return { ...quote, remaining, available: remaining >= needed && needed > 0 };
   },
 });
@@ -228,7 +228,7 @@ export const create = mutation({
     const { quote, coupon } = await buildQuote(ctx, tour, args);
     if (args.couponCode && quote.couponError) throw new ConvexError({ code: "COUPON_INVALID", reason: quote.couponError });
 
-    const needed = tour.pricingModel === "per_group" ? 1 : quote.groupSize;
+    const needed = capacityUnits(tour, args.adults, args.children);
     const remaining = await remainingCapacity(ctx, tour, args.date, args.startTime);
     if (remaining < needed) throw new ConvexError({ code: "SOLD_OUT", remaining });
 

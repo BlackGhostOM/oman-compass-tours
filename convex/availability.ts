@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
+import { capacityUnits } from "./lib/pricing";
 
 /**
  * Availability for a tour over a date range (default: next 90 days).
@@ -35,7 +36,7 @@ export const forTour = query({
         const override = overrides.find((o) => o.startTime === time);
         const capacity = override?.capacity ?? tour.defaultCapacityPerSlot;
         const blackout = dayBlackout || override?.isBlackout;
-        const booked = active.filter((b) => b.date === date && (b.startTime ?? tour.startTimes[0]) === time).reduce((a, b) => a + (tour.pricingModel === "per_group" ? 1 : b.groupSize), 0);
+        const booked = active.filter((b) => b.date === date && (b.startTime || tour.startTimes[0]) === time).reduce((a, b) => a + capacityUnits(tour, b.adults, b.children), 0);
         return { time, remaining: blackout ? 0 : Math.max(0, capacity - booked) };
       });
       dates.push({ date, slots, isBlackout: dayBlackout });

@@ -241,7 +241,9 @@ export const knowledgeBase = internalQuery({
       if (ver) policyText.push(`## ${p.title.en}\n${ver.body.en.replace(/>.*\n\n/, "").slice(0, 1500)}`);
     }
     return {
-      tours: tours.map((t) => ({ code: t.code, title: t.title, slug: t.slug, summary: t.summary, durationLabel: t.durationLabel, pricingModel: t.pricingModel, priceFrom: t.priceFrom, priceAdult: t.priceAdult ?? null, priceChild: t.priceChild ?? null, priceGroup: t.priceGroup ?? null, maxGroup: t.maxGroup, startTimes: t.startTimes, freeCancellationHours: t.freeCancellationHours, depositPercent: t.depositPercent, inclusions: t.inclusions.map((i) => i.en), pickupIncluded: t.pickupIncluded })),
+      tours: tours.map((t) => ({ code: t.code, title: t.title, slug: t.slug, summary: t.summary, durationLabel: t.durationLabel, pricingModel: t.pricingModel, priceFrom: t.priceFrom, priceAdult: t.priceAdult ?? null, priceChild: t.priceChild ?? null, priceGroup: t.priceGroup ?? null,
+        tieredPricing: t.tieredPricing ?? null,
+        vehiclePricing: t.vehiclePricing ?? null, maxGroup: t.maxGroup, startTimes: t.startTimes, freeCancellationHours: t.freeCancellationHours, depositPercent: t.depositPercent, inclusions: t.inclusions.map((i) => i.en), pickupIncluded: t.pickupIncluded })),
       policies: policyText.join("\n\n"),
       hours: settings?.value ?? { start: "07:30", end: "19:30" },
     };

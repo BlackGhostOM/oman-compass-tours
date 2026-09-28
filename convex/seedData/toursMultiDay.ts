@@ -1,4 +1,4 @@
-import { DAY, airportMuscat, commonExclusions, hotelMuscat, multiDayFaqs, type TourSeed } from "./tourSeedTypes";
+import { DAY, airportMuscat, commonExclusions, hotelMuscat, multiDayFaqs, multiDayVehicleFaqs, type TourSeed } from "./tourSeedTypes";
 
 /** Two- and three-day private journeys from Muscat (Viator catalogue, September 2026). */
 export const shortJourneys: TourSeed[] = [
@@ -35,7 +35,7 @@ export const shortJourneys: TourSeed[] = [
       { en: "Pickup from any address in Muscat, including the airport", ar: "الاستلام من أي عنوان في مسقط بما في ذلك المطار" },
     ],
     exclusions: [{ en: "Oman Across Ages Museum entrance (about OMR 5)", ar: "رسوم دخول متحف عُمان عبر الزمان (نحو 5 ر.ع.)" }, ...commonExclusions],
-    faqs: multiDayFaqs({
+    faqs: multiDayVehicleFaqs({
       question: { en: "Can we upgrade the hotel?", ar: "هل يمكننا ترقية الفندق؟" },
       answer: { en: "Yes. The price is based on a 4-star hotel such as Sahab Resort or dusitD2 Naseem; Anantara Al Jabal Al Akhdar and Alila Jabal Akhdar (5-star) are available for a supplement that we confirm before payment.", ar: "نعم. السعر على أساس فندق أربع نجوم مثل منتجع سحاب أو دوسيت دي2 نسيم؛ ويتوفر أنانتارا الجبل الأخضر وأليلا الجبل الأخضر (خمس نجوم) مقابل فرق نؤكده قبل الدفع." },
     }),
@@ -48,13 +48,13 @@ export const shortJourneys: TourSeed[] = [
     startTimes: ["08:30"],
     pickupIncluded: true,
     guideLanguages: ["en", "ar"],
-    minGroup: 2,
-    maxGroup: 4,
-    capacityPerSlot: 4,
+    minGroup: 1,
+    maxGroup: 12,
+    capacityPerSlot: 3, // 4WDs available per departure — capacity counts vehicles for this model
     difficulty: "easy",
-    pricingModel: "per_person",
-    priceAdultOmr: 269,
-    priceChildOmr: 190,
+    pricingModel: "per_vehicle",
+    // Each 4WD is a flat 120; a fifth adult or seventh guest starts a second vehicle at full price
+    vehicleOmr: { pricePerVehicle: 120, maxAdults: 4, seats: 6 },
     childAgeMax: 11,
     usdReference: 1400,
     depositPercent: 35,

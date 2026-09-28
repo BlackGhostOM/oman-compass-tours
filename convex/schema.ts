@@ -41,7 +41,33 @@ export const currencyValidator = v.union(
 export const pricingModelValidator = v.union(
   v.literal("per_group"),
   v.literal("per_person"),
+  v.literal("tiered"),
+  v.literal("per_vehicle"),
 );
+
+/**
+ * Tiered pricing (baisa): the first adult pays a starting TOTAL, the first two
+ * adults together pay a combined TOTAL, then every further adult and every
+ * child adds a flat amount. Infants stay free.
+ */
+export const tieredPricingValidator = v.object({
+  firstAdult: v.number(),
+  firstTwoAdults: v.number(),
+  extraAdult: v.number(),
+  extraChild: v.number(),
+});
+
+/**
+ * Per-vehicle pricing (baisa): each 4WD carries up to `seats` guests, at most
+ * `maxAdults` of them adults (e.g. 4 adults + 2 children, or 1 adult +
+ * 5 children with seats=6, maxAdults=4). Every vehicle costs the same flat
+ * price; guests beyond one vehicle's capacity take another at full price.
+ */
+export const vehiclePricingValidator = v.object({
+  pricePerVehicle: v.number(),
+  maxAdults: v.number(),
+  seats: v.number(),
+});
 
 export const bookingStatusValidator = v.union(
   v.literal("inquiry"),
@@ -227,6 +253,8 @@ export default defineSchema({
     priceGroup: v.optional(v.number()),
     priceAdult: v.optional(v.number()),
     priceChild: v.optional(v.number()),
+    tieredPricing: v.optional(tieredPricingValidator),
+    vehiclePricing: v.optional(vehiclePricingValidator),
     childAgeMax: v.optional(v.number()),
     infantAgeMax: v.optional(v.number()),
     priceFrom: v.number(), // denormalised "from" price for cards

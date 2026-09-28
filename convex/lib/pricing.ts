@@ -5,15 +5,109 @@
 
 export type L = { en: string; ar: string };
 
+export type TieredPricing = {
+  /** Total for a lone adult (baisa). */
+  firstAdult: number;
+  /** Combined total for the first two adults (baisa), NOT each. */
+  firstTwoAdults: number;
+  /** Flat add-on for every adult after the second (baisa). */
+  extraAdult: number;
+  /** Flat add-on per child (baisa). Infants stay free. */
+  extraChild: number;
+};
+
+export type VehiclePricing = {
+  /** Flat price per 4WD (baisa); every vehicle costs the same. */
+  pricePerVehicle: number;
+  /** Most adults one vehicle carries (4 in the standard setup). */
+  maxAdults: number;
+  /** Total guests one vehicle carries, children included (6 in the standard setup). */
+  seats: number;
+};
+
 export type PricingTour = {
-  pricingModel: "per_group" | "per_person";
+  pricingModel: "per_group" | "per_person" | "tiered" | "per_vehicle";
   priceGroup?: number | null;
   priceAdult?: number | null;
   priceChild?: number | null;
+  tieredPricing?: TieredPricing | null;
+  vehiclePricing?: VehiclePricing | null;
   depositPercent: number;
   minGroup: number;
   maxGroup: number;
 };
+
+/**
+ * 4WDs needed for a party: adults are capped per vehicle, and everyone —
+ * children included, infants on laps excluded — needs a seat. The standard
+ * setup (4 adults, 6 seats) fits 4 adults + 2 children or 1 adult + 5 children;
+ * a fifth adult or a seventh guest starts a second vehicle at full price.
+ */
+export function vehiclesNeeded(adults: number, children: number, cfg: VehiclePricing): number {
+  const a = Math.max(0, Math.floor(adults));
+  const c = Math.max(0, Math.floor(children));
+  if (a + c === 0) return 0;
+  const maxAdults = Math.max(1, Math.floor(cfg.maxAdults));
+  const seats = Math.max(maxAdults, Math.floor(cfg.seats));
+  return Math.max(Math.ceil(a / maxAdults), Math.ceil((a + c) / seats));
+}
+
+/**
+ * How much of a slot's capacity one party consumes. Private models (per_group,
+ * tiered) take one departure whatever the party size; per-person tours take a
+ * seat per guest; per-vehicle tours take one unit per 4WD, so capacityPerSlot
+ * counts the day's vehicle fleet.
+ */
+export function capacityUnits(tour: Pick<PricingTour, "pricingModel" | "vehiclePricing">, adults: number, children: number): number {
+  switch (tour.pricingModel) {
+    case "per_group":
+    case "tiered":
+      return 1;
+    case "per_vehicle":
+      return Math.max(1, vehiclesNeeded(adults, children, tour.vehiclePricing ?? { pricePerVehicle: 0, maxAdults: 4, seats: 6 }));
+    default:
+      return Math.max(0, Math.floor(adults) + Math.floor(children));
+  }
+}
+
+/**
+ * Why a tour's prices are not ready to go live, or null when they are (baisa).
+ * The single gate used by the editor, the status switch, the bulk bar and the
+ * JSON import, so no path can publish a tour that would quote 0 OMR — or a
+ * tiered card where two adults cost less than one.
+ */
+export function pricingProblem(tour: Pick<PricingTour, "pricingModel" | "priceGroup" | "priceAdult" | "tieredPricing" | "vehiclePricing">): string | null {
+  switch (tour.pricingModel) {
+    case "per_group":
+      return (tour.priceGroup ?? 0) > 0 ? null : "priceGroup";
+    case "tiered": {
+      const t = tour.tieredPricing;
+      if (!t || t.firstAdult <= 0 || t.firstTwoAdults <= 0) return "tieredPricing";
+      return t.firstTwoAdults >= t.firstAdult ? null : "tieredPricing.firstTwoAdults";
+    }
+    case "per_vehicle":
+      return (tour.vehiclePricing?.pricePerVehicle ?? 0) > 0 ? null : "vehiclePricing";
+    default:
+      return (tour.priceAdult ?? 0) > 0 ? null : "priceAdult";
+  }
+}
+
+/**
+ * The denormalised "from" price a card shows: the cheapest way onto the tour.
+ * One adult for tiered pricing, one vehicle for per-vehicle pricing.
+ */
+export function priceFromOf(tour: Pick<PricingTour, "pricingModel" | "priceGroup" | "priceAdult" | "tieredPricing" | "vehiclePricing">): number {
+  switch (tour.pricingModel) {
+    case "per_group":
+      return tour.priceGroup ?? 0;
+    case "tiered":
+      return tour.tieredPricing?.firstAdult ?? 0;
+    case "per_vehicle":
+      return tour.vehiclePricing?.pricePerVehicle ?? 0;
+    default:
+      return tour.priceAdult ?? 0;
+  }
+}
 
 export type PricingAddOn = {
   _id: string;
@@ -112,6 +206,43 @@ export function computeQuote(input: QuoteInput): Quote {
       total: priceGroup,
     });
     subtotal = priceGroup;
+  } else if (tour.pricingModel === "tiered" && tour.tieredPricing) {
+    // The first adult pays a starting total, the first two together a combined
+    // total, then every further adult and every child adds a flat amount.
+    // Seasonal overrides do not apply to tiered pricing.
+    const t = tour.tieredPricing;
+    if (adults === 1) {
+      items.push({ kind: "adult", label: { en: "Adult", ar: "بالغ" }, quantity: 1, unitPrice: t.firstAdult, total: t.firstAdult });
+      subtotal += t.firstAdult;
+    } else if (adults >= 2) {
+      items.push({ kind: "adult", label: { en: "First two adults", ar: "أول بالغَيْن" }, quantity: 1, unitPrice: t.firstTwoAdults, total: t.firstTwoAdults });
+      subtotal += t.firstTwoAdults;
+      if (adults > 2) {
+        const extras = adults - 2;
+        items.push({ kind: "adult", label: { en: "Additional adult", ar: "بالغ إضافي" }, quantity: extras, unitPrice: t.extraAdult, total: extras * t.extraAdult });
+        subtotal += extras * t.extraAdult;
+      }
+    }
+    if (children > 0) {
+      items.push({ kind: "child", label: { en: "Child", ar: "طفل" }, quantity: children, unitPrice: t.extraChild, total: children * t.extraChild });
+      subtotal += children * t.extraChild;
+    }
+  } else if (tour.pricingModel === "per_vehicle" && tour.vehiclePricing) {
+    // Every 4WD costs the same flat price; the party size decides how many are
+    // needed. Seasonal overrides do not apply to per-vehicle pricing.
+    const cfg = tour.vehiclePricing;
+    const vehicles = vehiclesNeeded(adults, children, cfg);
+    items.push({
+      kind: "group",
+      label: {
+        en: `4WD vehicle (up to ${cfg.maxAdults} adults, ${cfg.seats} guests)`,
+        ar: `سيارة دفع رباعي (حتى ${cfg.maxAdults} بالغين و${cfg.seats} ضيوف)`,
+      },
+      quantity: vehicles,
+      unitPrice: cfg.pricePerVehicle,
+      total: vehicles * cfg.pricePerVehicle,
+    });
+    subtotal = vehicles * cfg.pricePerVehicle;
   } else {
     if (adults > 0) {
       items.push({ kind: "adult", label: { en: "Adult", ar: "بالغ" }, quantity: adults, unitPrice: priceAdult, total: adults * priceAdult });

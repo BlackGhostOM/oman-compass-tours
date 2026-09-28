@@ -10,6 +10,7 @@ import type { Id } from "./_generated/dataModel";
 import { action, internalMutation } from "./_generated/server";
 import { omrToBaisa } from "./lib/money";
 import { generateBookingReference, generateToken } from "./lib/ids";
+import { computeQuote } from "./lib/pricing";
 import { media, syncCatalogFromSeed } from "./lib/catalogSync";
 import { policiesSeed } from "./seedData/policies";
 import { reviewsSeed } from "./seedData/reviews";
@@ -183,14 +184,15 @@ export const seedAccounts = internalMutation({
         const traveller = { firstName: "Sara", lastName: "Traveller", nationality: "GB", phone: "+447700900123", email: acc.email, hotel: "Al Bustan Palace", preferredLanguage: "en" as const };
         const future = new Date(now + 14 * 86_400_000).toISOString().slice(0, 10);
         const past = new Date(now - 40 * 86_400_000).toISOString().slice(0, 10);
+        const total1 = computeQuote({ tour: tour1, tourId: String(tour1._id), adults: 2, children: 0, infants: 0, addOns: [], date: future }).total;
         const b1 = await ctx.db.insert("bookings", {
           reference: generateBookingReference(), userId: user._id, tourId: tour1._id, tourTitle: tour1.title, date: future, startTime: "08:00",
-          adults: 2, children: 0, infants: 0, groupSize: 2, pricingModel: "per_group", currency: "OMR",
-          subtotal: tour1.priceGroup!, addOnsTotal: 0, discountTotal: 0, total: tour1.priceGroup!, depositDue: tour1.priceGroup!, amountPaid: tour1.priceGroup!, amountRefunded: 0,
+          adults: 2, children: 0, infants: 0, groupSize: 2, pricingModel: tour1.pricingModel, currency: "OMR",
+          subtotal: total1, addOnsTotal: 0, discountTotal: 0, total: total1, depositDue: total1, amountPaid: total1, amountRefunded: 0,
           traveller, locale: "en", status: "confirmed", policyVersionIds: policyIds, source: "web", voucherToken: generateToken(), confirmedAt: now - 86_400_000, updatedAt: now,
         });
-        await ctx.db.insert("bookingItems", { bookingId: b1, kind: "group", label: { en: "Private group (up to 6)", ar: "مجموعة خاصة (حتى 6)" }, quantity: 1, unitPrice: tour1.priceGroup!, total: tour1.priceGroup! });
-        await ctx.db.insert("payments", { bookingId: b1, provider: "stripe", kind: "full", amount: Math.round((tour1.priceGroup! / 1000) * 2.6008 * 100), currency: "USD", amountOmr: tour1.priceGroup!, fxRate: 2.6008, status: "succeeded", providerPaymentId: "pi_demo_seed_1", idempotencyKey: `seed-${b1}`, paidAt: now - 86_400_000, refundedAmount: 0, updatedAt: now });
+        await ctx.db.insert("bookingItems", { bookingId: b1, kind: "adult", label: { en: "First two adults", ar: "أول بالغَيْن" }, quantity: 1, unitPrice: total1, total: total1 });
+        await ctx.db.insert("payments", { bookingId: b1, provider: "stripe", kind: "full", amount: Math.round((total1 / 1000) * 2.6008 * 100), currency: "USD", amountOmr: total1, fxRate: 2.6008, status: "succeeded", providerPaymentId: "pi_demo_seed_1", idempotencyKey: `seed-${b1}`, paidAt: now - 86_400_000, refundedAmount: 0, updatedAt: now });
         const total2 = tour2.priceAdult! * 2;
         const b2 = await ctx.db.insert("bookings", {
           reference: generateBookingReference(), userId: user._id, tourId: tour2._id, tourTitle: tour2.title, date: past, startTime: "07:00",

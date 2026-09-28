@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useMutation, useQuery } from "convex/react";
+import { ConvexError } from "convex/values";
 import { Archive, Copy, Eye, EyeOff, Plus, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../../../../convex/_generated/api";
@@ -50,8 +51,9 @@ export default function AdminProductsPage() {
     if (selected.size === 0) return;
     setBusy(true);
     try {
-      const count = await setStatusMany({ ids: [...selected], status: next });
-      toast.success(t("bulkDone", { count }));
+      const r = await setStatusMany({ ids: [...selected], status: next });
+      toast.success(t("bulkDone", { count: r.changed }));
+      if (r.unpriced.length) toast.warning(t("bulkUnpriced", { codes: r.unpriced.join(", ") }));
       setSelected(new Set());
     } finally {
       setBusy(false);
@@ -139,9 +141,9 @@ export default function AdminProductsPage() {
                     <div className="text-xs text-muted-foreground">{tr.kind} {tr.isFeatured ? `· ${t("featured")}` : ""} {tr.tags.includes("price-placeholder") ? `· ${t("pricePlaceholder")}` : ""}</div>
                   </TableCell>
                   <TableCell>{tr.category ? pick(tr.category, locale) : "—"}</TableCell>
-                  <TableCell className="text-end"><Money baisa={tr.priceFrom} /> <span className="text-xs text-muted-foreground">{tr.pricingModel === "per_group" ? t("perGroup") : t("perAdult")}</span></TableCell>
+                  <TableCell className="text-end"><Money baisa={tr.priceFrom} /> <span className="text-xs text-muted-foreground">{tr.pricingModel === "per_group" ? t("perGroup") : tr.pricingModel === "per_vehicle" ? t("perVehicle") : tr.pricingModel === "tiered" ? t("forFirstAdult") : t("perAdult")}</span></TableCell>
                   <TableCell>
-                    <Select value={tr.status} onValueChange={(v) => setTourStatus({ id: tr._id, status: v as Status }).then(() => toast.success(t("statusUpdated")))}>
+                    <Select value={tr.status} onValueChange={(v) => setTourStatus({ id: tr._id, status: v as Status }).then(() => toast.success(t("statusUpdated"))).catch((err) => toast.error(err instanceof ConvexError && (err.data as { code?: string })?.code === "PRICE_MISSING" ? t("priceMissing") : String((err as Error).message)))}>
                       <SelectTrigger className="h-7 w-32"><SelectValue /></SelectTrigger>
                       <SelectContent><SelectItem value="published">{t("statuses.published")}</SelectItem><SelectItem value="draft">{t("statuses.draft")}</SelectItem><SelectItem value="archived">{t("statuses.archived")}</SelectItem></SelectContent>
                     </Select>

@@ -44,7 +44,7 @@ export default function WishlistPage() {
                   {tour.ratingAverage > 0 && <RatingStars rating={tour.ratingAverage} />}
                 </div>
                 <div className="mt-3 flex items-center justify-between">
-                  <span dir="ltr" className="font-heading text-lg text-foreground">{formatOmr(tour.priceFrom, locale, { compact: true })}<span className="ms-1 text-xs font-normal text-muted-foreground">{tour.pricingModel === "per_group" ? tc("perGroup") : tc("perAdult")}</span></span>
+                  <span dir="ltr" className="font-heading text-lg text-foreground">{formatOmr(tour.priceFrom, locale, { compact: true })}<span className="ms-1 text-xs font-normal text-muted-foreground">{tour.pricingModel === "per_group" ? tc("perGroup") : tour.pricingModel === "per_vehicle" ? tc("perVehicle") : tour.pricingModel === "tiered" ? tc("forFirstAdult") : tc("perAdult")}</span></span>
                   <Button asChild size="sm" className="bg-gold-gradient text-navy-950"><Link href={`/book/${pick(tour.slug, locale)}`}>{tc("bookNow")}</Link></Button>
                 </div>
               </div>

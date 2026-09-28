@@ -1,5 +1,6 @@
 import { query } from "../_generated/server";
 import { requireStaff } from "../lib/access";
+import { capacityUnits } from "../lib/pricing";
 
 const DAY = 86_400_000;
 const omanDate = (ts: number) => new Date(ts + 4 * 3_600_000).toISOString().slice(0, 10);
@@ -53,7 +54,9 @@ export const stats = query({
     // Occupancy today
     const tours = await ctx.db.query("tours").withIndex("by_status", (q) => q.eq("status", "published")).take(200);
     const capacityToday = tours.reduce((a, t) => a + t.defaultCapacityPerSlot * t.startTimes.length, 0);
-    const bookedToday = active(todays).reduce((a, b) => a + (b.pricingModel === "per_group" ? 1 : b.groupSize), 0);
+    // Same units as the capacity it is compared with: seats, private departures or 4WDs depending on the model
+    const tourById = new Map(tours.map((t) => [String(t._id), t]));
+    const bookedToday = active(todays).reduce((a, b) => a + capacityUnits(tourById.get(String(b.tourId)) ?? { pricingModel: b.pricingModel }, b.adults, b.children), 0);
 
     const openAll = await ctx.db.query("leads").withIndex("by_status", (q) => q.eq("status", "new")).take(300);
     const openLeads = openAll.filter((l) => l.source !== "partner");

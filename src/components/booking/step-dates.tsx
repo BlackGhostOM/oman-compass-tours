@@ -100,11 +100,15 @@ export function StepDates({ tour, state, update, quote, onNext }: { tour: Bookin
 
           <div className="space-y-3">
             <Label className="block">{t("guests")}</Label>
-            <Counter id="adults" label={t("adults")} hint={t("adultsHint")} value={state.adults} min={1} max={tour.maxGroup} onChange={(v) => update({ adults: v })} />
+            <Counter id="adults" label={t("adults")} hint={t("adultsHint")} value={state.adults} min={1} max={Math.max(1, tour.maxGroup - state.children)} onChange={(v) => update({ adults: v })} />
             <Counter id="children" label={t("children")} hint={t("childrenHint", { min: tour.infantAgeMax + 1, max: tour.childAgeMax ?? 11 })} value={state.children} min={0} max={Math.max(0, tour.maxGroup - state.adults)} onChange={(v) => update({ children: v })} />
             <Counter id="infants" label={t("infants")} hint={t("infantsHint", { max: tour.infantAgeMax })} value={state.infants} min={0} max={6} onChange={(v) => update({ infants: v })} />
             {tour.pricingModel === "per_group" && <p className="text-xs text-ink-500">{t("perGroupNote", { max: tour.maxGroup })}</p>}
+            {tour.pricingModel === "per_vehicle" && tour.vehiclePricing && (
+              <p className="text-xs text-ink-500">{t("perVehicleNote", { maxAdults: tour.vehiclePricing.maxAdults, seats: tour.vehiclePricing.seats })}</p>
+            )}
             {groupSize < tour.minGroup && <p className="text-xs text-danger">{t("minGroup", { min: tour.minGroup })}</p>}
+            {groupSize > tour.maxGroup && <p className="text-xs text-danger">{t("maxGroup", { max: tour.maxGroup })}</p>}
           </div>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { mutation, query } from "../_generated/server";
 import { assertInt, audit, requireStaff } from "../lib/access";
 import { faqValidator, itineraryDayValidator, localized, localizedOptional, mediaValidator, pricingModelValidator, seoValidator } from "../schema";
 import { releaseStorageRefs } from "../lib/mediaRefs";
+import { priceFromOf, pricingProblem } from "../lib/pricing";
 
 const slugify = (s: string) =>
   s
@@ -77,6 +78,10 @@ const tourInput = {
   priceGroupOmr: v.optional(v.number()),
   priceAdultOmr: v.optional(v.number()),
   priceChildOmr: v.optional(v.number()),
+  /** Tiered pricing in OMR: totals for the first adult and the first two adults, then flat add-ons. */
+  tieredOmr: v.optional(v.object({ firstAdult: v.number(), firstTwoAdults: v.number(), extraAdult: v.number(), extraChild: v.number() })),
+  /** Per-vehicle pricing in OMR: a flat price per 4WD, with the vehicle's capacity. */
+  vehicleOmr: v.optional(v.object({ pricePerVehicle: v.number(), maxAdults: v.number(), seats: v.number() })),
   childAgeMax: v.optional(v.number()),
   infantAgeMax: v.optional(v.number()),
   compareAtPriceFromOmr: v.optional(v.number()),
@@ -101,7 +106,12 @@ export const upsert = mutation({
   returns: v.id("tours"),
   handler: async (ctx, { id, data }) => {
     const staff = await requireStaff(ctx);
-    const omr = (x?: number) => (x === undefined ? undefined : Math.round(Math.max(0, x) * 1000));
+    // Prices arrive in OMR; a NaN or absurd value would poison priceFrom and every quote
+    const omr = (x: number | undefined, field: string) => {
+      if (x === undefined) return undefined;
+      if (!Number.isFinite(x) || x < 0 || x > 100_000) throw new ConvexError({ code: "INVALID_ARGUMENT", field });
+      return Math.round(x * 1000);
+    };
     assertInt(data.minGroup, 1, 200, "minGroup");
     assertInt(data.maxGroup, data.minGroup, 500, "maxGroup");
     assertInt(data.defaultCapacityPerSlot, 1, 500, "capacity");
@@ -109,14 +119,29 @@ export const upsert = mutation({
     assertInt(data.freeCancellationHours, 0, 720, "freeCancellationHours");
     assertInt(data.holdHours, 1, 168, "holdHours");
     assertInt(data.durationDays, 1, 60, "durationDays");
-    // Drafts may be saved before pricing is decided; a price is required only to publish.
-    if (data.status === "published") {
-      if (data.pricingModel === "per_group" && !data.priceGroupOmr) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "priceGroupOmr" });
-      if (data.pricingModel === "per_person" && !data.priceAdultOmr) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "priceAdultOmr" });
+    const priceGroup = omr(data.priceGroupOmr, "priceGroupOmr");
+    const priceAdult = omr(data.priceAdultOmr, "priceAdultOmr");
+    const priceChild = omr(data.priceChildOmr, "priceChildOmr");
+    const tieredPricing = data.tieredOmr
+      ? {
+          firstAdult: omr(data.tieredOmr.firstAdult, "tieredOmr")!,
+          firstTwoAdults: omr(data.tieredOmr.firstTwoAdults, "tieredOmr")!,
+          extraAdult: omr(data.tieredOmr.extraAdult, "tieredOmr")!,
+          extraChild: omr(data.tieredOmr.extraChild, "tieredOmr")!,
+        }
+      : undefined;
+    if (data.vehicleOmr) {
+      assertInt(data.vehicleOmr.maxAdults, 1, 10, "vehicleMaxAdults");
+      assertInt(data.vehicleOmr.seats, data.vehicleOmr.maxAdults, 16, "vehicleSeats");
     }
-    const priceGroup = omr(data.priceGroupOmr);
-    const priceAdult = omr(data.priceAdultOmr);
-    const priceChild = omr(data.priceChildOmr);
+    const vehiclePricing = data.vehicleOmr
+      ? { pricePerVehicle: omr(data.vehicleOmr.pricePerVehicle, "vehicleOmr")!, maxAdults: data.vehicleOmr.maxAdults, seats: data.vehicleOmr.seats }
+      : undefined;
+    // Drafts may be saved before pricing is decided; a complete price is required only to publish.
+    if (data.status === "published") {
+      const problem = pricingProblem({ pricingModel: data.pricingModel, priceGroup, priceAdult, tieredPricing, vehiclePricing });
+      if (problem) throw new ConvexError({ code: "INVALID_ARGUMENT", field: problem });
+    }
     const slug = { en: slugify(data.slug?.en || data.title.en), ar: slugify(data.slug?.ar || data.title.ar) };
     for (const l of ["en", "ar"] as const) {
       const clash = l === "en" ? await ctx.db.query("tours").withIndex("by_slug_en", (q) => q.eq("slug.en", slug.en)).unique() : await ctx.db.query("tours").withIndex("by_slug_ar", (q) => q.eq("slug.ar", slug.ar)).unique();
@@ -125,16 +150,19 @@ export const upsert = mutation({
     const codeClash = await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", data.code)).unique();
     if (codeClash && codeClash._id !== id) throw new ConvexError({ code: "CODE_TAKEN" });
 
-    const { priceGroupOmr: _a, priceAdultOmr: _b, priceChildOmr: _c, compareAtPriceFromOmr, ...rest } = data;
-    void _a; void _b; void _c;
+    const { priceGroupOmr: _a, priceAdultOmr: _b, priceChildOmr: _c, tieredOmr: _d, vehicleOmr: _e, compareAtPriceFromOmr, ...rest } = data;
+    void _a; void _b; void _c; void _d; void _e;
     const doc = {
       ...rest,
       slug,
       priceGroup,
       priceAdult,
       priceChild,
-      priceFrom: (data.pricingModel === "per_group" ? priceGroup : priceAdult) ?? 0, // 0 only for drafts without a price yet
-      compareAtPriceFrom: omr(compareAtPriceFromOmr),
+      tieredPricing,
+      vehiclePricing,
+      // 0 only for drafts without a price yet
+      priceFrom: priceFromOf({ pricingModel: data.pricingModel, priceGroup, priceAdult, tieredPricing, vehiclePricing }),
+      compareAtPriceFrom: omr(compareAtPriceFromOmr, "compareAt"),
       searchText: `${data.title.en} ${data.title.ar} ${data.summary.en} ${data.summary.ar} ${data.tags.join(" ")}`,
       updatedAt: Date.now(),
     };
@@ -157,6 +185,11 @@ export const setStatus = mutation({
     const staff = await requireStaff(ctx);
     const t = await ctx.db.get(id);
     if (!t) throw new ConvexError({ code: "NOT_FOUND" });
+    // The editor enforces this on save; the list's status switch must not be a way around it
+    if (status === "published") {
+      const problem = pricingProblem(t);
+      if (problem) throw new ConvexError({ code: "PRICE_MISSING", field: problem });
+    }
     await ctx.db.patch(id, { status, updatedAt: Date.now() });
     await audit(ctx, staff, "tour.status", "tours", String(id), { status: t.status }, { status });
     return null;
@@ -166,18 +199,24 @@ export const setStatus = mutation({
 /** Bulk visibility: hide (draft), show (published) or archive several products at once. */
 export const setStatusMany = mutation({
   args: { ids: v.array(v.id("tours")), status: v.union(v.literal("draft"), v.literal("published"), v.literal("archived")) },
-  returns: v.number(),
+  returns: v.object({ changed: v.number(), unpriced: v.array(v.string()) }),
   handler: async (ctx, { ids, status }) => {
     const staff = await requireStaff(ctx);
     let changed = 0;
+    const unpriced: string[] = [];
     for (const id of ids.slice(0, 200)) {
       const t = await ctx.db.get(id);
       if (!t || t.status === status) continue;
+      // Showing a tour with no complete price would let visitors book it for 0 OMR; leave it hidden and say so
+      if (status === "published" && pricingProblem(t)) {
+        unpriced.push(t.code);
+        continue;
+      }
       await ctx.db.patch(id, { status, updatedAt: Date.now() });
       await audit(ctx, staff, "tour.status", "tours", String(id), { status: t.status }, { status });
       changed += 1;
     }
-    return changed;
+    return { changed, unpriced };
   },
 });
 
@@ -372,6 +411,8 @@ export const upsertDestination = mutation({
 /* Bulk import (JSON template)                                         */
 /* ------------------------------------------------------------------ */
 
+const PRICING_MODELS = ["per_group", "per_person", "tiered", "per_vehicle"] as const;
+
 export const importTours = mutation({
   args: { tours: v.array(v.any()) },
   returns: v.object({ created: v.number(), updated: v.number(), errors: v.array(v.string()) }),
@@ -392,11 +433,45 @@ export const importTours = mutation({
         if (!category) throw new Error(`unknown category_key ${String(r.category_key)}`);
         const destKeys = Array.isArray(r.destination_keys) ? r.destination_keys : String(r.destination_keys ?? "").split("|").filter(Boolean);
         const destinationIds = destKeys.map((k) => destinations.find((d) => d.key === k)?._id).filter((x): x is Id<"destinations"> => !!x);
-        const pricingModel: "per_group" | "per_person" = r.pricing_model === "per_group" ? "per_group" : "per_person";
-        const omr = (x: unknown) => (x === undefined || x === null || x === "" ? undefined : Math.round(Number(x) * 1000));
+        // An unknown model is an error, not a silent per-person tour priced at nothing
+        const model = r.pricing_model === undefined || r.pricing_model === null || r.pricing_model === "" ? "per_person" : String(r.pricing_model);
+        if (!PRICING_MODELS.includes(model as (typeof PRICING_MODELS)[number])) throw new Error(`unknown pricing_model ${model}`);
+        const pricingModel = model as (typeof PRICING_MODELS)[number];
+        const omr = (x: unknown, field: string) => {
+          if (x === undefined || x === null || x === "") return undefined;
+          const n = Number(x);
+          if (!Number.isFinite(n) || n < 0 || n > 100_000) throw new Error(`invalid ${field}`);
+          return Math.round(n * 1000);
+        };
+        const int = (x: unknown, lo: number, hi: number, field: string) => {
+          const n = Number(x);
+          if (!Number.isInteger(n) || n < lo || n > hi) throw new Error(`invalid ${field}`);
+          return n;
+        };
         const title = L(r.title);
-        const priceGroup = omr(r.price_group_omr);
-        const priceAdult = omr(r.price_adult_omr);
+        const priceGroup = omr(r.price_group_omr, "price_group_omr");
+        const priceAdult = omr(r.price_adult_omr, "price_adult_omr");
+        const priceChild = omr(r.price_child_omr, "price_child_omr");
+        // Keys for the models a row does not use are written as undefined, so a model change on update clears them
+        const tieredPricing =
+          pricingModel === "tiered"
+            ? {
+                firstAdult: omr(r.tier_first_adult_omr, "tier_first_adult_omr") ?? 0,
+                firstTwoAdults: omr(r.tier_first_two_adults_omr, "tier_first_two_adults_omr") ?? 0,
+                extraAdult: omr(r.tier_extra_adult_omr, "tier_extra_adult_omr") ?? 0,
+                extraChild: omr(r.tier_extra_child_omr, "tier_extra_child_omr") ?? 0,
+              }
+            : undefined;
+        const vehicleMaxAdults = pricingModel === "per_vehicle" ? int(r.vehicle_max_adults ?? 4, 1, 10, "vehicle_max_adults") : 0;
+        const vehiclePricing =
+          pricingModel === "per_vehicle"
+            ? { pricePerVehicle: omr(r.vehicle_price_omr, "vehicle_price_omr") ?? 0, maxAdults: vehicleMaxAdults, seats: int(r.vehicle_seats ?? 6, vehicleMaxAdults, 16, "vehicle_seats") }
+            : undefined;
+        const status = r.status === "published" ? ("published" as const) : ("draft" as const);
+        if (status === "published") {
+          const problem = pricingProblem({ pricingModel, priceGroup, priceAdult, tieredPricing, vehiclePricing });
+          if (problem) throw new Error(`a published row needs a complete price (${problem})`);
+        }
         const doc = {
           code,
           kind: r.kind === "service" ? ("service" as const) : ("tour" as const),
@@ -421,13 +496,15 @@ export const importTours = mutation({
           maxGroup: Number(r.max_group ?? 6),
           defaultCapacityPerSlot: Number(r.capacity_per_slot ?? r.max_group ?? 6),
           difficulty: (["easy", "moderate", "challenging"] as const).find((d) => d === r.difficulty),
-          pricingModel: pricingModel as "per_group" | "per_person",
+          pricingModel,
           priceGroup,
           priceAdult,
-          priceChild: omr(r.price_child_omr),
+          priceChild,
+          tieredPricing,
+          vehiclePricing,
           childAgeMax: r.child_age_max ? Number(r.child_age_max) : undefined,
           infantAgeMax: 2,
-          priceFrom: pricingModel === "per_group" ? priceGroup ?? 0 : priceAdult ?? 0,
+          priceFrom: priceFromOf({ pricingModel, priceGroup, priceAdult, tieredPricing, vehiclePricing }),
           depositPercent: Number(r.deposit_percent ?? 100),
           freeCancellationHours: Number(r.free_cancellation_hours ?? 24),
           allowReserveNowPayLater: true,
@@ -435,7 +512,7 @@ export const importTours = mutation({
           coverImage: r.cover_image_url ? { kind: "image" as const, url: String(r.cover_image_url), alt: title } : undefined,
           ratingAverage: 0,
           ratingCount: 0,
-          status: r.status === "published" ? ("published" as const) : ("draft" as const),
+          status,
           isFeatured: false,
           tags: Array.isArray(r.tags) ? (r.tags as string[]) : String(r.tags ?? "").split("|").filter(Boolean),
           searchText: `${title.en} ${title.ar}`,

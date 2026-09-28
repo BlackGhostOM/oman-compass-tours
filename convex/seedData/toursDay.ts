@@ -63,8 +63,10 @@ export const dayTours: TourSeed[] = [
     maxGroup: 6,
     capacityPerSlot: 3,
     difficulty: "easy",
-    pricingModel: "per_group",
-    priceGroupOmr: 88,
+    pricingModel: "tiered",
+    // Viator rate card: 61 for one adult, 88 for the first two together, then +12 per adult and +8 per child
+    tieredOmr: { firstAdult: 61, firstTwoAdults: 88, extraAdult: 12, extraChild: 8 },
+    childAgeMax: 11,
     usdReference: 230,
     depositPercent: 35,
     freeCancellationHours: 72,

@@ -33,7 +33,8 @@ test.describe("Customer account", () => {
     await expect(page.getByRole("heading", { name: "Upcoming trips" })).toBeVisible();
     const card = page.locator("article").filter({ hasText: "Experience Muscat City Tour" }).first();
     await expect(card).toBeVisible();
-    await expect(card.getByText("Confirmed")).toBeVisible();
+    // The seeded booking is dated two weeks after seeding; once that date passes the hourly lifecycle cron moves it on
+    await expect(card.getByText(/^(Confirmed|In progress|Completed)$/).first()).toBeVisible();
 
     const voucherLink = card.getByRole("link", { name: /Voucher/ });
     const href = await voucherLink.getAttribute("href");

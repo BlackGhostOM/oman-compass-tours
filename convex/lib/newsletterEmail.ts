@@ -76,6 +76,8 @@ const T = {
     from: "From",
     perAdult: "per adult",
     perGroup: "per private group",
+    perVehicle: "per 4WD vehicle",
+    forFirstAdult: "for the first adult",
     upTo: (n: number) => `up to ${n} guests`,
     freeCancel: "Free cancellation",
     browse: "Browse all tours",
@@ -90,6 +92,8 @@ const T = {
     from: "ابتداءً من",
     perAdult: "للبالغ",
     perGroup: "للمجموعة الخاصة",
+    perVehicle: "لكل سيارة دفع رباعي",
+    forFirstAdult: "للبالغ الأول",
     upTo: (n: number) => `حتى ${n} ضيوف`,
     freeCancel: "إلغاء مجاني",
     browse: "تصفّح كل الجولات",
@@ -130,7 +134,7 @@ function price(t: EmailTour, locale: Locale, big: boolean, s = SCALE): string {
   const tr = T[locale];
   return `<div style="font-family:${SANS};font-size:${fs(11, s)};color:${C.ink500}">${tr.from}</div>
 <div dir="ltr" style="display:inline-block;font-family:${SERIF};font-size:${fs(big ? 24 : 17, s)};line-height:1.2;font-weight:700;color:${C.navy}">OMR ${omr(t.priceFrom)}</div>
-<div style="font-family:${SANS};font-size:${fs(11, s)};color:${C.ink500}">${t.pricingModel === "per_group" ? tr.perGroup : tr.perAdult} · <span dir="ltr">≈ $${usd(t.priceFrom)}</span></div>`;
+<div style="font-family:${SANS};font-size:${fs(11, s)};color:${C.ink500}">${t.pricingModel === "per_group" ? tr.perGroup : t.pricingModel === "per_vehicle" ? tr.perVehicle : t.pricingModel === "tiered" ? tr.forFirstAdult : tr.perAdult} · <span dir="ltr">≈ $${usd(t.priceFrom)}</span></div>`;
 }
 
 export function button(href: string, label: string, size: "sm" | "lg", s = SCALE): string {

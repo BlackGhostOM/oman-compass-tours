@@ -11,10 +11,12 @@ export type BookingTour = {
   durationLabel: LocalizedString;
   durationDays: number;
   startTimes: string[];
-  pricingModel: "per_group" | "per_person";
+  pricingModel: "per_group" | "per_person" | "tiered" | "per_vehicle";
   priceGroup: number | null;
   priceAdult: number | null;
   priceChild: number | null;
+  tieredPricing?: { firstAdult: number; firstTwoAdults: number; extraAdult: number; extraChild: number } | null;
+  vehiclePricing?: { pricePerVehicle: number; maxAdults: number; seats: number } | null;
   childAgeMax: number | null;
   infantAgeMax: number;
   minGroup: number;

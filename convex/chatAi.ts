@@ -7,7 +7,7 @@ import { internalAction } from "./_generated/server";
 import { faqAsText } from "./lib/faq";
 
 type KB = {
-  tours: { code: string; title: { en: string; ar: string }; slug: { en: string; ar: string }; summary: { en: string; ar: string }; durationLabel: { en: string; ar: string }; pricingModel: string; priceFrom: number; priceAdult: number | null; priceChild: number | null; priceGroup: number | null; maxGroup: number; startTimes: string[]; freeCancellationHours: number; depositPercent: number; inclusions: string[]; pickupIncluded: boolean }[];
+  tours: { code: string; title: { en: string; ar: string }; slug: { en: string; ar: string }; summary: { en: string; ar: string }; durationLabel: { en: string; ar: string }; pricingModel: string; priceFrom: number; priceAdult: number | null; priceChild: number | null; priceGroup: number | null; tieredPricing?: { firstAdult: number; firstTwoAdults: number; extraAdult: number; extraChild: number } | null; vehiclePricing?: { pricePerVehicle: number; maxAdults: number; seats: number } | null; maxGroup: number; startTimes: string[]; freeCancellationHours: number; depositPercent: number; inclusions: string[]; pickupIncluded: boolean }[];
   policies: string;
   hours: unknown;
 };
@@ -23,7 +23,7 @@ type PromptContext = {
 function buildSystemPrompt(kb: KB, locale: "en" | "ar", siteUrl: string, ctx: PromptContext): string {
   const knownContact = [ctx.known.name && `name: ${ctx.known.name}`, ctx.known.phone && `phone: ${ctx.known.phone}`, ctx.known.email && `email: ${ctx.known.email}`, ctx.known.preferredChannel && `preferred channel: ${ctx.known.preferredChannel}`].filter(Boolean).join(", ");
   const tours = kb.tours
-    .map((t) => `- ${t.code} · ${t.title.en} / ${t.title.ar} · ${t.durationLabel.en} · ${t.pricingModel === "per_group" ? `${omr(t.priceGroup ?? t.priceFrom)} per private group (up to ${t.maxGroup})` : `${omr(t.priceAdult ?? t.priceFrom)} per adult${t.priceChild ? `, ${omr(t.priceChild)} per child` : ""}`} · starts ${t.startTimes.join("/")} · free cancellation ${t.freeCancellationHours}h · deposit ${t.depositPercent}% · pickup ${t.pickupIncluded ? "included" : "not included"} · includes: ${t.inclusions.slice(0, 5).join(", ")} · book: ${siteUrl}/${locale}/tours/${t.slug[locale]}`)
+    .map((t) => `- ${t.code} · ${t.title.en} / ${t.title.ar} · ${t.durationLabel.en} · ${t.pricingModel === "per_group" ? `${omr(t.priceGroup ?? t.priceFrom)} per private group (up to ${t.maxGroup})` : t.pricingModel === "tiered" && t.tieredPricing ? `${omr(t.tieredPricing.firstAdult)} for 1 adult, ${omr(t.tieredPricing.firstTwoAdults)} for 2 adults, +${omr(t.tieredPricing.extraAdult)} each extra adult, +${omr(t.tieredPricing.extraChild)} per child, infants free` : t.pricingModel === "per_vehicle" && t.vehiclePricing ? `${omr(t.vehiclePricing.pricePerVehicle)} per 4WD (each carries up to ${t.vehiclePricing.maxAdults} adults / ${t.vehiclePricing.seats} guests; larger parties take more vehicles)` : `${omr(t.priceAdult ?? t.priceFrom)} per adult${t.priceChild ? `, ${omr(t.priceChild)} per child` : ""}`} · starts ${t.startTimes.join("/")} · free cancellation ${t.freeCancellationHours}h · deposit ${t.depositPercent}% · pickup ${t.pickupIncluded ? "included" : "not included"} · includes: ${t.inclusions.slice(0, 5).join(", ")} · book: ${siteUrl}/${locale}/tours/${t.slug[locale]}`)
     .join("\n");
   return `You are the virtual concierge of Oman Compass Tours Company, a licensed Omani tour operator in Muscat (Ministry of Heritage & Tourism licence 1440944, rated 5.0 on Tripadvisor, #1 of 46 experiences in Muscat). Office hours: Mon 07:30–19:00, Tue–Sun 07:30–19:30 Oman time. WhatsApp/phone +968 9225 5028, email omancompasstours@gmail.com. Website: ${siteUrl}.
 
@@ -50,7 +50,7 @@ function fallbackReply(text: string, kb: KB, locale: "en" | "ar", siteUrl: strin
   const q = text.toLowerCase();
   const hit = kb.tours.find((t) => [t.title.en, t.title.ar, t.code, ...t.title.en.split(" ")].some((w) => w.length > 4 && q.includes(w.toLowerCase())));
   if (hit) {
-    const price = hit.pricingModel === "per_group" ? `${omr(hit.priceGroup ?? hit.priceFrom)} ${locale === "ar" ? "للمجموعة الخاصة" : "per private group"}` : `${omr(hit.priceAdult ?? hit.priceFrom)} ${locale === "ar" ? "للبالغ" : "per adult"}`;
+    const price = hit.pricingModel === "per_group" ? `${omr(hit.priceGroup ?? hit.priceFrom)} ${locale === "ar" ? "للمجموعة الخاصة" : "per private group"}` : hit.pricingModel === "per_vehicle" ? `${omr(hit.priceFrom)} ${locale === "ar" ? "لكل سيارة دفع رباعي" : "per 4WD vehicle"}` : hit.pricingModel === "tiered" ? `${locale === "ar" ? `ابتداءً من ${omr(hit.priceFrom)} للبالغ الأول` : `from ${omr(hit.priceFrom)} for the first adult`}` : `${omr(hit.priceAdult ?? hit.priceFrom)} ${locale === "ar" ? "للبالغ" : "per adult"}`;
     const link = `${siteUrl}/${locale}/tours/${hit.slug[locale]}`;
     return { reply: locale === "ar" ? `${hit.title.ar}: ${hit.durationLabel.ar}، ${price}، إلغاء مجاني حتى ${hit.freeCancellationHours} ساعة. يمكنك التحقق من التوفر والحجز هنا: ${link}` : `${hit.title.en}: ${hit.durationLabel.en}, ${price}, free cancellation up to ${hit.freeCancellationHours}h. Check availability and book here: ${link}`, confidence: 0.8, handoff: false };
   }

@@ -5,6 +5,7 @@ import { destinationsSeed } from "../seedData/destinations";
 import { toursSeed } from "../seedData/tours";
 import { VIATOR_URL } from "../seedData/tourSeedTypes";
 import { omrToBaisa } from "./money";
+import { priceFromOf } from "./pricing";
 
 const TRIPADVISOR_URL =
   "https://www.tripadvisor.com/Attraction_Review-g1940497-d26437481-Reviews-OMAN_COMPASS_TOURS-Muscat_Muscat_Governorate.html";
@@ -67,7 +68,13 @@ export async function syncCatalogFromSeed(ctx: MutationCtx, now: number, opts: {
     const priceGroup = t.priceGroupOmr !== undefined ? omrToBaisa(t.priceGroupOmr) : undefined;
     const priceAdult = t.priceAdultOmr !== undefined ? omrToBaisa(t.priceAdultOmr) : undefined;
     const priceChild = t.priceChildOmr !== undefined ? omrToBaisa(t.priceChildOmr) : undefined;
-    const priceFrom = t.pricingModel === "per_group" ? priceGroup! : priceAdult!;
+    const tieredPricing = t.tieredOmr
+      ? { firstAdult: omrToBaisa(t.tieredOmr.firstAdult), firstTwoAdults: omrToBaisa(t.tieredOmr.firstTwoAdults), extraAdult: omrToBaisa(t.tieredOmr.extraAdult), extraChild: omrToBaisa(t.tieredOmr.extraChild) }
+      : undefined;
+    const vehiclePricing = t.vehicleOmr
+      ? { pricePerVehicle: omrToBaisa(t.vehicleOmr.pricePerVehicle), maxAdults: t.vehicleOmr.maxAdults, seats: t.vehicleOmr.seats }
+      : undefined;
+    const priceFrom = priceFromOf({ pricingModel: t.pricingModel, priceGroup, priceAdult, tieredPricing, vehiclePricing });
     const keepCover = existing && !isPlaceholderMedia(existing.coverImage);
     const doc = {
       code: t.code,
@@ -99,6 +106,8 @@ export async function syncCatalogFromSeed(ctx: MutationCtx, now: number, opts: {
       priceGroup,
       priceAdult,
       priceChild,
+      tieredPricing,
+      vehiclePricing,
       childAgeMax: t.childAgeMax,
       infantAgeMax: 2,
       priceFrom,

@@ -30,11 +30,15 @@ export type TourSeed = {
   maxGroup: number;
   capacityPerSlot: number;
   difficulty?: "easy" | "moderate" | "challenging";
-  pricingModel: "per_group" | "per_person";
+  pricingModel: "per_group" | "per_person" | "tiered" | "per_vehicle";
   /** OMR (major units) */
   priceGroupOmr?: number;
   priceAdultOmr?: number;
   priceChildOmr?: number;
+  /** Tiered: totals for the first adult and the first two adults, then flat add-ons per extra adult / child. */
+  tieredOmr?: { firstAdult: number; firstTwoAdults: number; extraAdult: number; extraChild: number };
+  /** Per-vehicle: flat price per 4WD; one vehicle carries up to `seats` guests, at most `maxAdults` adults. */
+  vehicleOmr?: { pricePerVehicle: number; maxAdults: number; seats: number };
   childAgeMax?: number;
   /** USD reference from Viator, if any */
   usdReference?: number;
@@ -132,6 +136,16 @@ const hotelsFaq = {
 
 export const dayFaqs = (...extra: { question: L; answer: L }[]) => [...extra, pickupFaq, privateFaq, dayCancelFaq, paymentFaq];
 export const multiDayFaqs = (...extra: { question: L; answer: L }[]) => [...extra, roomsFaq, hotelsFaq, multiCancelFaq, paymentFaq];
+
+/** Per-vehicle tours price the 4WD, not the traveller, so the family FAQ says so. */
+const vehicleFamilyFaq = {
+  question: { en: "Can we travel as a family or a larger group?", ar: "هل يمكننا السفر كعائلة أو مجموعة أكبر؟" },
+  answer: {
+    en: "Yes. The price is one flat amount per 4WD, which carries up to 4 adults and 6 guests in total — for example 4 adults and 2 children, or 1 adult and 5 children. A larger party simply takes a second vehicle at the same price; choose the number of travellers on the booking page and the total updates automatically.",
+    ar: "نعم. السعر مبلغ ثابت لكل سيارة دفع رباعي تتسع حتى 4 بالغين و6 ضيوف إجمالًا، مثل 4 بالغين وطفلين، أو بالغ واحد و5 أطفال. وإن كان عددكم أكبر تُضاف سيارة ثانية بالسعر نفسه؛ اختر عدد المسافرين في صفحة الحجز ويتحدّث الإجمالي تلقائيًا.",
+  },
+};
+export const multiDayVehicleFaqs = (...extra: { question: L; answer: L }[]) => [...extra, vehicleFamilyFaq, hotelsFaq, multiCancelFaq, paymentFaq];
 export const serviceFaqs = (...extra: { question: L; answer: L }[]) => [...extra, dayCancelFaq, paymentFaq];
 
 export const DAY = 1440;
