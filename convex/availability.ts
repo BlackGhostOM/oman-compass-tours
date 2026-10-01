@@ -1,6 +1,10 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
+import { getViewer, isStaff } from "./lib/access";
 import { capacityUnits } from "./lib/pricing";
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_RANGE_DAYS = 200;
 
 /**
  * Availability for a tour over a date range (default: next 90 days).
@@ -10,8 +14,15 @@ import { capacityUnits } from "./lib/pricing";
 export const forTour = query({
   args: { tourId: v.id("tours"), from: v.string(), to: v.string() },
   handler: async (ctx, { tourId, from, to }) => {
+    const empty = { dates: [] as { date: string; slots: { time: string; remaining: number }[]; isBlackout: boolean }[] };
+    if (!DATE_RE.test(from) || !DATE_RE.test(to) || to < from) return empty;
+    if ((Date.parse(to) - Date.parse(from)) / 86_400_000 > MAX_RANGE_DAYS) return empty;
     const tour = await ctx.db.get(tourId);
-    if (!tour) return { dates: [] as { date: string; slots: { time: string; remaining: number }[]; isBlackout: boolean }[] };
+    if (!tour) return empty;
+    if (tour.status !== "published") {
+      const viewer = await getViewer(ctx);
+      if (!viewer || !isStaff(viewer)) return empty;
+    }
     const rows = await ctx.db
       .query("availability")
       .withIndex("by_tour_date", (q) => q.eq("tourId", tourId).gte("date", from).lte("date", to))

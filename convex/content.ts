@@ -41,9 +41,13 @@ export const team = query({
   },
 });
 
+/** Settings the public site may read; every other siteSettings key is internal configuration. */
+const PUBLIC_SETTING_KEYS = new Set(["site.previewNotice", "company.profilePdfUrl", "about.storyImage"]);
+
 export const setting = query({
   args: { key: v.string() },
   handler: async (ctx, { key }) => {
+    if (!PUBLIC_SETTING_KEYS.has(key)) return null;
     const row = await ctx.db.query("siteSettings").withIndex("by_key", (q) => q.eq("key", key)).unique();
     return row?.value ?? null;
   },

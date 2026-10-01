@@ -150,8 +150,13 @@ export const invite = mutation({
     const actor = role === "admin" ? await requireOwner(ctx) : await requireAdmin(ctx);
     const e = email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "email" });
+    // Direct promotion only for a verified address: a password sign-up can claim any e-mail,
+    // so an unverified account must go through the token sent to the real mailbox.
     const existingUser = await ctx.db.query("users").withIndex("email", (q) => q.eq("email", e)).first();
-    if (existingUser) {
+    if (existingUser && existingUser.emailVerificationTime) {
+      if (existingUser._id === actor._id) throw new ConvexError({ code: "CANNOT_CHANGE_OWN_ROLE" });
+      if (existingUser.role === "owner") throw new ConvexError({ code: "CANNOT_DEMOTE_OWNER" });
+      if (existingUser.role === "admin" && actor.role !== "owner") throw new ConvexError({ code: "FORBIDDEN" });
       await ctx.db.patch(existingUser._id, { role });
       await audit(ctx, actor, "user.role", "users", String(existingUser._id), { role: existingUser.role }, { role, viaInvite: true });
       return { token: "" };

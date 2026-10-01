@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { useMutation } from "convex/react";
+import { useAction } from "convex/react";
 import { ConvexError } from "convex/values";
 import { z } from "zod";
 import { CheckCircle2, Send } from "lucide-react";
@@ -29,7 +29,7 @@ export function ContactForm({ tourId, compact = false }: { tourId?: Id<"tours">;
   const t = useTranslations("contact.form");
   const locale = useLocale() as "en" | "ar";
   const pathname = usePathname();
-  const create = useMutation(api.leads.createFromContact);
+  const create = useAction(api.leads.createFromContact);
   const [form, setForm] = useState({ name: "", email: "", phone: "", message: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);

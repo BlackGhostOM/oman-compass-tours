@@ -7,7 +7,7 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { action, internalMutation } from "./_generated/server";
+import { internalAction, internalMutation } from "./_generated/server";
 import { omrToBaisa } from "./lib/money";
 import { generateBookingReference, generateToken } from "./lib/ids";
 import { computeQuote } from "./lib/pricing";
@@ -17,11 +17,19 @@ import { reviewsSeed } from "./seedData/reviews";
 import { blogSeed } from "./seedData/blog";
 import { addOnsSeed, bannersSeed, couponsSeed, siteSettingsSeed, teamSeed } from "./seedData/misc";
 
-export const DEMO_ACCOUNTS = [
-  { email: "owner@omancompasstours.com", password: "OmanCompass!2026", name: "Owner (demo)", role: "owner" as const },
-  { email: "staff@omancompasstours.com", password: "OmanCompass!2026", name: "Staff (demo)", role: "staff" as const },
-  { email: "customer@example.com", password: "Traveller!2026", name: "Sara Traveller", role: "customer" as const },
-];
+/**
+ * Demo accounts for local/dev deployments only. The password is never stored in
+ * the repository: set SEED_DEMO_PASSWORD on the deployment before seeding, or
+ * the accounts are skipped (content is still seeded).
+ */
+const demoPassword = process.env.SEED_DEMO_PASSWORD;
+export const DEMO_ACCOUNTS = demoPassword
+  ? [
+      { email: "owner@omancompasstours.com", password: demoPassword, name: "Owner (demo)", role: "owner" as const },
+      { email: "staff@omancompasstours.com", password: demoPassword, name: "Staff (demo)", role: "staff" as const },
+      { email: "customer@example.com", password: demoPassword, name: "Sara Traveller", role: "customer" as const },
+    ]
+  : [];
 
 export const seedContent = internalMutation({
   args: {},
@@ -209,8 +217,12 @@ export const seedAccounts = internalMutation({
   },
 });
 
-/** Entry point: `npx convex run seed:run` */
-export const run = action({
+/**
+ * Entry point: `npx convex run seed:run`. Internal on purpose: it rewrites the
+ * catalogue and (with SEED_DEMO_PASSWORD) creates privileged accounts, so it
+ * must never be reachable from the public client API.
+ */
+export const run = internalAction({
   args: {},
   returns: v.object({ content: v.any(), accounts: v.array(v.string()), bookings: v.number() }),
   handler: async (

@@ -21,7 +21,7 @@ function webhookRoute(provider: ProviderId) {
     const verification = await adapter.verifyWebhook(request);
     if (!verification.ok) {
       console.warn(`[webhook:${provider}] rejected: ${verification.error}`);
-      return new Response(JSON.stringify({ error: verification.error }), { status: 400, headers: { "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "Webhook rejected" }), { status: 400, headers: { "Content-Type": "application/json" } });
     }
     await ctx.runAction(internal.payments.processWebhook, { provider, events: verification.events });
     return new Response(JSON.stringify({ received: true, events: verification.events.length }), { status: 200, headers: { "Content-Type": "application/json" } });

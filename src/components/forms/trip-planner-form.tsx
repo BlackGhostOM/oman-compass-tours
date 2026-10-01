@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { useMutation } from "convex/react";
+import { useAction } from "convex/react";
 import { ConvexError } from "convex/values";
 import { z } from "zod";
 import { CheckCircle2, Compass } from "lucide-react";
@@ -36,14 +36,14 @@ const schema = z.object({
 export function TripPlannerForm() {
   const t = useTranslations("planner");
   const locale = useLocale() as "en" | "ar";
-  const create = useMutation(api.leads.createFromTripPlanner);
+  const create = useAction(api.leads.createFromTripPlanner);
   const [form, setForm] = useState({ name: "", email: "", phone: "", nationality: "", startDate: "", endDate: "", travellers: 2, budget: "comfort" as (typeof BUDGETS)[number], message: "" });
   const [interests, setInterests] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [honeypot, setHoneypot] = useState("");
-  const [, setTurnstile] = useState<string | undefined>();
+  const [turnstile, setTurnstile] = useState<string | undefined>();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -70,6 +70,7 @@ export function TripPlannerForm() {
         interests,
         message: parsed.data.message || undefined,
         honeypot,
+        turnstileToken: turnstile,
       });
       setDone(true);
     } catch (err) {

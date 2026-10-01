@@ -58,7 +58,7 @@ export const notifyStaffNewLead = internalAction({
         row("Source", lead.source),
         row("Language", lead.locale.toUpperCase()),
         lead.tourTitle ? row("Tour", escapeHtml(lead.tourTitle)) : "",
-        lead.tripDetails?.startDate ? row("Dates", `${lead.tripDetails.startDate} → ${lead.tripDetails.endDate ?? "?"}`) : "",
+        lead.tripDetails?.startDate ? row("Dates", `${escapeHtml(lead.tripDetails.startDate)} → ${escapeHtml(lead.tripDetails.endDate ?? "?")}`) : "",
         lead.tripDetails?.travellers ? row("Travellers", String(lead.tripDetails.travellers)) : "",
         lead.tripDetails?.budget ? row("Budget", escapeHtml(lead.tripDetails.budget)) : "",
         lead.tripDetails?.interests?.length ? row("Interests", escapeHtml(lead.tripDetails.interests.join(", "))) : "",

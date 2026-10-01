@@ -121,6 +121,17 @@ export async function enforceRateLimit(
   await ctx.db.patch(existing._id, { count: existing.count + 1 });
 }
 
+/** Like enforceRateLimit, but reports the outcome instead of throwing (for optional side effects such as e-mails). */
+export async function tryRateLimit(ctx: MutationCtx, key: string, limit: number, windowMs: number): Promise<boolean> {
+  try {
+    await enforceRateLimit(ctx, key, limit, windowMs);
+    return true;
+  } catch (err) {
+    if (err instanceof ConvexError && (err.data as { code?: string })?.code === "RATE_LIMITED") return false;
+    throw err;
+  }
+}
+
 /** Ensures a number is finite, integer and within bounds. */
 export function assertInt(value: number, min: number, max: number, field: string): number {
   if (!Number.isFinite(value) || !Number.isInteger(value) || value < min || value > max) {

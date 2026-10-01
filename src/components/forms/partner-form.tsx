@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { useMutation } from "convex/react";
+import { useAction } from "convex/react";
 import { ConvexError } from "convex/values";
 import { z } from "zod";
 import { CheckCircle2, Send } from "lucide-react";
@@ -50,7 +50,7 @@ export function PartnerForm() {
   const t = useTranslations("partners.form");
   const locale = useLocale() as "en" | "ar";
   const pathname = usePathname();
-  const create = useMutation(api.leads.createPartnerRequest);
+  const create = useAction(api.leads.createPartnerRequest);
   const [form, setForm] = useState<Form>({ name: "", company: "", country: "", city: "", email: "", phone: "", website: "", businessType: "travel_agency", markets: [], clientTypes: [], bookingsPerYear: undefined, interests: [], message: "", consent: false as unknown as true });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);

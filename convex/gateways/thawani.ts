@@ -1,5 +1,15 @@
 import { ProviderError, type CheckoutRequest, type CheckoutResult, type NormalizedEvent, type PaymentProvider, type RefundRequest, type RefundResult, type RemoteStatus, type WebhookVerification } from "./provider";
 
+// Thawani session ids are opaque tokens; anything else must never reach the API path we interpolate it into.
+const SESSION_ID_RE = /^[A-Za-z0-9_-]{6,128}$/;
+
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 /**
  * Thawani Pay (Oman) — hosted checkout, settled in OMR (baisa).
  * Docs: https://docs.thawani.om  (Checkout API v1)
@@ -67,7 +77,7 @@ export const thawaniProvider: PaymentProvider = {
     const secret = process.env.THAWANI_WEBHOOK_SECRET;
     if (secret) {
       const got = request.headers.get("x-webhook-secret") ?? request.headers.get("thawani-webhook-secret") ?? new URL(request.url).searchParams.get("secret");
-      if (got !== secret) return { ok: false, error: "Invalid webhook secret" };
+      if (!got || !constantTimeEqual(got, secret)) return { ok: false, error: "Invalid webhook secret" };
     }
     let payload: { session_id?: string; client_reference_id?: string; event_type?: string; data?: { session_id?: string; client_reference_id?: string; payment_status?: string } };
     try {
@@ -76,7 +86,7 @@ export const thawaniProvider: PaymentProvider = {
       return { ok: false, error: "Invalid JSON" };
     }
     const sessionId = payload.session_id ?? payload.data?.session_id;
-    if (!sessionId) return { ok: false, error: "Missing session_id" };
+    if (!sessionId || !SESSION_ID_RE.test(sessionId)) return { ok: false, error: "Missing session_id" };
     // Server-to-server verification (never trust the payload)
     const remote = await thawaniProvider.getStatus(sessionId);
     const eventId = `${sessionId}:${remote.status}`;
@@ -91,8 +101,8 @@ export const thawaniProvider: PaymentProvider = {
     try {
       let paymentId = req.providerPaymentId;
       if (!paymentId && req.providerSessionId) {
-        const session = await api<ThawaniSession>(`/checkout/session/${req.providerSessionId}`);
-        const payments = await api<ThawaniPayment[]>(`/payments?checkout_invoice=${session.invoice}`);
+        const session = await api<ThawaniSession>(`/checkout/session/${encodeURIComponent(req.providerSessionId)}`);
+        const payments = await api<ThawaniPayment[]>(`/payments?checkout_invoice=${encodeURIComponent(session.invoice ?? "")}`);
         paymentId = payments.find((p) => p.status === "Successful")?.payment_id ?? "";
       }
       if (!paymentId) return { status: "failed", error: "No Thawani payment id found for this session" };
@@ -107,11 +117,11 @@ export const thawaniProvider: PaymentProvider = {
   },
 
   async getStatus(providerSessionId: string): Promise<RemoteStatus> {
-    const session = await api<ThawaniSession>(`/checkout/session/${providerSessionId}`);
+    const session = await api<ThawaniSession>(`/checkout/session/${encodeURIComponent(providerSessionId)}`);
     if (session.payment_status === "paid") {
       let providerPaymentId: string | undefined;
       try {
-        const payments = await api<ThawaniPayment[]>(`/payments?checkout_invoice=${session.invoice}`);
+        const payments = await api<ThawaniPayment[]>(`/payments?checkout_invoice=${encodeURIComponent(session.invoice ?? "")}`);
         providerPaymentId = payments.find((p) => p.status === "Successful")?.payment_id;
       } catch {
         /* optional */

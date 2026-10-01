@@ -3,7 +3,7 @@ import { ConvexError } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
-import { assertString, enforceRateLimit, getViewer, isStaff, requireStaff } from "./lib/access";
+import { assertString, enforceRateLimit, getViewer, isStaff, requireStaff, tryRateLimit } from "./lib/access";
 import { localeValidator } from "./schema";
 
 // Only explicit requests for a person trigger an immediate transfer; everything else is handled by the assistant,
@@ -39,6 +39,8 @@ export const open = mutation({
       if (viewer && !existing.userId) await ctx.db.patch(existing._id, { userId: viewer._id, guestName: existing.guestName ?? viewer.name, guestEmail: existing.guestEmail ?? viewer.email });
       return existing._id;
     }
+    // Site-wide cap: a fresh sessionKey must not mint unlimited conversations (each one costs AI calls and a staff e-mail).
+    await enforceRateLimit(ctx, "chat:open:global", 300, 60 * 60 * 1000);
     const id = await ctx.db.insert("conversations", {
       userId: viewer?._id,
       sessionKey: args.sessionKey,
@@ -79,14 +81,25 @@ export const send = mutation({
     const wantsHuman = HANDOFF_PATTERNS.test(text);
     const nextStatus = c.status === "ai" && wantsHuman ? "waiting_human" : c.status;
     await ctx.db.patch(conversationId, { lastMessageAt: now, lastMessagePreview: text.slice(0, 120), unreadForStaff: c.unreadForStaff + 1, status: nextStatus, handoffReason: nextStatus === "waiting_human" && c.status === "ai" ? "customer_request" : c.handoffReason });
-    if (!c.notifiedNewAt) await ctx.scheduler.runAfter(0, internal.chatEmails.notifyStaff, { conversationId, kind: "new" });
+    // Site-wide caps bound the cost of a flood; beyond them the inbox still shows every conversation.
+    if (!c.notifiedNewAt && (await tryRateLimit(ctx, "chat:notify:global", 60, 60 * 60 * 1000))) {
+      await ctx.scheduler.runAfter(0, internal.chatEmails.notifyStaff, { conversationId, kind: "new" });
+    }
     if (nextStatus === "waiting_human" && c.status === "ai") {
       await ctx.db.insert("messages", { conversationId, role: "system", body: c.locale === "ar" ? "تم تحويل المحادثة إلى أحد أعضاء الفريق. سيرد عليك قريبًا." : "Handing you over to a team member. Someone will reply shortly." });
       await ctx.scheduler.runAfter(0, internal.chat.ensureLeadForHandoff, { conversationId });
       await ctx.scheduler.runAfter(0, internal.chatEmails.notifyStaff, { conversationId, kind: "handoff" });
     } else if (c.status === "ai" || c.status === "waiting_human") {
       // Keep answering until a team member actually takes over (status "human"); nobody should be left waiting.
-      await ctx.scheduler.runAfter(0, internal.chatAi.respond, { conversationId });
+      if (await tryRateLimit(ctx, "chat:ai:global", 600, 60 * 60 * 1000)) {
+        await ctx.scheduler.runAfter(0, internal.chatAi.respond, { conversationId });
+      } else if (c.status === "ai") {
+        // Hourly AI budget exhausted: hand over to the team instead of leaving the visitor without an answer.
+        await ctx.db.patch(conversationId, { status: "waiting_human", handoffReason: "ai_budget" });
+        await ctx.db.insert("messages", { conversationId, role: "system", body: c.locale === "ar" ? "تم تحويل المحادثة إلى أحد أعضاء الفريق. سيرد عليك قريبًا." : "Handing you over to a team member. Someone will reply shortly." });
+        await ctx.scheduler.runAfter(0, internal.chat.ensureLeadForHandoff, { conversationId });
+        await ctx.scheduler.runAfter(0, internal.chatEmails.notifyStaff, { conversationId, kind: "handoff" });
+      }
     }
     return null;
   },
@@ -98,7 +111,9 @@ export const identify = mutation({
   returns: v.null(),
   handler: async (ctx, { conversationId, sessionKey, name, phone, email }) => {
     const { c } = await loadConversationForCaller(ctx, conversationId, sessionKey);
-    await ctx.db.patch(c._id, { guestName: assertString(name, 120, "name", 1), guestPhone: assertString(phone, 32, "phone", 6), guestEmail: email?.toLowerCase() });
+    const guestEmail = email?.trim().toLowerCase() || undefined;
+    if (guestEmail !== undefined && (guestEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail))) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "email" });
+    await ctx.db.patch(c._id, { guestName: assertString(name, 120, "name", 1), guestPhone: assertString(phone, 32, "phone", 6), guestEmail });
     return null;
   },
 });

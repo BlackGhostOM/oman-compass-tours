@@ -1,12 +1,38 @@
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { internal } from "./_generated/api";
-import { mutation, type MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { action, internalMutation, type MutationCtx } from "./_generated/server";
 import { assertString, enforceRateLimit, getViewer } from "./lib/access";
 import { localeValidator } from "./schema";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^\+?[0-9\s()-]{7,20}$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Cloudflare Turnstile, verified server side. When TURNSTILE_SECRET_KEY is not configured the check is
+ * skipped (honeypot + rate limits still apply); once it is, every public form must carry a valid token.
+ */
+async function verifyTurnstile(token: string | undefined): Promise<void> {
+  const secret = process.env.TURNSTILE_SECRET_KEY;
+  if (!secret) return;
+  if (!token || token.length > 2048) throw new ConvexError({ code: "CAPTCHA" });
+  let success = false;
+  try {
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ secret, response: token }),
+    });
+    success = ((await res.json()) as { success?: boolean }).success === true;
+  } catch {
+    success = false;
+  }
+  if (!success) throw new ConvexError({ code: "CAPTCHA" });
+}
+
+type LeadResult = { ok: boolean; leadId: Id<"leads"> };
 
 async function slaMinutes(ctx: MutationCtx): Promise<number> {
   const row = await ctx.db.query("siteSettings").withIndex("by_key", (q) => q.eq("key", "leads.slaMinutes")).unique();
@@ -28,7 +54,7 @@ const partnerProfile = v.object({
 });
 
 /** B2B partnership registration from /partners. Stored as a lead with a structured partner profile. */
-export const createPartnerRequest = mutation({
+export const createPartnerRequest = action({
   args: {
     name: v.string(),
     email: v.string(),
@@ -40,12 +66,31 @@ export const createPartnerRequest = mutation({
     ...partnerProfile.fields, // includes the optional free-text message
   },
   returns: v.object({ ok: v.boolean(), leadId: v.id("leads") }),
+  handler: async (ctx, args): Promise<LeadResult> => {
+    const { turnstileToken, ...rest } = args;
+    await verifyTurnstile(turnstileToken);
+    return await ctx.runMutation(internal.leads.createPartnerRequestInternal, rest);
+  },
+});
+
+export const createPartnerRequestInternal = internalMutation({
+  args: {
+    name: v.string(),
+    email: v.string(),
+    phone: v.string(),
+    locale: localeValidator,
+    pagePath: v.optional(v.string()),
+    honeypot: v.optional(v.string()),
+    ...partnerProfile.fields, // includes the optional free-text message
+  },
+  returns: v.object({ ok: v.boolean(), leadId: v.id("leads") }),
   handler: async (ctx, args) => {
     if (args.honeypot) throw new ConvexError({ code: "SPAM" });
     const email = args.email.trim().toLowerCase();
     if (!EMAIL_RE.test(email)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "email" });
     if (!PHONE_RE.test(args.phone)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "phone" });
     await enforceRateLimit(ctx, `partner:${email}`, 3, 60 * 60 * 1000);
+    await enforceRateLimit(ctx, "leads:global", 100, 60 * 60 * 1000);
     const clip = (value: string | undefined, max: number) => (value ? value.trim().slice(0, max) : undefined);
     const list = (values: string[]) => values.map((x) => x.slice(0, 40)).slice(0, 12);
     const viewer = await getViewer(ctx);
@@ -84,7 +129,7 @@ export const createPartnerRequest = mutation({
   },
 });
 
-export const createFromContact = mutation({
+export const createFromContact = action({
   args: {
     name: v.string(),
     email: v.string(),
@@ -97,12 +142,32 @@ export const createFromContact = mutation({
     honeypot: v.optional(v.string()),
   },
   returns: v.object({ ok: v.boolean(), leadId: v.id("leads") }),
+  handler: async (ctx, args): Promise<LeadResult> => {
+    const { turnstileToken, ...rest } = args;
+    await verifyTurnstile(turnstileToken);
+    return await ctx.runMutation(internal.leads.createFromContactInternal, rest);
+  },
+});
+
+export const createFromContactInternal = internalMutation({
+  args: {
+    name: v.string(),
+    email: v.string(),
+    phone: v.optional(v.string()),
+    message: v.string(),
+    locale: localeValidator,
+    tourId: v.optional(v.id("tours")),
+    pagePath: v.optional(v.string()),
+    honeypot: v.optional(v.string()),
+  },
+  returns: v.object({ ok: v.boolean(), leadId: v.id("leads") }),
   handler: async (ctx, args) => {
     if (args.honeypot) throw new ConvexError({ code: "SPAM" });
     const email = args.email.trim().toLowerCase();
     if (!EMAIL_RE.test(email)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "email" });
     if (args.phone && !PHONE_RE.test(args.phone)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "phone" });
     await enforceRateLimit(ctx, `contact:${email}`, 5, 60 * 60 * 1000);
+    await enforceRateLimit(ctx, "leads:global", 100, 60 * 60 * 1000);
 
     const viewer = await getViewer(ctx);
     const now = Date.now();
@@ -127,7 +192,31 @@ export const createFromContact = mutation({
 });
 
 /** "Plan my trip" form → lead with trip details. */
-export const createFromTripPlanner = mutation({
+export const createFromTripPlanner = action({
+  args: {
+    name: v.string(),
+    email: v.string(),
+    phone: v.string(),
+    nationality: v.optional(v.string()),
+    locale: localeValidator,
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
+    travellers: v.optional(v.number()),
+    budget: v.optional(v.string()),
+    interests: v.optional(v.array(v.string())),
+    message: v.optional(v.string()),
+    honeypot: v.optional(v.string()),
+    turnstileToken: v.optional(v.string()),
+  },
+  returns: v.object({ ok: v.boolean(), leadId: v.id("leads") }),
+  handler: async (ctx, args): Promise<LeadResult> => {
+    const { turnstileToken, ...rest } = args;
+    await verifyTurnstile(turnstileToken);
+    return await ctx.runMutation(internal.leads.createFromTripPlannerInternal, rest);
+  },
+});
+
+export const createFromTripPlannerInternal = internalMutation({
   args: {
     name: v.string(),
     email: v.string(),
@@ -149,6 +238,7 @@ export const createFromTripPlanner = mutation({
     if (!EMAIL_RE.test(email)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "email" });
     if (!PHONE_RE.test(args.phone)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "phone" });
     await enforceRateLimit(ctx, `planner:${email}`, 5, 60 * 60 * 1000);
+    await enforceRateLimit(ctx, "leads:global", 100, 60 * 60 * 1000);
     const travellers = args.travellers === undefined ? undefined : Math.max(1, Math.min(60, Math.round(args.travellers)));
 
     const viewer = await getViewer(ctx);
@@ -163,8 +253,8 @@ export const createFromTripPlanner = mutation({
       locale: args.locale,
       source: "trip_planner",
       tripDetails: {
-        startDate: args.startDate,
-        endDate: args.endDate,
+        startDate: args.startDate && DATE_RE.test(args.startDate) ? args.startDate : undefined,
+        endDate: args.endDate && DATE_RE.test(args.endDate) ? args.endDate : undefined,
         travellers,
         budget: args.budget?.slice(0, 40),
         interests: (args.interests ?? []).slice(0, 12).map((i) => i.slice(0, 40)),

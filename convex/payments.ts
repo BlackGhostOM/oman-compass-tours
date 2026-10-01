@@ -12,6 +12,25 @@ import { baisaToMinor, FALLBACK_RATES, type Currency } from "./lib/money";
 import { currencyValidator, paymentKindValidator, paymentProviderValidator } from "./schema";
 
 const PROVIDER_IDS = ["thawani", "stripe", "paypal"] as const;
+
+/**
+ * The checkout success/cancel URLs are built from the caller-supplied origin. Once SITE_URL is configured,
+ * only our own site (and local development) may receive the provider redirect, so a hosted checkout page
+ * cannot be made to bounce a payer to a third-party site.
+ */
+function isAllowedOrigin(origin: string): boolean {
+  if (!/^https?:\/\/[^/]+$/.test(origin)) return false;
+  const site = process.env.SITE_URL;
+  if (!site) return true;
+  const strip = (host: string) => host.replace(/^www\./, "");
+  try {
+    const host = new URL(origin).host;
+    if (host === "localhost" || host.startsWith("localhost:") || host.startsWith("127.0.0.1")) return true;
+    return strip(host) === strip(new URL(site).host);
+  } catch {
+    return false;
+  }
+}
 const providerIdValidator = v.union(v.literal("thawani"), v.literal("stripe"), v.literal("paypal"));
 
 /* ------------------------------------------------------------------ */
@@ -120,7 +139,7 @@ export const startCheckout = action({
     if (!data) throw new ConvexError({ code: "BOOKING_NOT_FOUND" });
     const { booking, fx } = data;
     if (!["pending_payment", "inquiry", "confirmed"].includes(booking.status)) throw new ConvexError({ code: "BOOKING_NOT_PAYABLE", status: booking.status });
-    if (!/^https?:\/\/[^/]+$/.test(args.origin)) throw new ConvexError({ code: "INVALID_ORIGIN" });
+    if (!isAllowedOrigin(args.origin)) throw new ConvexError({ code: "INVALID_ORIGIN" });
 
     const provider = getProvider(args.provider);
     if (!provider.isConfigured()) throw new ConvexError({ code: "PROVIDER_NOT_CONFIGURED", provider: args.provider });
@@ -187,6 +206,9 @@ export const capturePaypal = action({
   handler: async (ctx, args): Promise<{ status: string }> => {
     const data: { booking: Doc<"bookings">; fx: Record<string, number> } | null = await ctx.runQuery(internal.payments.getBookingForCheckout, { reference: args.reference, token: args.token });
     if (!data) throw new ConvexError({ code: "BOOKING_NOT_FOUND" });
+    // The order must be one we created for this booking; otherwise the merchant credentials would capture arbitrary orders.
+    const payment: Doc<"payments"> | null = await ctx.runQuery(internal.payments.getPaypalPaymentByOrder, { orderId: args.orderId });
+    if (!payment || payment.bookingId !== data.booking._id) throw new ConvexError({ code: "PAYMENT_NOT_FOUND" });
     const result = await capturePaypalOrder(args.orderId);
     if (result.status === "succeeded" && process.env.PAYMENTS_TRUST_API_VERIFICATION === "true") {
       await ctx.runMutation(internal.payments.applyEvent, {
@@ -196,6 +218,11 @@ export const capturePaypal = action({
     }
     return { status: result.status };
   },
+});
+
+export const getPaypalPaymentByOrder = internalQuery({
+  args: { orderId: v.string() },
+  handler: async (ctx, { orderId }) => ctx.db.query("payments").withIndex("by_provider_session", (q) => q.eq("provider", "paypal").eq("providerSessionId", orderId)).first(),
 });
 
 /** Optional API-side verification (used by the success page as a fallback when enabled). */
@@ -440,7 +467,10 @@ export const paymentLinkByToken = query({
     if (!link) return null;
     const booking = await ctx.db.get(link.bookingId);
     if (!booking) return null;
-    return { reference: booking.reference, voucherToken: booking.voucherToken, amountOmr: link.amountOmr, kind: link.kind, description: link.description ?? null, expired: link.expiresAt < Date.now(), used: !!link.usedAt, tourTitle: booking.tourTitle, date: booking.date };
+    const expired = link.expiresAt < Date.now();
+    const used = !!link.usedAt;
+    // An expired or used link must not keep granting the voucher token (and with it the booking details) forever.
+    return { reference: booking.reference, voucherToken: expired || used ? "" : booking.voucherToken, amountOmr: link.amountOmr, kind: link.kind, description: link.description ?? null, expired, used, tourTitle: booking.tourTitle, date: booking.date };
   },
 });
 

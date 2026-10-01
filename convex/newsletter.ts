@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { internal } from "./_generated/api";
 import { mutation } from "./_generated/server";
-import { enforceRateLimit } from "./lib/access";
+import { enforceRateLimit, tryRateLimit } from "./lib/access";
 import { generateToken } from "./lib/ids";
 import { localeValidator } from "./schema";
 
@@ -21,6 +21,7 @@ export const subscribe = mutation({
       throw new ConvexError({ code: "INVALID_ARGUMENT", field: "email" });
     }
     await enforceRateLimit(ctx, `newsletter:${email}`, 3, 60 * 60 * 1000);
+    await enforceRateLimit(ctx, "newsletter:global", 100, 60 * 60 * 1000);
 
     const existing = await ctx.db
       .query("newsletterSubscribers")
@@ -30,7 +31,10 @@ export const subscribe = mutation({
     if (existing) {
       if (existing.unsubscribedAt) {
         await ctx.db.patch(existing._id, { unsubscribedAt: undefined, locale: args.locale });
-        await ctx.scheduler.runAfter(0, internal.newsletterSend.sendWelcome, { subscriberId: existing._id });
+        // Re-subscribing the same address repeatedly must not turn the welcome e-mail into harassment.
+        if (await tryRateLimit(ctx, `newsletter:welcome:${email}`, 1, 24 * 60 * 60 * 1000)) {
+          await ctx.scheduler.runAfter(0, internal.newsletterSend.sendWelcome, { subscriberId: existing._id });
+        }
       }
       return { ok: true };
     }

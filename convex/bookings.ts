@@ -18,6 +18,13 @@ const addOnSelectionValidator = v.array(v.object({ addOnId: v.id("addOns"), quan
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
 
+/** Gives a coupon use back when an unpaid booking is cancelled, so throwaway holds cannot exhaust a usage limit. */
+async function releaseCoupon(ctx: MutationCtx, code: string | undefined) {
+  if (!code) return;
+  const c = await ctx.db.query("coupons").withIndex("by_code", (q) => q.eq("code", code)).unique();
+  if (c && c.usedCount > 0) await ctx.db.patch(c._id, { usedCount: c.usedCount - 1 });
+}
+
 async function loadCoupon(ctx: QueryCtx | MutationCtx, code?: string): Promise<(PricingCoupon & { _id: Id<"coupons"> }) | null | undefined> {
   if (!code) return null;
   const c = await ctx.db.query("coupons").withIndex("by_code", (q) => q.eq("code", code.trim().toUpperCase())).unique();
@@ -165,7 +172,10 @@ export const saveDraft = mutation({
     const viewer = await getViewer(ctx);
     const drafts = await ctx.db.query("bookingDrafts").withIndex("by_session", (q) => q.eq("sessionKey", args.sessionKey)).take(20);
     const existing = drafts.find((x) => x.tourId === args.tourId && !x.convertedBookingId);
-    const data = JSON.parse(JSON.stringify(args.data).slice(0, 20_000));
+    await enforceRateLimit(ctx, `draft:${args.sessionKey}`, 120, 60 * 60 * 1000);
+    const serialized = JSON.stringify(args.data ?? null);
+    if (serialized.length > 20_000) throw new ConvexError({ code: "TOO_LARGE" });
+    const data = JSON.parse(serialized);
     if (existing) {
       await ctx.db.patch(existing._id, { step: assertInt(args.step, 1, 5, "step"), data, lastTouchedAt: Date.now(), userId: viewer?._id ?? existing.userId, locale: args.locale });
       return existing._id;
@@ -215,6 +225,9 @@ export const create = mutation({
     if (!EMAIL_RE.test(email)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "email" });
     if (!/^\+[1-9][0-9]{6,14}$/.test(args.traveller.phone)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "phone" });
     await enforceRateLimit(ctx, `booking:${email}`, 10, 60 * 60 * 1000);
+    // Holds consume real capacity until they expire, so the e-mail key alone (attacker-chosen) is not enough.
+    await enforceRateLimit(ctx, `booking:session:${args.sessionKey}`, 10, 60 * 60 * 1000);
+    await enforceRateLimit(ctx, "booking:global", 150, 60 * 60 * 1000);
 
     // Policies: every required current version must be accepted
     const policies = await ctx.db.query("policies").take(50);
@@ -405,6 +418,7 @@ export const expireHolds = internalMutation({
       for (const b of rows) {
         if (b.amountPaid > 0) continue; // a payment arrived; never auto-cancel a paid booking
         await ctx.db.patch(b._id, { status: "cancelled", cancellationReason: "hold_expired", cancelledAt: now, updatedAt: now });
+        await releaseCoupon(ctx, b.couponCode);
         await ctx.db.insert("auditLogs", { action: "booking.hold_expired", entityType: "bookings", entityId: b._id, before: { status }, after: { status: "cancelled" }, createdAt: now });
         expired++;
       }
@@ -495,6 +509,7 @@ export const requestCancellation = mutation({
     const now = Date.now();
     if (b.amountPaid === 0) {
       await ctx.db.patch(b._id, { status: "cancelled", cancelledAt: now, cancellationReason: reason?.slice(0, 500) ?? "customer", updatedAt: now });
+      await releaseCoupon(ctx, b.couponCode);
       return { status: "cancelled", refundEligible: false };
     }
     // Paid bookings: mark cancelled; refund is processed by staff through the provider adapter.
@@ -518,13 +533,18 @@ export const addCustomerNote = mutation({
   },
 });
 
-/** Attach guest bookings (same email) to a user who just signed in. */
+/**
+ * Attach guest bookings (same email) to a user who just signed in. Only an
+ * e-mail the auth provider verified (Google, magic link) may claim them: a
+ * password sign-up can use any address, so trusting it would hand a stranger
+ * the traveller's name, phone and hotel.
+ */
 export const claimGuestBookings = mutation({
   args: {},
   returns: v.number(),
   handler: async (ctx) => {
     const viewer = await getViewer(ctx);
-    if (!viewer?.email) return 0;
+    if (!viewer?.email || !viewer.emailVerificationTime) return 0;
     const rows = await ctx.db.query("bookings").withIndex("by_email", (q) => q.eq("traveller.email", viewer.email!)).take(100);
     let n = 0;
     for (const b of rows) {

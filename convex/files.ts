@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { requireStaff, requireUser } from "./lib/access";
+import { enforceRateLimit, requireStaff, requireUser } from "./lib/access";
 
 /** Signed upload URL for the signed-in customer (documents) or staff (media). */
 export const generateUploadUrl = mutation({
@@ -8,7 +8,11 @@ export const generateUploadUrl = mutation({
   returns: v.string(),
   handler: async (ctx, { purpose }) => {
     if (purpose === "media") await requireStaff(ctx);
-    else await requireUser(ctx);
+    else {
+      const user = await requireUser(ctx);
+      // A customer never needs more than a handful of documents; stop storage abuse.
+      await enforceRateLimit(ctx, `upload:${user._id}`, 20, 60 * 60 * 1000);
+    }
     return await ctx.storage.generateUploadUrl();
   },
 });
