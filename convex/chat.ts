@@ -240,7 +240,7 @@ export const getForAi = internalQuery({
     if (!c) return null;
     const rows = await ctx.db.query("messages").withIndex("by_conversation", (q) => q.eq("conversationId", conversationId)).order("desc").take(30);
     const tour = c.tourId ? await ctx.db.get(c.tourId) : null;
-    return { conversation: c, history: rows.reverse().map((m) => ({ role: m.role, body: m.body })), tour: tour ? { title: tour.title, slug: tour.slug, priceFrom: tour.priceFrom, pricingModel: tour.pricingModel, summary: tour.summary, freeCancellationHours: tour.freeCancellationHours, durationLabel: tour.durationLabel } : null };
+    return { conversation: c, history: rows.reverse().map((m) => ({ role: m.role, body: m.body, askedContact: m.aiAskedContact === true, finalAsk: m.aiFinalAsk === true })), tour: tour ? { title: tour.title, slug: tour.slug, priceFrom: tour.priceFrom, pricingModel: tour.pricingModel, summary: tour.summary, freeCancellationHours: tour.freeCancellationHours, durationLabel: tour.durationLabel } : null };
   },
 });
 
@@ -273,12 +273,15 @@ export const postAssistantMessage = internalMutation({
     suggestHandoff: v.boolean(),
     offerHandoff: v.optional(v.boolean()),
     visitor: v.optional(v.object({ name: v.optional(v.string()), phone: v.optional(v.string()), email: v.optional(v.string()), preferredChannel: v.optional(v.string()) })),
+    askedContact: v.optional(v.boolean()),
+    finalAsk: v.optional(v.boolean()),
+    declinedContact: v.optional(v.boolean()),
   },
   returns: v.null(),
-  handler: async (ctx, { conversationId, body, confidence, suggestHandoff, offerHandoff, visitor }) => {
+  handler: async (ctx, { conversationId, body, confidence, suggestHandoff, offerHandoff, visitor, askedContact, finalAsk, declinedContact }) => {
     const c = await ctx.db.get(conversationId);
     if (!c) return null;
-    await ctx.db.insert("messages", { conversationId, role: "assistant", body, aiConfidence: confidence, aiSuggestedHandoff: suggestHandoff || !!offerHandoff });
+    await ctx.db.insert("messages", { conversationId, role: "assistant", body, aiConfidence: confidence, aiSuggestedHandoff: suggestHandoff || !!offerHandoff, aiAskedContact: askedContact === true || finalAsk === true || undefined, aiFinalAsk: finalAsk === true || undefined });
     const handoff = suggestHandoff && c.status === "ai";
     // Contact details the visitor shared in the conversation become part of the record (never overwrite what we already know).
     const clean = (value?: string, max = 120) => (value && value.trim() ? value.trim().slice(0, max) : undefined);
@@ -291,6 +294,7 @@ export const postAssistantMessage = internalMutation({
     };
     await ctx.db.patch(conversationId, {
       ...captured,
+      guestDeclinedContact: c.guestDeclinedContact || declinedContact === true || undefined,
       lastMessageAt: Date.now(),
       lastMessagePreview: body.slice(0, 120),
       unreadForCustomer: c.unreadForCustomer + 1,

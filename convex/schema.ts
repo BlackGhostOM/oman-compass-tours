@@ -671,6 +671,8 @@ export default defineSchema({
     notifiedNewAt: v.optional(v.number()),
     notifiedHandoffAt: v.optional(v.number()),
     guestPreferredChannel: v.optional(v.string()),
+    /** The visitor clearly declined to share contact details with the assistant; it never asks again. */
+    guestDeclinedContact: v.optional(v.boolean()),
   })
     .index("by_user", ["userId", "lastMessageAt"])
     .index("by_session", ["sessionKey"])
@@ -690,6 +692,9 @@ export default defineSchema({
     attachments: v.optional(v.array(v.id("_storage"))),
     aiConfidence: v.optional(v.number()),
     aiSuggestedHandoff: v.optional(v.boolean()),
+    /** The assistant asked for the visitor's contact details in this reply (finalAsk: the one request made as they leave). */
+    aiAskedContact: v.optional(v.boolean()),
+    aiFinalAsk: v.optional(v.boolean()),
     readByStaffAt: v.optional(v.number()),
     readByCustomerAt: v.optional(v.number()),
   }).index("by_conversation", ["conversationId"]),
