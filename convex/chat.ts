@@ -282,10 +282,11 @@ export const postAssistantMessage = internalMutation({
     const handoff = suggestHandoff && c.status === "ai";
     // Contact details the visitor shared in the conversation become part of the record (never overwrite what we already know).
     const clean = (value?: string, max = 120) => (value && value.trim() ? value.trim().slice(0, max) : undefined);
+    const validEmail = (value?: string) => (value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? value.toLowerCase() : undefined);
     const captured = {
       guestName: c.guestName ?? clean(visitor?.name),
       guestPhone: c.guestPhone ?? clean(visitor?.phone, 32),
-      guestEmail: c.guestEmail ?? clean(visitor?.email)?.toLowerCase(),
+      guestEmail: c.guestEmail ?? validEmail(clean(visitor?.email, 254)),
       guestPreferredChannel: c.guestPreferredChannel ?? clean(visitor?.preferredChannel, 32),
     };
     await ctx.db.patch(conversationId, {

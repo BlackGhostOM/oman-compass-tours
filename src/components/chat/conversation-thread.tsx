@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PhoneInput } from "@/components/forms/phone-input";
+import { ChatText } from "./chat-text";
 
 type Props = {
   conversationId: Id<"conversations">;
@@ -120,7 +121,7 @@ export function ConversationThread({ conversationId, sessionKey, onStartNew, cla
               <p key={m._id} className="mx-auto max-w-[85%] text-center text-xs italic text-muted-foreground">{m.body}</p>
             ) : (
               <Bubble key={m._id} role={m.role} label={roleLabel(m.role)} time={time(m.createdAt)}>
-                {m.body}
+                <ChatText text={m.body} />
                 {m.aiSuggestedHandoff && status === "ai" && (
                   <button type="button" onClick={() => void connectHuman()} className="mt-2 block text-xs font-medium text-gold-500 underline-offset-4 hover:underline">
                     {t("talkToHuman")}
@@ -227,20 +228,6 @@ export function ConversationThread({ conversationId, sessionKey, onStartNew, cla
   );
 }
 
-/** Turns bare http(s) URLs in a message into links (same tab for our own site, new tab otherwise). */
-function linkify(text: string): React.ReactNode {
-  const parts = text.split(/(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/g);
-  if (parts.length === 1) return text;
-  return parts.map((part, i) =>
-    /^https?:\/\//.test(part) ? (
-      <a key={i} href={part} target={part.startsWith(site.url) || part.includes("localhost") ? undefined : "_blank"} rel="noopener noreferrer" className="break-all underline underline-offset-2">
-        {part.replace(/^https?:\/\/(www\.)?/, "")}
-      </a>
-    ) : (
-      part
-    ),
-  );
-}
 
 function Bubble({ role, label, time, children }: { role: string; label: string; time?: string; children: React.ReactNode }) {
   const mine = role === "customer";
@@ -253,7 +240,7 @@ function Bubble({ role, label, time, children }: { role: string; label: string; 
         </span>
       )}
       <div>
-        <div className={cn("whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-sm leading-relaxed", mine ? "rounded-se-sm bg-gold-500 text-navy-950" : "rounded-ss-sm bg-muted text-foreground")}>{typeof children === "string" ? linkify(children) : children}</div>
+        <div className={cn("whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-sm leading-relaxed", mine ? "rounded-se-sm bg-gold-500 text-navy-950" : "rounded-ss-sm bg-muted text-foreground")}>{typeof children === "string" ? <ChatText text={children} /> : children}</div>
         <p className={cn("mt-0.5 text-[10px] text-muted-foreground", mine ? "text-end" : "")}>
           {label}
           {time ? ` · ${time}` : ""}

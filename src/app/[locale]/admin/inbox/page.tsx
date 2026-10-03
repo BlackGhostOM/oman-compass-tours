@@ -10,6 +10,7 @@ import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import { Link, useRouter } from "@/i18n/navigation";
 import { cn } from "@/lib/utils";
+import { ChatText } from "@/components/chat/chat-text";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -100,7 +101,7 @@ function InboxInner() {
                   <div key={String(m._id)} className={cn("flex", m.role === "customer" ? "justify-start" : "justify-end")}>
                     <div className={cn("max-w-[75%] rounded-xl px-3 py-2 text-sm", m.role === "customer" ? "bg-muted text-foreground" : m.role === "assistant" ? "bg-gold-500/15 text-foreground" : m.role === "system" ? "bg-transparent text-xs italic text-muted-foreground" : "bg-navy-950 text-sand-50")} dir="auto">
                       <div className="mb-0.5 flex items-center gap-1 text-[10px] opacity-70">{m.role === "assistant" ? <Bot className="size-3" /> : m.role === "customer" ? <UserRound className="size-3" /> : null}{t(`roles.${m.role}`)}{m.aiConfidence !== null && m.aiConfidence !== undefined ? ` · ${Math.round(m.aiConfidence * 100)}%` : ""} · <DateTime value={m.createdAt} /></div>
-                      <p className="whitespace-pre-wrap">{m.body}</p>
+                      <p className="whitespace-pre-wrap"><ChatText text={m.body} /></p>
                     </div>
                   </div>
                 ))}
