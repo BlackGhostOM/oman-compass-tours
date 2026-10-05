@@ -2,6 +2,7 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import { CreditCard, Landmark, Wallet } from "lucide-react";
+import { baisaToMinor, FALLBACK_RATES, MINOR_UNITS, minorToMajor } from "../../../convex/lib/money";
 import { formatMoney, formatOmr } from "@/lib/content";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
@@ -41,7 +42,8 @@ export function ProviderPicker({
   const locale = useLocale();
   const t = useTranslations("checkout.providers");
   const settle = settlementFor(provider, currency);
-  const settleAmount = settle === "OMR" ? amountBaisa / 1000 : (amountBaisa / 1000) * (rates[settle] ?? 1);
+  // Exactly what checkout charges: the same rate fallback and rounding to the currency's minor units (payments.ts)
+  const settleAmount = settle === "OMR" ? amountBaisa / 1000 : minorToMajor(baisaToMinor(amountBaisa, settle, rates[settle] ?? FALLBACK_RATES[settle]), settle);
   const all: ProviderId[] = ["thawani", "stripe", "paypal"];
 
   return (
@@ -53,7 +55,7 @@ export function ProviderPicker({
           <SelectContent>
             {CURRENCIES.map((c) => (
               <SelectItem key={c} value={c}>
-                <span dir="ltr">{c} · {c === "OMR" ? formatOmr(amountBaisa, locale) : formatMoney((amountBaisa / 1000) * (rates[c] ?? 1), c, locale)}</span>
+                <span dir="ltr">{c} · {c === "OMR" ? formatOmr(amountBaisa, locale) : `≈ ${formatMoney((amountBaisa / 1000) * (rates[c] ?? FALLBACK_RATES[c]), c, locale)}`}</span>
               </SelectItem>
             ))}
           </SelectContent>
@@ -91,7 +93,7 @@ export function ProviderPicker({
 
       <div className="rounded-lg border border-sand-200 bg-sand-50 p-4 text-sm">
         <p className="text-ink-500">{t("youWillBeCharged")}</p>
-        <p className="mt-1 font-heading text-2xl text-navy-950" dir="ltr">{settle === "OMR" ? formatOmr(amountBaisa, locale) : formatMoney(settleAmount, settle, locale)}</p>
+        <p className="mt-1 font-heading text-2xl text-navy-950" dir="ltr">{settle === "OMR" ? formatOmr(amountBaisa, locale) : formatMoney(settleAmount, settle, locale, MINOR_UNITS[settle])}</p>
         {settle !== currency && <p className="mt-1 text-xs text-ink-500">{t("settlementNote", { provider: t(`${provider}.name`), currency: settle })}</p>}
         {disabledReason && <p className="mt-2 text-xs text-danger">{disabledReason}</p>}
       </div>

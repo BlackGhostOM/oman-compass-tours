@@ -170,3 +170,13 @@ export function sanitizeSelection(tour: BookingTour, input: unknown, opts: Selec
     },
   };
 }
+
+/**
+ * The wizard link for booking the same trip again ("Book again" after a lapsed hold or cancellation): the same date,
+ * start time and party as ?date=&time=&adults=&children=&infants=. The wizard runs them through sanitizeSelection,
+ * so a date that has passed or no longer fits falls back to the first bookable day.
+ */
+export function rebookHref(slug: string, b: { date: string; startTime?: string | null; adults: number; children: number; infants: number }): string {
+  const q = new URLSearchParams({ date: b.date, ...(b.startTime ? { time: b.startTime } : {}), adults: String(b.adults), children: String(b.children), infants: String(b.infants) });
+  return `/book/${slug}?${q.toString()}`;
+}

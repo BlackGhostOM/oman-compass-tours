@@ -3,6 +3,7 @@ import { fetchQuery } from "convex/nextjs";
 import QRCode from "qrcode";
 import path from "node:path";
 import { Document, Font, Page, Text, View, Image as PdfImage, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
+import { guestsLine } from "../../../../../convex/lib/guests";
 import { api } from "../../../../../convex/_generated/api";
 import { site } from "@/lib/site";
 
@@ -64,7 +65,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   const verifyUrl = `${site.url}/en/booking/${booking.reference}?t=${booking.voucherToken}`;
   const qr = await QRCode.toDataURL(verifyUrl, { margin: 1, width: 240, color: { dark: NAVY, light: "#FFFFFF" } });
   const date = new Date(booking.date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
-  const guests = `${booking.adults} adult(s)${booking.children ? `, ${booking.children} child(ren)` : ""}${booking.infants ? `, ${booking.infants} infant(s)` : ""}`;
+  const guests = guestsLine(booking, "en");
 
   const doc = (
     <Document title={`Voucher ${booking.reference}`} author={site.name}>
@@ -115,7 +116,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
           </View>
           <View style={styles.total}><Text style={styles.totalLabel}>Total</Text><Text style={styles.totalAmount}>{omr(booking.total)}</Text></View>
           <View style={styles.row}><Text style={styles.tdLabel}>Paid</Text><Text style={styles.tdAmount}>{omr(booking.amountPaid)}</Text></View>
-          {booking.total - booking.amountPaid > 0 ? <View style={styles.row}><Text style={styles.tdLabel}>Balance due before departure</Text><Text style={styles.tdAmount}>{omr(booking.total - booking.amountPaid)}</Text></View> : null}
+          {booking.total - booking.amountPaid > 0 ? <View style={styles.row}><Text style={styles.tdLabel}>Balance payable to your guide at the start of the trip (cash or card)</Text><Text style={styles.tdAmount}>{omr(booking.total - booking.amountPaid)}</Text></View> : null}
         </View>
 
         {booking.tour?.inclusions?.length ? (

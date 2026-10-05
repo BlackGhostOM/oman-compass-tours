@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { CalendarDays, Clock, MessageCircle, ShieldCheck, Users } from "lucide-react";
 import { Link } from "@/i18n/navigation";
+import { perPersonPrices } from "../../../convex/lib/pricing";
 import { formatOmr, pick, type LocalizedString, cancellationWindow, upToKey } from "@/lib/content";
 import { whatsappLink, site } from "@/lib/site";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ export function BookPanel({
   const slug = pick(tour.slug, locale);
   const title = pick(tour.title, locale);
   const reviews = tour.ratingCount + (tour.externalReviewCount ?? 0);
+  const childPrice = perPersonPrices(tour).child;
   const message = `Hello Oman Compass Tours 👋 I would like to book: ${title}\nمرحباً، أرغب في حجز: ${pick(tour.title, "ar")}\n${site.url}/${locale}/tours/${slug}`;
 
   return (
@@ -60,12 +62,17 @@ export function BookPanel({
         )}
       </div>
 
-      {tour.pricingModel === "per_person" && tour.priceChild ? (
+      {/* The child price the booking will charge (same rule as the pricing engine), "Free" when it is 0 */}
+      {tour.pricingModel === "per_person" ? (
         <p className="mt-3 text-xs text-ink-500">
           {t("childPrice", { min: (tour.infantAgeMax ?? 2) + 1, max: tour.childAgeMax ?? 11 })}:{" "}
-          <span className="font-medium text-ink-900" dir="ltr">
-            {formatOmr(tour.priceChild, locale, { compact: true })}
-          </span>
+          {childPrice > 0 ? (
+            <span className="font-medium text-ink-900" dir="ltr">
+              {formatOmr(childPrice, locale, { compact: true })}
+            </span>
+          ) : (
+            <span className="font-medium text-success">{t("free")}</span>
+          )}
         </p>
       ) : null}
 

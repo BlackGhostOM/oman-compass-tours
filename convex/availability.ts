@@ -1,8 +1,8 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { getViewer, isStaff } from "./lib/access";
-import { activeBookingsBetween, bookedUnits, slotCapacity, slotView, type SlotView } from "./lib/capacity";
-import { isOperatingDate } from "./lib/dates";
+import { activeBookingsBetween, bookedUnits, concurrentCap, concurrentRemaining, slotCapacity, slotView, tourSpanDays, type SlotView } from "./lib/capacity";
+import { addDaysIso, isOperatingDate } from "./lib/dates";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_RANGE_DAYS = 200;
@@ -29,12 +29,16 @@ export const forTour = query({
       const viewer = await getViewer(ctx);
       if (!viewer || !isStaff(viewer)) return empty;
     }
-    // Rows per date are bounded by startTimes + 1, and the range by MAX_RANGE_DAYS
+    // With a concurrent cap (opt-in), a trip starting on a date also needs room on the days it spans, and earlier
+    // multi-day trips still out count too, so both ranges widen by durationDays - 1 (lib/capacity)
+    const capped = concurrentCap(tour) !== null;
+    const extra = capped ? tourSpanDays(tour) - 1 : 0;
+    // Rows per date are bounded by startTimes + 1, and the range by MAX_RANGE_DAYS (+ the trip length)
     const rows = await ctx.db
       .query("availability")
-      .withIndex("by_tour_date", (q) => q.eq("tourId", tourId).gte("date", from).lte("date", to))
+      .withIndex("by_tour_date", (q) => q.eq("tourId", tourId).gte("date", from).lte("date", addDaysIso(to, extra)))
       .collect();
-    const active = await activeBookingsBetween(ctx, tourId, from, to);
+    const active = await activeBookingsBetween(ctx, tourId, addDaysIso(from, -extra), addDaysIso(to, extra));
 
     const byDate = new Map<string, typeof rows>();
     for (const r of rows) byDate.set(r.date, [...(byDate.get(r.date) ?? []), r]);
@@ -47,9 +51,10 @@ export const forTour = query({
       const operating = isOperatingDate(tour, date);
       const overrides = byDate.get(date) ?? [];
       const dayBlackout = !operating || overrides.some((o) => o.isBlackout && !o.startTime);
+      const dayLeft = capped && operating ? concurrentRemaining(tour, active, (day) => byDate.get(day) ?? [], date) : Infinity;
       const slots = tour.startTimes.map((time) => {
         const capacity = operating ? slotCapacity(tour, overrides, time) : 0;
-        return slotView(tour, time, capacity, capacity > 0 ? bookedUnits(tour, active, date, time) : 0);
+        return slotView(tour, time, capacity, capacity > 0 ? bookedUnits(tour, active, date, time) : 0, dayLeft);
       });
       dates.push({ date, slots, isBlackout: dayBlackout, operating });
     }

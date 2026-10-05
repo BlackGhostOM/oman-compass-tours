@@ -33,7 +33,7 @@ export default function AdminBookingsPage() {
   const tours = useQuery(api.admin.bookings.toursForSelect);
   const rows = useQuery(api.admin.bookings.list, { status: status === "all" ? undefined : (status as (typeof STATUSES)[number]), search: search || undefined, from: from || undefined, to: to || undefined, tourId: tourId === "all" ? undefined : (tourId as Id<"tours">) });
 
-  const csvRows = useMemo(() => rows?.map((b) => ({ reference: b.reference, tour: b.tourTitle.en, date: b.date, time: b.startTime ?? "", traveller: b.traveller, email: b.email, phone: b.phone, nationality: b.nationality, guests: b.groupSize, totalOmr: b.total / 1000, paidOmr: b.amountPaid / 1000, status: b.status, source: b.source, created: new Date(b.createdAt).toISOString() })), [rows]);
+  const csvRows = useMemo(() => rows?.map((b) => ({ reference: b.reference, tour: b.tourTitle.en, date: b.date, time: b.startTime ?? "", traveller: b.traveller, email: b.email, phone: b.phone, nationality: b.nationality, guests: b.groupSize, adults: b.adults, children: b.children, infants: b.infants, totalOmr: b.total / 1000, paidOmr: b.amountPaid / 1000, status: b.status, source: b.source, created: new Date(b.createdAt).toISOString() })), [rows]);
 
   return (
     <div>
@@ -90,7 +90,7 @@ export default function AdminBookingsPage() {
                   <TableCell><Link href={`/admin/bookings/${b._id}`} className="font-medium text-gold-700 hover:underline" dir="ltr" onClick={(e) => e.stopPropagation()}>{b.reference}</Link></TableCell>
                   <TableCell className="max-w-56 truncate">{pick(b.tourTitle, locale)}</TableCell>
                   <TableCell><DateTime value={b.date} withTime={false} /> <span className="text-muted-foreground" dir="ltr">{b.startTime}</span></TableCell>
-                  <TableCell><div>{b.traveller}</div><div className="text-xs text-muted-foreground">{b.nationality} · {b.groupSize} {t("guestsShort")}</div></TableCell>
+                  <TableCell><div>{b.traveller}</div><div className="text-xs text-muted-foreground">{b.nationality} · {t("party", { adults: b.adults, children: b.children, infants: b.infants })}</div></TableCell>
                   <TableCell className="text-end"><Money baisa={b.total} /></TableCell>
                   <TableCell className="text-end"><Money baisa={b.amountPaid} className={b.amountPaid >= b.total ? "text-success" : b.amountPaid > 0 ? "text-warning" : ""} /></TableCell>
                   <TableCell>

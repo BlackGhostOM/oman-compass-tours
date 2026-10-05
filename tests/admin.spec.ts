@@ -48,12 +48,22 @@ test.describe("Staff dashboard", () => {
     const workflow = page.locator("section").filter({ has: page.getByRole("heading", { name: "Status workflow" }) });
     await expect(workflow).toBeVisible();
 
-    // Manual bookings default to "confirmed"; move to "in progress" then "completed"
+    // Manual bookings default to "confirmed"; move to "in progress" then "completed". The tour has not run yet, so
+    // each move is a forced change that asks for confirmation first (cancelling it changes nothing).
+    const force = page.getByRole("alertdialog");
     await workflow.getByRole("button", { name: "In progress" }).click();
+    await expect(force).toContainText("Force the status to");
+    await force.getByRole("button", { name: "Cancel" }).click();
+    await expect(force).toBeHidden();
+    await expect(workflow.getByRole("button", { name: "In progress" })).toBeEnabled();
+
+    await workflow.getByRole("button", { name: "In progress" }).click();
+    await force.getByRole("button", { name: "Force the change" }).click();
     await expect(page.getByText("Status updated.").first()).toBeVisible();
     await expect(workflow.getByRole("button", { name: "In progress" })).toBeDisabled();
 
     await workflow.getByRole("button", { name: "Completed" }).click();
+    await force.getByRole("button", { name: "Force the change" }).click();
     await expect(workflow.getByRole("button", { name: "Completed" })).toBeDisabled();
 
     // Persisted: after a reload the header badge and the workflow both show the new status

@@ -124,11 +124,12 @@ const paymentFaq = {
   },
 };
 
-const roomsFaq = {
+/** Matches what the booking engine charges: per-person prices, no automatic party-size discount (see migrations:fixRoomsFaq). */
+export const roomsFaq = {
   question: { en: "Can we travel as a family of four?", ar: "هل يمكننا السفر كعائلة من أربعة أشخاص؟" },
   answer: {
-    en: "Yes. Prices are per person based on two travellers sharing one room and one 4WD. Four travellers in two rooms benefit from a discounted per-person rate, and children share their parents' room at a reduced price — choose the number of travellers on the booking page and the total updates automatically.",
-    ar: "نعم. الأسعار للفرد على أساس مسافرَين في غرفة واحدة وسيارة دفع رباعي واحدة. يستفيد أربعة مسافرين في غرفتين من سعر مخفّض للفرد، ويشارك الأطفال غرفة والديهم بسعر مخفّض؛ اختر عدد المسافرين في صفحة الحجز ويتحدّث الإجمالي تلقائيًا.",
+    en: "Yes. Prices are per person, based on two travellers sharing a room. Children share their parents' room and pay the reduced child price shown on this page. Choose the number of travellers on the booking page and the total updates automatically. A single-room supplement and rates for larger parties are quoted on request, so just contact us.",
+    ar: "نعم. الأسعار للفرد على أساس مسافرَين يتشاركان غرفة واحدة. يشارك الأطفال غرفة والديهم ويدفعون سعر الطفل المخفّض الموضّح في هذه الصفحة. اختر عدد المسافرين في صفحة الحجز وسيتحدّث الإجمالي تلقائيًا. أمّا مُلحق الغرفة المفردة وأسعار المجموعات الأكبر فنقدّمها عند الطلب، ويسعدنا تواصلكم معنا.",
   },
 };
 

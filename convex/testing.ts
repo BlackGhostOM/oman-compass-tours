@@ -13,12 +13,14 @@ export const createPendingPayment = internalMutation({
     provider: v.union(v.literal("stripe"), v.literal("thawani"), v.literal("paypal")),
     providerSessionId: v.string(),
     currency: v.optional(v.string()),
+    /** Baisa to charge; defaults to the rest of the deposit. */
+    amountOmr: v.optional(v.number()),
   },
   returns: v.object({ paymentId: v.id("payments"), amount: v.number(), currency: v.string() }),
   handler: async (ctx, args) => {
     const booking = await ctx.db.query("bookings").withIndex("by_reference", (q) => q.eq("reference", args.reference.toUpperCase())).unique();
     if (!booking) throw new Error("booking not found");
-    const amountOmr = Math.max(0, booking.depositDue - booking.amountPaid);
+    const amountOmr = args.amountOmr ?? Math.max(0, booking.depositDue - booking.amountPaid);
     const currency = (args.currency ?? (args.provider === "thawani" ? "OMR" : "USD")) as "OMR" | "USD";
     const rate = currency === "OMR" ? 1 : 2.6008;
     const amount = currency === "OMR" ? amountOmr : Math.round((amountOmr / 1000) * rate * 100);

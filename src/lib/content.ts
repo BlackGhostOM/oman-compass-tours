@@ -22,12 +22,17 @@ export function formatOmr(baisa: number, locale: string, opts: { compact?: boole
   }).format(omr);
 }
 
-/** Formats a converted display amount in another currency. */
-export function formatMoney(amountMajor: number, currency: string, locale: string): string {
+/**
+ * Formats a converted amount in another currency. By default an indicative whole-unit figure; pass fractionDigits
+ * (the currency's minor units) for an exact amount such as the card charge.
+ */
+export function formatMoney(amountMajor: number, currency: string, locale: string, fractionDigits?: number): string {
+  const digits = fractionDigits ?? (currency === "OMR" ? 3 : 0);
   return new Intl.NumberFormat(locale === "ar" ? "ar-OM" : "en", {
     style: "currency",
     currency,
-    maximumFractionDigits: currency === "OMR" ? 3 : 0,
+    minimumFractionDigits: fractionDigits !== undefined ? digits : undefined,
+    maximumFractionDigits: digits,
   }).format(amountMajor);
 }
 

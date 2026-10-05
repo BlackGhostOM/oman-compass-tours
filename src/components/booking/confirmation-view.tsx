@@ -17,6 +17,8 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { rebookHref } from "@/components/booking/selection";
+import { useGuestsLabel } from "@/components/booking/price-summary";
 
 const statusTone: Record<string, string> = {
   inquiry: "bg-warning/15 text-warning",
@@ -33,6 +35,7 @@ export function ConfirmationView({ reference, token }: { reference: string; toke
   const t = useTranslations("confirmation");
   const ts = useTranslations("bookingStatus");
   const tsum = useTranslations("booking.summary");
+  const guests = useGuestsLabel();
   const params = useSearchParams();
   const booking = useQuery(api.bookings.byReference, { reference, token });
   const viewer = useQuery(api.users.viewer);
@@ -124,7 +127,7 @@ export function ConfirmationView({ reference, token }: { reference: string; toke
 
         {holdOver === "hold_expired" && !attention && (
           <div className="flex flex-wrap justify-center gap-3">
-            {booking.tour && <Button asChild className="bg-gold-gradient font-semibold text-navy-950"><Link href={`/book/${pick(booking.tour.slug, locale)}`}>{t("rebook")}</Link></Button>}
+            {booking.tour && <Button asChild className="bg-gold-gradient font-semibold text-navy-950"><Link href={rebookHref(pick(booking.tour.slug, locale), booking)}>{t("rebook")}</Link></Button>}
             <Button asChild variant="outline"><a href={`https://wa.me/${site.whatsappNumber}?text=${encodeURIComponent(`Booking ${booking.reference}`)}`} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4 text-[#25D366]" /> {t("whatsapp")}</a></Button>
           </div>
         )}
@@ -166,7 +169,7 @@ export function ConfirmationView({ reference, token }: { reference: string; toke
           <dl className="mt-6 grid gap-4 border-t border-sand-200 pt-5 text-sm sm:grid-cols-2">
             <div className="flex gap-3"><UserRound className="mt-0.5 size-4 text-gold-500" /><div><dt className="text-ink-500">{t("lead")}</dt><dd className="font-medium text-ink-900">{booking.traveller.firstName} {booking.traveller.lastName} · {countryName(booking.traveller.nationality, locale)}</dd><dd className="text-xs text-ink-500" dir="ltr">{booking.traveller.phone}</dd></div></div>
             <div className="flex gap-3"><MapPin className="mt-0.5 size-4 text-gold-500" /><div><dt className="text-ink-500">{t("pickup")}</dt><dd className="font-medium text-ink-900">{booking.traveller.pickupLocation || booking.traveller.hotel || pick(booking.tour?.meetingPoint?.label, locale) || "—"}</dd></div></div>
-            <div className="flex gap-3 sm:col-span-2"><Clock className="mt-0.5 size-4 text-gold-500" /><div><dt className="text-ink-500">{t("guests")}</dt><dd className="font-medium text-ink-900">{booking.adults} × {t("adult")}{booking.children > 0 && ` · ${booking.children} × ${t("child")}`}{booking.infants > 0 && ` · ${booking.infants} × ${t("infant")}`}</dd></div></div>
+            <div className="flex gap-3 sm:col-span-2"><Clock className="mt-0.5 size-4 text-gold-500" /><div><dt className="text-ink-500">{t("guests")}</dt><dd className="font-medium text-ink-900">{guests(booking.adults, booking.children, booking.infants)}</dd></div></div>
           </dl>
           <div className="mt-5 border-t border-sand-200 pt-5">
             <ul className="space-y-1.5 text-sm">

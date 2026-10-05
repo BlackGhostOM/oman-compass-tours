@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Check, Clock, Languages, MapPin, ShieldCheck, Users, X } from "lucide-react";
 import { api } from "../../../../../../convex/_generated/api";
+import { perPersonPrices } from "../../../../../../convex/lib/pricing";
 import { Link, redirect } from "@/i18n/navigation";
 import { fetchPublic } from "@/lib/convex-server";
 import { decodeSlug, pick, upToKey } from "@/lib/content";
@@ -58,6 +59,7 @@ export default async function TourPage({ params }: Props) {
   const title = pick(tour.title, locale);
   const path = `/tours/${pick(tour.slug, locale)}`;
   const reviewsTotal = tour.ratingCount + (tour.externalReviewCount ?? 0);
+  const childPrice = perPersonPrices(tour).child;
 
   const jsonLd = [
     {
@@ -246,7 +248,12 @@ export default async function TourPage({ params }: Props) {
                       ) : (
                         <>
                           <PriceRow label={tc("perAdult")} baisa={tour.priceAdult ?? tour.priceFrom} locale={locale} />
-                          {tour.priceChild ? <PriceRow label={`${tc("perChild")} (${t("ages", { min: (tour.infantAgeMax ?? 2) + 1, max: tour.childAgeMax ?? 11 })})`} baisa={tour.priceChild} locale={locale} /> : null}
+                          {/* Always the child price the booking charges (perPersonPrices), "Free" when it is 0 */}
+                          {childPrice > 0 ? (
+                            <PriceRow label={`${tc("perChild")} (${t("ages", { min: (tour.infantAgeMax ?? 2) + 1, max: tour.childAgeMax ?? 11 })})`} baisa={childPrice} locale={locale} />
+                          ) : (
+                            <tr><td className="px-4 py-3">{`${tc("perChild")} (${t("ages", { min: (tour.infantAgeMax ?? 2) + 1, max: tour.childAgeMax ?? 11 })})`}</td><td className="px-4 py-3 text-success" colSpan={2}>{t("free")}</td></tr>
+                          )}
                           <tr><td className="px-4 py-3">{t("infants", { max: tour.infantAgeMax ?? 2 })}</td><td className="px-4 py-3 text-success" colSpan={2}>{t("free")}</td></tr>
                         </>
                       )}

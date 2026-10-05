@@ -106,7 +106,7 @@ export function BookingCard({ booking }: { booking: BookingSummary }) {
         <dl className="grid gap-x-6 gap-y-1 text-sm text-muted-foreground sm:grid-cols-2">
           <div className="flex items-center gap-2"><Clock className="size-4 text-gold-500" /> {formatDate(booking.date, locale, "short")} · <span dir="ltr">{booking.startTime}</span></div>
           {pickup && <div className="flex items-center gap-2"><MapPin className="size-4 text-gold-500" /> <span className="truncate">{pickup}</span></div>}
-          <div>{t("guests", { adults: booking.adults, children: booking.children })}</div>
+          <div>{t("guests", { adults: booking.adults, children: booking.children, infants: booking.infants })}</div>
           <div dir="ltr" className="text-foreground">{formatOmr(booking.amountPaid, locale)} / {formatOmr(booking.total, locale)}</div>
         </dl>
         {confirmed && booking.status !== "completed" && <Countdown date={booking.date} startTime={booking.startTime} />}
@@ -115,7 +115,9 @@ export function BookingCard({ booking }: { booking: BookingSummary }) {
           {confirmed && (
             <Button asChild size="sm" variant="outline"><a href={`/api/voucher/${booking.voucherToken}`} target="_blank" rel="noopener noreferrer"><Download className="size-4" /> {t("voucher")}</a></Button>
           )}
-          <Button asChild size="sm" variant="outline"><a href={`/api/calendar/${booking.voucherToken}`}><CalendarPlus className="size-4" /> {t("calendar")}</a></Button>
+          {(confirmed || needsPayment) && (
+            <Button asChild size="sm" variant="outline"><a href={`/api/calendar/${booking.voucherToken}`}><CalendarPlus className="size-4" /> {t("calendar")}</a></Button>
+          )}
           {needsPayment && (
             <Button asChild size="sm" className="bg-gold-gradient text-navy-950"><Link href={`/checkout/${booking.reference}?t=${booking.voucherToken}`}>{t("payNow")}</Link></Button>
           )}

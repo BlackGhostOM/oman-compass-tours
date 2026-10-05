@@ -1,12 +1,14 @@
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import type { Doc, Id } from "../_generated/dataModel";
-import { mutation, query } from "../_generated/server";
+import type { Doc } from "../_generated/dataModel";
+import { internal } from "../_generated/api";
+import { mutation, query, type MutationCtx } from "../_generated/server";
 import { assertInt, audit, requireStaff } from "../lib/access";
 import { faqValidator, itineraryDayValidator, localized, localizedOptional, mediaValidator, pricingModelValidator, seoValidator } from "../schema";
 import { releaseStorageRefs } from "../lib/mediaRefs";
 import { priceFromOf, pricingProblem } from "../lib/pricing";
-import { isRealIsoDate } from "../lib/dates";
+import { isRealIsoDate, normalizeStartTimes, omanTodayIso } from "../lib/dates";
+import { activeBookingsBetween, activeBookingsOn, bookedUnits, overridesOn, refreshBookingEndDates, slotCapacity, startTimeChangeImpact } from "../lib/capacity";
 
 const slugify = (s: string) =>
   s
@@ -32,20 +34,37 @@ export const list = query({
   },
 });
 
+/** Seasons read for the tour editor, newest start first; only current and upcoming ones are shown. */
+const SEASON_LIST_LIMIT = 200;
+
+/** Upcoming availability overrides listed in the tour editor (each range apply can write one row per day). */
+const AVAILABILITY_LIST_LIMIT = 400;
+
 export const get = query({
   args: { id: v.id("tours") },
   handler: async (ctx, { id }) => {
     await requireStaff(ctx);
     const t = await ctx.db.get(id);
     if (!t) return null;
-    const [media, seasons, availability, addOns] = await Promise.all([
+    // Overrides from today on (past rows no longer matter and would crowd out the newest ones)
+    const today = omanTodayIso();
+    const [media, seasons, overrides, addOns] = await Promise.all([
       ctx.db.query("tourMedia").withIndex("by_tour_order", (q) => q.eq("tourId", id)).take(50),
-      ctx.db.query("pricingSeasons").withIndex("by_tour", (q) => q.eq("tourId", id)).take(50),
-      ctx.db.query("availability").withIndex("by_tour_date", (q) => q.eq("tourId", id)).take(400),
+      // Newest seasons first (the oldest 50 would hide new ones); seasons that ended are left out below
+      ctx.db.query("pricingSeasons").withIndex("by_tour", (q) => q.eq("tourId", id)).order("desc").take(SEASON_LIST_LIMIT),
+      ctx.db.query("availability").withIndex("by_tour_date", (q) => q.eq("tourId", id).gte("date", today)).take(AVAILABILITY_LIST_LIMIT + 1),
       ctx.db.query("addOns").withIndex("by_tour", (q) => q.eq("tourId", id)).take(50),
     ]);
     const mediaWithUrls = await Promise.all(media.map(async (m) => ({ ...m, url: m.media.url ?? (m.media.storageId ? await ctx.storage.getUrl(m.media.storageId) : null) })));
-    return { ...t, media: mediaWithUrls, seasons, availability, addOns };
+    // availability.booked is never maintained; show what is really booked, counted like the booking engine (lib/capacity)
+    const shown = overrides.slice(0, AVAILABILITY_LIST_LIMIT);
+    const active = shown.length > 0 ? await activeBookingsBetween(ctx, id, shown[0].date, shown[shown.length - 1].date) : [];
+    const availability = shown.map((a) => ({
+      ...a,
+      booked: a.startTime ? bookedUnits(t, active, a.date, a.startTime) : t.startTimes.reduce((sum, time) => sum + bookedUnits(t, active, a.date, time), 0),
+    }));
+    const currentSeasons = seasons.filter((s) => s.endDate >= today).sort((a, b) => a.startDate.localeCompare(b.startDate) || a.endDate.localeCompare(b.endDate));
+    return { ...t, media: mediaWithUrls, seasons: currentSeasons, availability, availabilityTruncated: overrides.length > AVAILABILITY_LIST_LIMIT, addOns };
   },
 });
 
@@ -80,6 +99,8 @@ const tourInput = {
   minGroup: v.number(),
   maxGroup: v.number(),
   defaultCapacityPerSlot: v.number(),
+  /** Opt-in cap on units out at once on any day, across start times and overlapping multi-day trips; null clears it. */
+  concurrentCapacity: v.optional(v.union(v.number(), v.null())),
   difficulty: v.optional(v.union(v.literal("easy"), v.literal("moderate"), v.literal("challenging"))),
   pricingModel: pricingModelValidator,
   priceGroupOmr: v.optional(v.number()),
@@ -108,11 +129,112 @@ const tourInput = {
   seo: v.optional(seoValidator),
 };
 
+const timeRemapValidator = v.array(v.object({ from: v.string(), to: v.string() }));
+type TimeRemap = { from: string; to: string }[];
+
+/**
+ * [D] The start times of a save or import row, normalised ("8:30" -> "08:30", deduped, sorted). Anything that is
+ * not a time, or an empty list on a published tour, is INVALID_ARGUMENT field startTimes (the wizard could show such
+ * a departure but bookings.create would refuse it at the last step).
+ */
+function cleanStartTimes(list: readonly string[], published: boolean): string[] {
+  const { times, invalid } = normalizeStartTimes(list);
+  if (invalid.length > 0 || times.length > 24 || (published && times.length === 0)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "startTimes", invalid });
+  return times;
+}
+
+/**
+ * Keeps upcoming bookings counted when a tour's start times change (capacity is counted per listed departure, so a
+ * booking at a removed time would vanish from it and its seats or 4WDs could be sold again).
+ * - Bookings with no stored time get the old first departure written on them, so a new first time cannot move them.
+ * - Bookings at a removed time block the change (START_TIME_IN_USE) unless `remap` maps that time to a new one; they
+ *   then move in this same mutation, with an audit row and a "booking updated" email each, and that time's upcoming
+ *   availability overrides move with them (when the new time has none of its own that day).
+ * - A move that leaves a receiving departure over its capacity throws REMAP_OVER_CAPACITY (rolling everything back)
+ *   unless staff confirmed it (opts.override), like NEEDS_OVERRIDE for manual bookings.
+ * Returns how many bookings were moved.
+ */
+async function applyStartTimeChange(
+  ctx: MutationCtx,
+  staff: Doc<"users"> | null,
+  tour: Doc<"tours">,
+  nextTimes: string[],
+  remap: TimeRemap | undefined,
+  opts: { override?: boolean; defaultCapacityPerSlot?: number } = {},
+): Promise<number> {
+  const unchanged = tour.startTimes.length === nextTimes.length && tour.startTimes.every((x, i) => x === nextTimes[i]);
+  if (unchanged) return 0;
+  const today = omanTodayIso();
+  const { conflicts, blanks } = await startTimeChangeImpact(ctx, tour, nextTimes, today);
+  const map = new Map<string, string>();
+  for (const r of remap ?? []) {
+    const [from] = normalizeStartTimes([r.from]).times;
+    const [to] = normalizeStartTimes([r.to]).times;
+    if (!from || !to || !nextTimes.includes(to)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "timeRemap" });
+    map.set(from, to);
+  }
+  const unresolved = conflicts.filter((c) => !map.has(c.startTime));
+  if (unresolved.length > 0) {
+    throw new ConvexError({ code: "START_TIME_IN_USE", times: [...new Set(unresolved.map((c) => c.startTime))], references: unresolved.slice(0, 20).map((c) => c.reference), count: unresolved.length });
+  }
+  const now = Date.now();
+  for (const b of blanks) await ctx.db.patch(b.bookingId, { startTime: b.startTime, updatedAt: now });
+  for (const c of conflicts) {
+    const to = map.get(c.startTime)!;
+    await ctx.db.patch(c.bookingId, { startTime: to, updatedAt: now });
+    await audit(ctx, staff, "booking.start_time_remapped", "bookings", String(c.bookingId), { startTime: c.startTime }, { startTime: to });
+    await ctx.scheduler.runAfter(0, internal.bookingEmails.sendBookingChanged, { bookingId: c.bookingId });
+  }
+  const moved = [...map].filter(([from]) => !nextTimes.includes(from));
+  if (moved.length > 0) {
+    const rows = await ctx.db.query("availability").withIndex("by_tour_date", (q) => q.eq("tourId", tour._id).gte("date", today)).take(5000);
+    // Date/time pairs that have a row, kept current as rows move, so two removed times sent to the same new time
+    // never leave two rows for one departure
+    const taken = new Set(rows.map((r) => `${r.date}|${r.startTime ?? ""}`));
+    for (const [from, to] of moved) {
+      for (const row of rows.filter((r) => r.startTime === from)) {
+        const key = `${row.date}|${to}`;
+        if (taken.has(key)) continue;
+        await ctx.db.patch(row._id, { startTime: to });
+        taken.add(key);
+      }
+    }
+  }
+  if (!opts.override && conflicts.length > 0) {
+    // Re-count every departure that received bookings, after the move (mutations read their own writes)
+    const targets = new Map<string, { date: string; time: string; references: string[] }>();
+    for (const c of conflicts) {
+      const time = map.get(c.startTime)!;
+      const key = `${c.date}|${time}`;
+      const entry = targets.get(key) ?? { date: c.date, time, references: [] };
+      entry.references.push(c.reference);
+      targets.set(key, entry);
+    }
+    const capacityTour = { ...tour, defaultCapacityPerSlot: opts.defaultCapacityPerSlot ?? tour.defaultCapacityPerSlot };
+    const over: { date: string; time: string; capacity: number; booked: number; references: string[] }[] = [];
+    for (const g of targets.values()) {
+      const capacity = slotCapacity(capacityTour, await overridesOn(ctx, tour._id, g.date), g.time);
+      const booked = bookedUnits(capacityTour, await activeBookingsOn(ctx, tour._id, g.date), g.date, g.time);
+      if (booked > capacity) over.push({ ...g, capacity, booked, references: g.references.slice(0, 10) });
+    }
+    if (over.length > 0) throw new ConvexError({ code: "REMAP_OVER_CAPACITY", departures: over.slice(0, 10), count: over.length });
+  }
+  return conflicts.length;
+}
+
 export const upsert = mutation({
-  args: { id: v.optional(v.id("tours")), data: v.object(tourInput) },
+  args: {
+    id: v.optional(v.id("tours")),
+    data: v.object(tourInput),
+    /** Where upcoming bookings at a removed start time move (e.g. [{from: "08:00", to: "08:30"}]); see applyStartTimeChange. */
+    timeRemap: v.optional(timeRemapValidator),
+    /** Staff confirmed moving the bookings even though a receiving departure ends up over capacity (REMAP_OVER_CAPACITY). */
+    remapOverride: v.optional(v.boolean()),
+  },
   returns: v.id("tours"),
-  handler: async (ctx, { id, data }) => {
+  handler: async (ctx, { id, data, timeRemap, remapOverride }) => {
     const staff = await requireStaff(ctx);
+    const startTimes = cleanStartTimes(data.startTimes, data.status === "published");
     // Prices arrive in OMR; a NaN or absurd value would poison priceFrom and every quote
     const omr = (x: number | undefined, field: string) => {
       if (x === undefined) return undefined;
@@ -122,6 +244,7 @@ export const upsert = mutation({
     assertInt(data.minGroup, 1, 200, "minGroup");
     assertInt(data.maxGroup, data.minGroup, 500, "maxGroup");
     assertInt(data.defaultCapacityPerSlot, 1, 500, "capacity");
+    if (data.concurrentCapacity != null) assertInt(data.concurrentCapacity, 1, 5000, "concurrentCapacity");
     // Every tour takes a deposit (1-100%): 0% would promise "pay 0 now" and then charge the full price at checkout
     assertInt(data.depositPercent, 1, 100, "depositPercent");
     // Age bands follow these settings (infants 0..infantAgeMax, children ..childAgeMax, adults above), so they must not overlap
@@ -156,7 +279,7 @@ export const upsert = mutation({
       : undefined;
     // Drafts may be saved before pricing is decided; a complete price is required only to publish.
     if (data.status === "published") {
-      const problem = pricingProblem({ pricingModel: data.pricingModel, priceGroup, priceAdult, tieredPricing, vehiclePricing });
+      const problem = pricingProblem({ pricingModel: data.pricingModel, priceGroup, priceAdult, priceChild, tieredPricing, vehiclePricing });
       if (problem) throw new ConvexError({ code: "INVALID_ARGUMENT", field: problem });
     }
     const slug = { en: slugify(data.slug?.en || data.title.en), ar: slugify(data.slug?.ar || data.title.ar) };
@@ -167,13 +290,16 @@ export const upsert = mutation({
     const codeClash = await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", data.code)).unique();
     if (codeClash && codeClash._id !== id) throw new ConvexError({ code: "CODE_TAKEN" });
 
-    const { priceGroupOmr: _a, priceAdultOmr: _b, priceChildOmr: _c, tieredOmr: _d, vehicleOmr: _e, compareAtPriceFromOmr, ...rest } = data;
+    const { priceGroupOmr: _a, priceAdultOmr: _b, priceChildOmr: _c, tieredOmr: _d, vehicleOmr: _e, compareAtPriceFromOmr, concurrentCapacity, ...rest } = data;
     void _a; void _b; void _c; void _d; void _e;
     const doc = {
       ...rest,
       slug,
+      startTimes,
       operatingWeekdays: operatingWeekdays.length > 0 ? operatingWeekdays : undefined,
       fixedDepartureDates: fixedDepartureDates.length > 0 ? fixedDepartureDates : undefined,
+      // Left as is when the caller does not send it; null (or nothing typed in the editor) turns it off
+      ...(concurrentCapacity !== undefined ? { concurrentCapacity: concurrentCapacity ?? undefined } : {}),
       priceGroup,
       priceAdult,
       priceChild,
@@ -187,8 +313,12 @@ export const upsert = mutation({
     };
     if (id) {
       const before = await ctx.db.get(id);
+      if (!before) throw new ConvexError({ code: "NOT_FOUND" });
+      const remapped = await applyStartTimeChange(ctx, staff, before, startTimes, timeRemap, { override: remapOverride, defaultCapacityPerSlot: data.defaultCapacityPerSlot });
+      // A new length re-dates the end of running and upcoming trips (bookings.endDate)
+      await refreshBookingEndDates(ctx, before, data.durationDays, omanTodayIso());
       await ctx.db.patch(id, doc);
-      await audit(ctx, staff, "tour.update", "tours", String(id), { title: before?.title, priceFrom: before?.priceFrom, status: before?.status }, { title: doc.title, priceFrom: doc.priceFrom, status: doc.status });
+      await audit(ctx, staff, "tour.update", "tours", String(id), { title: before.title, priceFrom: before.priceFrom, status: before.status, startTimes: before.startTimes }, { title: doc.title, priceFrom: doc.priceFrom, status: doc.status, startTimes, remapped: remapped || undefined });
       return id;
     }
     const newId = await ctx.db.insert("tours", { ...doc, ratingAverage: 0, ratingCount: 0 });
@@ -326,6 +456,14 @@ export const upsertSeason = mutation({
     }
     if (args.priceGroupOmr === undefined && args.priceAdultOmr === undefined && args.priceChildOmr === undefined) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "price" });
     if (!isRealIsoDate(args.startDate) || !isRealIsoDate(args.endDate) || args.startDate > args.endDate) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "dates" });
+    // Tiered and per-vehicle prices ignore seasons, so a season there would say "Saved" and never apply
+    const tour = await ctx.db.get(args.tourId);
+    if (!tour) throw new ConvexError({ code: "NOT_FOUND" });
+    if (tour.pricingModel === "tiered" || tour.pricingModel === "per_vehicle") throw new ConvexError({ code: "INVALID_ARGUMENT", field: "pricingModel" });
+    if (args.id) {
+      const current = await ctx.db.get(args.id);
+      if (!current || current.tourId !== args.tourId) throw new ConvexError({ code: "NOT_FOUND" });
+    }
     const omr = (x?: number) => (x === undefined ? undefined : Math.round(x * 1000));
     const doc = { tourId: args.tourId, name: args.name, startDate: args.startDate, endDate: args.endDate, priceGroup: omr(args.priceGroupOmr), priceAdult: omr(args.priceAdultOmr), priceChild: omr(args.priceChildOmr), isActive: args.isActive };
     if (args.id) { await ctx.db.patch(args.id, doc); return args.id; }
@@ -454,122 +592,268 @@ export const upsertDestination = mutation({
 /* ------------------------------------------------------------------ */
 
 const PRICING_MODELS = ["per_group", "per_person", "tiered", "per_vehicle"] as const;
+const PRICING_KEYS = ["pricing_model", "price_group_omr", "price_adult_omr", "price_child_omr", "tier_first_adult_omr", "tier_first_two_adults_omr", "tier_extra_adult_omr", "tier_extra_child_omr", "vehicle_price_omr", "vehicle_max_adults", "vehicle_seats"];
+/** The template's sample row uses this prefix so trying the template can never overwrite a real product. */
+const SAMPLE_CODE_RE = /^SAMPLE-/i;
 
+/**
+ * Bulk import from the JSON template (or CSV converted to JSON with the template's columns).
+ * - Rows are matched by code. A new code creates a draft with the template defaults. An existing code is patched
+ *   with the columns present in the row only (an empty cell counts as missing), so ratings, featured status, hold
+ *   hours, pay-later, itinerary, FAQs, status and slug stay as they are unless the row sets them.
+ * - Numbers are validated with the same limits as the editor (upsert); start times are normalised (normalizeStartTimes)
+ *   and may not drop a time that still has upcoming bookings.
+ * - SAMPLE-* codes (the template's sample row) are refused.
+ * - dryRun validates every row and reports which codes would be created or updated, without writing.
+ */
 export const importTours = mutation({
-  args: { tours: v.array(v.any()) },
-  returns: v.object({ created: v.number(), updated: v.number(), errors: v.array(v.string()) }),
-  handler: async (ctx, { tours }) => {
+  args: { tours: v.array(v.any()), dryRun: v.optional(v.boolean()) },
+  returns: v.object({ created: v.number(), updated: v.number(), errors: v.array(v.string()), creates: v.array(v.string()), updates: v.array(v.string()), dryRun: v.boolean() }),
+  handler: async (ctx, { tours, dryRun }) => {
     const staff = await requireStaff(ctx);
     const categories = await ctx.db.query("categories").take(100);
     const destinations = await ctx.db.query("destinations").take(100);
-    let created = 0, updated = 0;
+    const creates: string[] = [];
+    const updates: string[] = [];
     const errors: string[] = [];
+    const seen = new Set<string>();
     const L = (x: unknown, fallback = ""): { en: string; ar: string } => (x && typeof x === "object" && "en" in (x as object) ? { en: String((x as { en?: string }).en ?? fallback), ar: String((x as { ar?: string }).ar ?? (x as { en?: string }).en ?? fallback) } : { en: String(x ?? fallback), ar: String(x ?? fallback) });
     const LArr = (x: unknown): { en: string; ar: string }[] => (Array.isArray(x) ? x.map((i) => L(i)) : typeof x === "string" ? x.split("|").filter(Boolean).map((s) => L(s)) : []);
     for (const [i, raw] of tours.slice(0, 200).entries()) {
       try {
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new Error("not an object");
         const r = raw as Record<string, unknown>;
-        const code = String(r.code ?? "").trim();
+        const has = (k: string) => r[k] !== undefined && r[k] !== null && !(typeof r[k] === "string" && (r[k] as string).trim() === "");
+        const str = (k: string) => String(r[k]).trim();
+        const code = has("code") ? str("code") : "";
         if (!code) throw new Error("missing code");
-        const category = categories.find((c) => c.key === r.category_key);
-        if (!category) throw new Error(`unknown category_key ${String(r.category_key)}`);
-        const destKeys = Array.isArray(r.destination_keys) ? r.destination_keys : String(r.destination_keys ?? "").split("|").filter(Boolean);
-        const destinationIds = destKeys.map((k) => destinations.find((d) => d.key === k)?._id).filter((x): x is Id<"destinations"> => !!x);
-        // An unknown model is an error, not a silent per-person tour priced at nothing
-        const model = r.pricing_model === undefined || r.pricing_model === null || r.pricing_model === "" ? "per_person" : String(r.pricing_model);
-        if (!PRICING_MODELS.includes(model as (typeof PRICING_MODELS)[number])) throw new Error(`unknown pricing_model ${model}`);
-        const pricingModel = model as (typeof PRICING_MODELS)[number];
-        const omr = (x: unknown, field: string) => {
-          if (x === undefined || x === null || x === "") return undefined;
-          const n = Number(x);
-          if (!Number.isFinite(n) || n < 0 || n > 100_000) throw new Error(`invalid ${field}`);
-          return Math.round(n * 1000);
+        if (SAMPLE_CODE_RE.test(code)) throw new Error(`${code} is the template's sample row; give it a real product code`);
+        if (seen.has(code)) throw new Error(`${code} appears more than once`);
+        seen.add(code);
+        const existing = await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", code)).unique();
+
+        // Readers: undefined when the row does not set the column (an empty cell included)
+        const loc = (k: string): { en: string; ar: string } | undefined => {
+          if (has(k)) return L(r[k]);
+          if (!has(`${k}_en`) && !has(`${k}_ar`)) return undefined;
+          const en = has(`${k}_en`) ? str(`${k}_en`) : str(`${k}_ar`);
+          return { en, ar: has(`${k}_ar`) ? str(`${k}_ar`) : en };
         };
-        const int = (x: unknown, lo: number, hi: number, field: string) => {
-          const n = Number(x);
-          if (!Number.isInteger(n) || n < lo || n > hi) throw new Error(`invalid ${field}`);
+        const split = (x: unknown) => (Array.isArray(x) ? x.map(String) : String(x).split("|")).map((s) => s.trim()).filter(Boolean);
+        const locList = (k: string): { en: string; ar: string }[] | undefined => {
+          if (has(k)) return LArr(r[k]);
+          if (!has(`${k}_en`) && !has(`${k}_ar`)) return undefined;
+          const en = has(`${k}_en`) ? split(r[`${k}_en`]) : [];
+          const ar = has(`${k}_ar`) ? split(r[`${k}_ar`]) : [];
+          return (en.length ? en : ar).map((e, j) => ({ en: e, ar: ar[j] ?? e }));
+        };
+        const list = (k: string) => (has(k) ? split(r[k]) : undefined);
+        const int = (k: string, lo: number, hi: number) => {
+          if (!has(k)) return undefined;
+          const n = Number(r[k]);
+          if (!Number.isInteger(n) || n < lo || n > hi) throw new Error(`invalid ${k} (whole number ${lo}-${hi})`);
           return n;
         };
-        const title = L(r.title);
-        const priceGroup = omr(r.price_group_omr, "price_group_omr");
-        const priceAdult = omr(r.price_adult_omr, "price_adult_omr");
-        const priceChild = omr(r.price_child_omr, "price_child_omr");
-        // Keys for the models a row does not use are written as undefined, so a model change on update clears them
-        const tieredPricing =
-          pricingModel === "tiered"
-            ? {
-                firstAdult: omr(r.tier_first_adult_omr, "tier_first_adult_omr") ?? 0,
-                firstTwoAdults: omr(r.tier_first_two_adults_omr, "tier_first_two_adults_omr") ?? 0,
-                extraAdult: omr(r.tier_extra_adult_omr, "tier_extra_adult_omr") ?? 0,
-                extraChild: omr(r.tier_extra_child_omr, "tier_extra_child_omr") ?? 0,
-              }
-            : undefined;
-        const vehicleMaxAdults = pricingModel === "per_vehicle" ? int(r.vehicle_max_adults ?? 4, 1, 10, "vehicle_max_adults") : 0;
-        const vehiclePricing =
-          pricingModel === "per_vehicle"
-            ? { pricePerVehicle: omr(r.vehicle_price_omr, "vehicle_price_omr") ?? 0, maxAdults: vehicleMaxAdults, seats: int(r.vehicle_seats ?? 6, vehicleMaxAdults, 16, "vehicle_seats") }
-            : undefined;
-        const status = r.status === "published" ? ("published" as const) : ("draft" as const);
-        if (status === "published") {
-          const problem = pricingProblem({ pricingModel, priceGroup, priceAdult, tieredPricing, vehiclePricing });
+        const bool = (k: string) => {
+          if (!has(k)) return undefined;
+          const x = str(k).toLowerCase();
+          if (["true", "1", "yes"].includes(x)) return true;
+          if (["false", "0", "no"].includes(x)) return false;
+          throw new Error(`invalid ${k} (true or false)`);
+        };
+        const omr = (k: string) => {
+          if (!has(k)) return undefined;
+          const n = Number(r[k]);
+          if (!Number.isFinite(n) || n < 0 || n > 100_000) throw new Error(`invalid ${k}`);
+          return Math.round(n * 1000);
+        };
+        const oneOf = <T extends string>(k: string, allowed: readonly T[]): T | undefined => {
+          if (!has(k)) return undefined;
+          const x = str(k);
+          if (!allowed.includes(x as T)) throw new Error(`invalid ${k} (${allowed.join(", ")})`);
+          return x as T;
+        };
+
+        const patch: Partial<Doc<"tours">> = {};
+        const kind = oneOf("kind", ["tour", "service"] as const);
+        if (kind) patch.kind = kind;
+        const title = loc("title");
+        if (title) patch.title = title;
+        else if (!existing) throw new Error("missing title");
+        for (const [k, field] of [["summary", "summary"], ["description", "description"], ["duration_label", "durationLabel"]] as const) {
+          const value = loc(k);
+          if (value) patch[field] = value;
+        }
+        for (const [k, field] of [["highlights", "highlights"], ["inclusions", "inclusions"], ["exclusions", "exclusions"]] as const) {
+          const value = locList(k);
+          if (value) patch[field] = value;
+        }
+        if (has("itinerary")) {
+          if (!Array.isArray(r.itinerary)) throw new Error("itinerary must be a list");
+          patch.itinerary = (r.itinerary as { time?: string; title: unknown; body: unknown }[]).map((d) => ({ time: d.time, title: L(d.title), body: L(d.body) }));
+        }
+        if (has("faqs")) {
+          if (!Array.isArray(r.faqs)) throw new Error("faqs must be a list");
+          patch.faqs = (r.faqs as { question: unknown; answer: unknown }[]).map((f) => ({ question: L(f.question), answer: L(f.answer) }));
+        }
+        if (has("category_key")) {
+          const category = categories.find((c) => c.key === str("category_key"));
+          if (!category) throw new Error(`unknown category_key ${str("category_key")}`);
+          patch.categoryId = category._id;
+        } else if (!existing) throw new Error("missing category_key");
+        const destKeys = list("destination_keys");
+        if (destKeys) {
+          const unknown = destKeys.filter((k) => !destinations.some((d) => d.key === k));
+          if (unknown.length) throw new Error(`unknown destination_keys ${unknown.join(", ")}`);
+          patch.destinationIds = destKeys.map((k) => destinations.find((d) => d.key === k)!._id);
+        }
+        const durationMinutes = int("duration_minutes", 1, 60 * 24 * 60);
+        if (durationMinutes !== undefined) patch.durationMinutes = durationMinutes;
+        const durationDays = int("duration_days", 1, 60);
+        if (durationDays !== undefined) patch.durationDays = durationDays;
+        const status = oneOf("status", ["draft", "published", "archived"] as const);
+        if (status) patch.status = status;
+        const finalStatus = status ?? existing?.status ?? "draft";
+        const startTimeList = list("start_times");
+        if (startTimeList) patch.startTimes = cleanStartTimes(startTimeList, finalStatus === "published");
+        else if (existing && finalStatus === "published" && existing.startTimes.length === 0) throw new Error("a published row needs start_times");
+        const pickupIncluded = bool("pickup_included");
+        if (pickupIncluded !== undefined) patch.pickupIncluded = pickupIncluded;
+        const guideLanguages = list("guide_languages");
+        if (guideLanguages) patch.guideLanguages = guideLanguages;
+        // Group sizes and capacity: same limits as the editor, checked against the tour's current values
+        const minGroup = int("min_group", 1, 200);
+        const maxGroup = int("max_group", 1, 500);
+        const capacity = int("capacity_per_slot", 1, 500);
+        const min = minGroup ?? existing?.minGroup ?? 1;
+        const max = maxGroup ?? existing?.maxGroup ?? 6;
+        if (max < min) throw new Error("max_group must be at least min_group");
+        if (minGroup !== undefined) patch.minGroup = minGroup;
+        if (maxGroup !== undefined) patch.maxGroup = maxGroup;
+        if (capacity !== undefined) patch.defaultCapacityPerSlot = capacity;
+        const difficulty = oneOf("difficulty", ["easy", "moderate", "challenging"] as const);
+        if (difficulty) patch.difficulty = difficulty;
+        const childAgeMax = int("child_age_max", (existing?.infantAgeMax ?? 2) + 1, 17);
+        if (childAgeMax !== undefined) patch.childAgeMax = childAgeMax;
+        // Every tour takes a deposit (1-100%), as in the editor
+        const depositPercent = int("deposit_percent", 1, 100);
+        if (depositPercent !== undefined) patch.depositPercent = depositPercent;
+        const freeCancellationHours = int("free_cancellation_hours", 0, 720);
+        if (freeCancellationHours !== undefined) patch.freeCancellationHours = freeCancellationHours;
+        const holdHours = int("hold_hours", 1, 168);
+        if (holdHours !== undefined) patch.holdHours = holdHours;
+        const payLater = bool("allow_reserve_now_pay_later");
+        if (payLater !== undefined) patch.allowReserveNowPayLater = payLater;
+        if (has("cover_image_url")) patch.coverImage = { kind: "image", url: str("cover_image_url"), alt: title ?? existing!.title };
+        const tags = list("tags");
+        if (tags) patch.tags = tags;
+        // Slug: from the row when given, from the title for a new product, otherwise unchanged
+        const slugObj = has("slug") && typeof r.slug === "object" ? (r.slug as { en?: string; ar?: string }) : undefined;
+        const slugEn = slugObj?.en ?? (has("slug_en") ? str("slug_en") : undefined);
+        const slugAr = slugObj?.ar ?? (has("slug_ar") ? str("slug_ar") : undefined);
+        if (slugEn || slugAr || !existing) {
+          const t = title ?? existing!.title;
+          const slug = { en: slugify(slugEn || existing?.slug.en || t.en), ar: slugify(slugAr || existing?.slug.ar || t.ar) };
+          if (!slug.en || !slug.ar) throw new Error("missing slug or title");
+          const clashEn = await ctx.db.query("tours").withIndex("by_slug_en", (q) => q.eq("slug.en", slug.en)).unique();
+          const clashAr = await ctx.db.query("tours").withIndex("by_slug_ar", (q) => q.eq("slug.ar", slug.ar)).unique();
+          const clash = clashEn && clashEn.code !== code ? clashEn : clashAr && clashAr.code !== code ? clashAr : null;
+          if (clash) throw new Error(`slug already used by ${clash.code}`);
+          patch.slug = slug;
+        }
+        // Pricing is one block: when any pricing column is present, the model and prices are rebuilt from the row on
+        // top of the current values (keys of models the tour no longer uses are cleared)
+        if (!existing || PRICING_KEYS.some(has)) {
+          const pricingModel = oneOf("pricing_model", PRICING_MODELS) ?? existing?.pricingModel ?? "per_person";
+          const priceGroup = has("price_group_omr") ? omr("price_group_omr") : existing?.priceGroup;
+          const priceAdult = has("price_adult_omr") ? omr("price_adult_omr") : existing?.priceAdult;
+          const priceChild = has("price_child_omr") ? omr("price_child_omr") : existing?.priceChild;
+          const tier = existing?.tieredPricing;
+          const tieredPricing =
+            pricingModel === "tiered"
+              ? {
+                  firstAdult: omr("tier_first_adult_omr") ?? tier?.firstAdult ?? 0,
+                  firstTwoAdults: omr("tier_first_two_adults_omr") ?? tier?.firstTwoAdults ?? 0,
+                  extraAdult: omr("tier_extra_adult_omr") ?? tier?.extraAdult ?? 0,
+                  extraChild: omr("tier_extra_child_omr") ?? tier?.extraChild ?? 0,
+                }
+              : undefined;
+          const vehicle = existing?.vehiclePricing;
+          const vehicleMaxAdults = pricingModel === "per_vehicle" ? (int("vehicle_max_adults", 1, 10) ?? vehicle?.maxAdults ?? 4) : 0;
+          const vehiclePricing =
+            pricingModel === "per_vehicle"
+              ? { pricePerVehicle: omr("vehicle_price_omr") ?? vehicle?.pricePerVehicle ?? 0, maxAdults: vehicleMaxAdults, seats: int("vehicle_seats", vehicleMaxAdults, 16) ?? Math.max(vehicleMaxAdults, vehicle?.seats ?? 6) }
+              : undefined;
+          Object.assign(patch, { pricingModel, priceGroup, priceAdult, priceChild, tieredPricing, vehiclePricing, priceFrom: priceFromOf({ pricingModel, priceGroup, priceAdult, tieredPricing, vehiclePricing }) });
+        }
+        if (finalStatus === "published") {
+          const problem = pricingProblem({ ...existing, ...patch } as Doc<"tours">);
           if (problem) throw new Error(`a published row needs a complete price (${problem})`);
         }
-        const doc = {
-          code,
-          kind: r.kind === "service" ? ("service" as const) : ("tour" as const),
-          title,
-          slug: { en: slugify(String((r.slug as { en?: string })?.en ?? r.slug_en ?? title.en)), ar: slugify(String((r.slug as { ar?: string })?.ar ?? r.slug_ar ?? title.ar)) },
-          summary: L(r.summary),
-          description: L(r.description),
-          highlights: LArr(r.highlights),
-          itinerary: Array.isArray(r.itinerary) ? (r.itinerary as { time?: string; title: unknown; body: unknown }[]).map((d) => ({ time: d.time, title: L(d.title), body: L(d.body) })) : [],
-          inclusions: LArr(r.inclusions),
-          exclusions: LArr(r.exclusions),
-          faqs: Array.isArray(r.faqs) ? (r.faqs as { question: unknown; answer: unknown }[]).map((f) => ({ question: L(f.question), answer: L(f.answer) })) : [],
-          categoryId: category._id,
-          destinationIds,
-          durationLabel: L(r.duration_label, "1 day"),
-          durationMinutes: Number(r.duration_minutes ?? 480),
-          durationDays: Number(r.duration_days ?? 1),
-          startTimes: Array.isArray(r.start_times) ? (r.start_times as string[]) : String(r.start_times ?? "08:00").split("|"),
-          pickupIncluded: String(r.pickup_included ?? "true") === "true",
-          guideLanguages: Array.isArray(r.guide_languages) ? (r.guide_languages as string[]) : String(r.guide_languages ?? "en|ar").split("|"),
-          minGroup: Number(r.min_group ?? 1),
-          maxGroup: Number(r.max_group ?? 6),
-          defaultCapacityPerSlot: Number(r.capacity_per_slot ?? r.max_group ?? 6),
-          difficulty: (["easy", "moderate", "challenging"] as const).find((d) => d === r.difficulty),
-          pricingModel,
-          priceGroup,
-          priceAdult,
-          priceChild,
-          tieredPricing,
-          vehiclePricing,
-          childAgeMax: r.child_age_max === undefined || r.child_age_max === null || r.child_age_max === "" ? undefined : int(r.child_age_max, 3, 17, "child_age_max"),
-          infantAgeMax: 2,
-          priceFrom: priceFromOf({ pricingModel, priceGroup, priceAdult, tieredPricing, vehiclePricing }),
-          // A blank deposit means full payment; 0% is refused (see upsert)
-          depositPercent: r.deposit_percent === undefined || r.deposit_percent === null || r.deposit_percent === "" ? 100 : int(r.deposit_percent, 1, 100, "deposit_percent"),
-          freeCancellationHours: Number(r.free_cancellation_hours ?? 24),
-          allowReserveNowPayLater: true,
-          holdHours: 24,
-          coverImage: r.cover_image_url ? { kind: "image" as const, url: String(r.cover_image_url), alt: title } : undefined,
-          ratingAverage: 0,
-          ratingCount: 0,
-          status,
-          isFeatured: false,
-          tags: Array.isArray(r.tags) ? (r.tags as string[]) : String(r.tags ?? "").split("|").filter(Boolean),
-          searchText: `${title.en} ${title.ar}`,
-          updatedAt: Date.now(),
-        };
-        const existing = await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", code)).unique();
-        if (existing) { await ctx.db.patch(existing._id, doc); updated++; }
-        else { await ctx.db.insert("tours", doc); created++; }
+
+        const now = Date.now();
+        if (existing) {
+          if (patch.startTimes) {
+            const { conflicts } = await startTimeChangeImpact(ctx, existing, patch.startTimes, omanTodayIso());
+            if (conflicts.length) throw new Error(`start time ${[...new Set(conflicts.map((c) => c.startTime))].join(", ")} still has upcoming bookings (${conflicts.slice(0, 5).map((c) => c.reference).join(", ")}); move them in the tour editor`);
+          }
+          updates.push(code);
+          if (dryRun) continue;
+          if (patch.startTimes) await applyStartTimeChange(ctx, staff, existing, patch.startTimes, undefined);
+          if (patch.durationDays !== undefined) await refreshBookingEndDates(ctx, existing, patch.durationDays, omanTodayIso());
+          const merged = { ...existing, ...patch };
+          await ctx.db.patch(existing._id, { ...patch, searchText: `${merged.title.en} ${merged.title.ar} ${merged.summary.en} ${merged.summary.ar} ${merged.tags.join(" ")}`, updatedAt: now });
+        } else {
+          creates.push(code);
+          if (dryRun) continue;
+          const doc = {
+            code,
+            kind: "tour" as const,
+            summary: L(undefined),
+            description: L(undefined),
+            highlights: [],
+            itinerary: [],
+            inclusions: [],
+            exclusions: [],
+            faqs: [],
+            destinationIds: [],
+            durationLabel: L("1 day"),
+            durationMinutes: 480,
+            durationDays: 1,
+            startTimes: ["08:00"],
+            pickupIncluded: true,
+            guideLanguages: ["en", "ar"],
+            minGroup: min,
+            maxGroup: max,
+            defaultCapacityPerSlot: capacity ?? max,
+            infantAgeMax: 2,
+            // A blank deposit means full payment; 0% is refused (see upsert)
+            depositPercent: 100,
+            freeCancellationHours: 24,
+            allowReserveNowPayLater: true,
+            holdHours: 24,
+            ratingAverage: 0,
+            ratingCount: 0,
+            status: "draft" as const,
+            isFeatured: false,
+            tags: [] as string[],
+            ...patch,
+            title: patch.title!,
+            categoryId: patch.categoryId!,
+            slug: patch.slug!,
+            pricingModel: patch.pricingModel!,
+            priceFrom: patch.priceFrom ?? 0,
+            updatedAt: now,
+          };
+          await ctx.db.insert("tours", { ...doc, searchText: `${doc.title.en} ${doc.title.ar} ${doc.summary.en} ${doc.summary.ar} ${doc.tags.join(" ")}` });
+        }
       } catch (err) {
-        errors.push(`row ${i + 1}: ${(err as Error).message}`);
+        const data = err instanceof ConvexError ? (err.data as { code?: string; field?: string }) : undefined;
+        errors.push(`row ${i + 1}: ${data?.code ? `${data.code}${data.field ? ` (${data.field})` : ""}` : (err as Error).message}`);
       }
     }
-    await audit(ctx, staff, "tour.import", "tours", undefined, undefined, { created, updated, errors: errors.length });
-    return { created, updated, errors };
+    if (!dryRun) await audit(ctx, staff, "tour.import", "tours", undefined, undefined, { created: creates.length, updated: updates.length, errors: errors.length, codes: [...creates, ...updates].slice(0, 50) });
+    return { created: dryRun ? 0 : creates.length, updated: dryRun ? 0 : updates.length, errors, creates, updates, dryRun: !!dryRun };
   },
 });
 

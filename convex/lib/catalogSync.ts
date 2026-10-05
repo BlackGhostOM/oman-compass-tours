@@ -6,6 +6,8 @@ import { toursSeed } from "../seedData/tours";
 import { VIATOR_URL } from "../seedData/tourSeedTypes";
 import { omrToBaisa } from "./money";
 import { priceFromOf } from "./pricing";
+import { refreshBookingEndDates, startTimeChangeImpact } from "./capacity";
+import { normalizeStartTimes, omanTodayIso } from "./dates";
 
 const TRIPADVISOR_URL =
   "https://www.tripadvisor.com/Attraction_Review-g1940497-d26437481-Reviews-OMAN_COMPASS_TOURS-Muscat_Muscat_Governorate.html";
@@ -25,7 +27,8 @@ const isPlaceholderMedia = (m?: { storageId?: Id<"_storage">; url?: string }) =>
 /**
  * Upserts categories, destinations and tours from the seed files.
  * Idempotent and safe on live data: tours are matched by `code`; ratings,
- * uploaded cover images/videos and draft status set by staff are preserved.
+ * uploaded cover images/videos and draft status set by staff are preserved, and start times that still
+ * have upcoming bookings are never removed (the tour's codes are returned in startTimesKept).
  */
 export async function syncCatalogFromSeed(ctx: MutationCtx, now: number, opts: { codes?: string[] } = {}) {
   /* Categories */
@@ -62,6 +65,7 @@ export async function syncCatalogFromSeed(ctx: MutationCtx, now: number, opts: {
   const tourIds = new Map<string, Id<"tours">>();
   let inserted = 0;
   let updated = 0;
+  const startTimesKept: string[] = [];
   for (const t of toursSeed) {
     if (opts.codes && !opts.codes.includes(t.code)) continue;
     const existing = await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", t.code)).unique();
@@ -76,6 +80,18 @@ export async function syncCatalogFromSeed(ctx: MutationCtx, now: number, opts: {
       : undefined;
     const priceFrom = priceFromOf({ pricingModel: t.pricingModel, priceGroup, priceAdult, tieredPricing, vehiclePricing });
     const keepCover = existing && !isPlaceholderMedia(existing.coverImage);
+    // Start times: normalised like the editor; a seed change that would drop a time with upcoming bookings is not
+    // applied (those parties would vanish from capacity) and is reported for staff to resolve in the tour editor
+    let startTimes = normalizeStartTimes(t.startTimes).times;
+    if (existing && startTimes.join() !== existing.startTimes.join()) {
+      const { conflicts, blanks } = await startTimeChangeImpact(ctx, existing, startTimes, omanTodayIso(now));
+      if (conflicts.length > 0) {
+        startTimes = existing.startTimes;
+        startTimesKept.push(t.code);
+      } else {
+        for (const b of blanks) await ctx.db.patch(b.bookingId, { startTime: b.startTime, updatedAt: now });
+      }
+    }
     const doc = {
       code: t.code,
       kind: t.kind,
@@ -94,7 +110,7 @@ export async function syncCatalogFromSeed(ctx: MutationCtx, now: number, opts: {
       durationLabel: t.durationLabel,
       durationMinutes: t.durationMinutes,
       durationDays: t.durationDays,
-      startTimes: t.startTimes,
+      startTimes,
       // Seed rules win; otherwise keep whatever staff set in the editor
       operatingWeekdays: t.operatingWeekdays ?? existing?.operatingWeekdays,
       fixedDepartureDates: t.fixedDepartureDates ?? existing?.fixedDepartureDates,
@@ -140,6 +156,8 @@ export async function syncCatalogFromSeed(ctx: MutationCtx, now: number, opts: {
     };
     let id: Id<"tours">;
     if (existing) {
+      // A new length re-dates the end of running and upcoming trips (bookings.endDate)
+      await refreshBookingEndDates(ctx, existing, t.durationDays, omanTodayIso(now));
       await ctx.db.patch(existing._id, doc);
       id = existing._id;
       updated += 1;
@@ -159,5 +177,5 @@ export async function syncCatalogFromSeed(ctx: MutationCtx, now: number, opts: {
     }
   }
 
-  return { categoryIds, destinationIds, tourIds, inserted, updated };
+  return { categoryIds, destinationIds, tourIds, inserted, updated, startTimesKept };
 }

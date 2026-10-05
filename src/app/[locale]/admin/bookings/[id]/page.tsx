@@ -4,7 +4,7 @@ import { use, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
-import { AlertTriangle, ArrowLeft, Copy, Download, Link2, Mail, MessageCircle, RefreshCw, Send } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CalendarClock, Copy, Download, Link2, Mail, MessageCircle, RefreshCw, Send } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../../../../../convex/_generated/api";
 import type { Id } from "../../../../../../convex/_generated/dataModel";
@@ -19,6 +19,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { DateTime, Money, PageHeader, Panel, StatusBadge } from "@/components/admin/ui";
+import { ChangeBookingDialog } from "@/components/admin/change-booking-dialog";
+import { useConfirm } from "@/components/admin/confirm-dialog";
 
 const ALL = ["inquiry", "pending_payment", "confirmed", "in_progress", "completed", "cancelled", "refunded"] as const;
 
@@ -27,6 +29,9 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ i
   const locale = useLocale();
   const t = useTranslations("admin.bookings.detail");
   const tt = useTranslations("admin.settings.templates");
+  const tb = useTranslations("admin.bookings");
+  const tm = useTranslations("admin.bookings.manual");
+  const ts = useTranslations("admin.status");
   const b = useQuery(api.admin.bookings.get, { id: id as Id<"bookings"> });
   const templates = useQuery(api.admin.settings.notificationTemplates);
   const updateStatus = useMutation(api.admin.bookings.updateStatus);
@@ -47,11 +52,15 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ i
   const [refundAmount, setRefundAmount] = useState<Record<string, string>>({});
   const [linkAmount, setLinkAmount] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [changeOpen, setChangeOpen] = useState(false);
+  const [confirmDialog, confirm] = useConfirm();
 
   if (b === undefined) return <Skeleton className="h-96 rounded-xl" />;
   if (b === null) return <p className="text-muted-foreground">{t("notFound")}</p>;
 
   const outstanding = Math.max(0, b.total - b.amountPaid);
+  // An unpaid hold is confirmed once the deposit is covered: a smaller link needs staff to lower the deposit
+  const depositLeft = b.status === "inquiry" || b.status === "pending_payment" ? Math.min(outstanding, Math.max(0, b.depositDue - b.amountPaid)) : 0;
   const wa = (text: string) => `https://wa.me/${b.traveller.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(text)}`;
   const fill = (tpl: string) => tpl.replace("{name}", b.traveller.firstName).replace("{reference}", b.reference).replace("{tour}", pick(b.tourTitle, b.locale)).replace("{date}", formatDate(b.date, b.locale, "short")).replace("{time}", b.startTime ?? "").replace("{pickup}", b.traveller.pickupLocation ?? b.traveller.hotel ?? "").replace("{voucher}", `${site.url}/api/voucher/${b.voucherToken}`).replace("{link}", `${site.url}/${b.locale}/checkout/${b.reference}?t=${b.voucherToken}`);
 
@@ -68,26 +77,47 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ i
     }
   }
 
-  /** Status change; a booking going back onto a full departure needs an explicit overbooking confirmation. */
+  /**
+   * Status change. A greyed (forced) transition, e.g. completing a tour that has not run yet, asks for confirmation
+   * first; a booking going back onto a departure that breaks its rules (full, blacked out, ...) asks to override.
+   */
   async function changeStatus(status: (typeof ALL)[number], force: boolean) {
     if (!b) return;
+    if (force && !(await confirm({ title: t("forceTitle", { status: ts(status) }), body: t("forceBody"), confirm: t("forceConfirm"), cancel: tm("cancel"), danger: true }))) return;
     setBusy("status");
     try {
       try {
         await updateStatus({ id: b._id, status, force });
       } catch (err) {
-        const data = err instanceof ConvexError ? (err.data as { code?: string; remaining?: number; needed?: number }) : undefined;
+        const data = err instanceof ConvexError ? (err.data as { code?: string; reasons?: string[]; remaining?: number; needed?: number }) : undefined;
         if (data?.code !== "NEEDS_OVERRIDE") throw err;
-        if (!window.confirm(t("needsOverride", { remaining: data.remaining ?? 0, needed: data.needed ?? 0 }))) return;
+        const items = (data.reasons ?? []).map((x) => (tm.has(`overrideReasons.${x}`) ? tm(`overrideReasons.${x}`, { remaining: data.remaining ?? 0, needed: data.needed ?? 0 }) : x));
+        if (!(await confirm({ title: tm("overrideTitle"), items, body: t("overrideRestore"), confirm: t("restoreAnyway"), cancel: tm("cancel"), danger: true }))) return;
         await updateStatus({ id: b._id, status, force, override: true });
       }
       toast.success(t("statusUpdated"));
     } catch (err) {
       const data = err instanceof ConvexError ? (err.data as { code?: string }) : undefined;
-      toast.error(data?.code ? `${t("error")} (${data.code})` : t("error"));
+      toast.error(data?.code && t.has(`errors.${data.code}`) ? t(`errors.${data.code}`) : data?.code ? `${t("error")} (${data.code})` : t("error"));
     } finally {
       setBusy(null);
     }
+  }
+
+  /** Issues and emails a payment link; one below the rest of the deposit asks staff to lower the deposit first. */
+  async function issuePaymentLink() {
+    if (!b) return;
+    const amountOmr = Number(linkAmount) || outstanding / 1000;
+    let lowerDeposit = false;
+    if (depositLeft > 0 && Math.round(amountOmr * 1000) < depositLeft) {
+      lowerDeposit = await confirm({ title: t("linkBelowDepositTitle"), body: t("linkBelowDepositBody", { minimum: (depositLeft / 1000).toFixed(3), amount: amountOmr.toFixed(3) }), confirm: t("linkBelowDepositConfirm"), cancel: tm("cancel") });
+      if (!lowerDeposit) return;
+    }
+    await run("link", async () => {
+      const r = await issueLink({ id: b._id, amountOmr, lowerDeposit: lowerDeposit || undefined });
+      await navigator.clipboard.writeText(r.url).catch(() => {});
+      await sendLinkEmail({ bookingId: b._id, url: r.url, amountOmr });
+    }, t("linkSent"));
   }
 
   return (
@@ -95,12 +125,13 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ i
       <PageHeader
         eyebrow={<span dir="ltr">{b.reference}</span>}
         title={pick(b.tourTitle, locale)}
-        description={`${formatDate(b.date, locale)} · ${b.startTime ?? ""} · ${b.adults}A ${b.children}C ${b.infants}I · ${t("source")}: ${b.source}`}
+        description={`${formatDate(b.date, locale)} · ${b.startTime ?? ""} · ${tb("party", { adults: b.adults, children: b.children, infants: b.infants })} · ${t("source")}: ${b.source}`}
         actions={
           <>
             <Button asChild variant="ghost" size="sm"><Link href="/admin/bookings"><ArrowLeft className="size-4 rtl:-scale-x-100" /> {t("back")}</Link></Button>
             <StatusBadge status={b.status} />
             {b.needsAttention && <StatusBadge status="cancelled" label={t("attentionTitle")} />}
+            {b.amendable && b.tour && <Button variant="outline" size="sm" onClick={() => setChangeOpen(true)}><CalendarClock className="size-4" /> {t("change")}</Button>}
             <Button asChild variant="outline" size="sm"><a href={`/api/voucher/${b.voucherToken}`} target="_blank" rel="noopener noreferrer"><Download className="size-4" /> {t("voucher")}</a></Button>
             <Button variant="outline" size="sm" disabled={busy === "resend"} onClick={() => run("resend", () => resend({ bookingId: b._id }), t("resent"))}><Mail className="size-4" /> {t("resend")}</Button>
           </>
@@ -114,7 +145,9 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ i
             <div>
               <p className="font-medium text-danger">{t("attentionTitle")}</p>
               <p className="text-sm text-muted-foreground">
-                {t("attentionBody", { reason: t.has(`attentionReasons.${b.attentionReason}`) ? t(`attentionReasons.${b.attentionReason}`) : t("attentionReasons.other") })}
+                {t.has(`attentionBodies.${b.attentionReason}`)
+                  ? t(`attentionBodies.${b.attentionReason}`)
+                  : t("attentionBody", { reason: t.has(`attentionReasons.${b.attentionReason}`) ? t(`attentionReasons.${b.attentionReason}`) : t("attentionReasons.other") })}
               </p>
             </div>
           </div>
@@ -219,8 +252,9 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ i
               <p className="text-sm font-medium">{t("paymentLink")}</p>
               <div className="mt-2 flex gap-2">
                 <Input placeholder={`OMR (${(outstanding / 1000).toFixed(3)})`} value={linkAmount} onChange={(e) => setLinkAmount(e.target.value)} />
-                <Button size="sm" disabled={busy === "link"} onClick={() => run("link", async () => { const r = await issueLink({ id: b._id, amountOmr: Number(linkAmount) || outstanding / 1000 }); await navigator.clipboard.writeText(r.url).catch(() => {}); await sendLinkEmail({ bookingId: b._id, url: r.url, amountOmr: Number(linkAmount) || outstanding / 1000 }); }, t("linkSent"))}><Link2 className="size-4" /> {t("issue")}</Button>
+                <Button size="sm" disabled={busy === "link"} onClick={() => issuePaymentLink()}><Link2 className="size-4" /> {t("issue")}</Button>
               </div>
+              {depositLeft > 0 && depositLeft < outstanding && <p className="mt-1.5 text-xs text-muted-foreground">{t("linkMinimum", { amount: (depositLeft / 1000).toFixed(3) })}</p>}
               {b.paymentLinks.length > 0 && <ul className="mt-2 space-y-1 text-xs text-muted-foreground">{b.paymentLinks.map((l) => <li key={l._id} className="flex items-center gap-2"><Money baisa={l.amountOmr} /> · {l.usedAt ? t("used") : l.expiresAt < Date.now() ? t("expired") : t("active")} <button type="button" className="text-gold-700" onClick={() => navigator.clipboard.writeText(`${site.url}/${b.locale}/pay/${l.token}`)}><Copy className="size-3" /></button></li>)}</ul>}
             </div>
           </div>
@@ -236,6 +270,8 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ i
           </ul>
         </Panel>
       </div>
+      {changeOpen && b.tour && <ChangeBookingDialog booking={{ ...b, tour: b.tour }} open={changeOpen} onOpenChange={setChangeOpen} />}
+      {confirmDialog}
     </div>
   );
 }

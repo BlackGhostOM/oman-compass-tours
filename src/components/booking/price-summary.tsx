@@ -78,6 +78,15 @@ export function SelectionIssue({ tour, quote, couponCode, onEdit }: { tour: Book
   );
 }
 
+/** The party as one phrase ("2 adults, 1 child, 1 infant" / "بالغان، طفل واحد، رضيع واحد"), zero children and infants left out. */
+export function useGuestsLabel() {
+  const locale = useLocale();
+  const t = useTranslations("booking.summary");
+  const tc = useTranslations("common");
+  return (adults: number, kids: number, infants: number) =>
+    [tc("adults", { count: adults }), ...(kids > 0 ? [tc("children", { count: kids })] : []), ...(infants > 0 ? [t("infants", { count: infants })] : [])].join(locale === "ar" ? "، " : ", ");
+}
+
 export function PriceSummary({
   tour,
   date,
@@ -106,6 +115,7 @@ export function PriceSummary({
   const t = useTranslations("booking.summary");
   const td = useTranslations("booking.dates");
   const tc = useTranslations("common");
+  const guests = useGuestsLabel();
 
   return (
     <aside className={cn("rounded-xl border border-sand-200 bg-white", className)}>
@@ -128,7 +138,7 @@ export function PriceSummary({
         <div className="flex items-center justify-between gap-3">
           <dt className="flex items-center gap-1.5 text-ink-500"><Users className="size-4 text-gold-500" /> {t("guests")}</dt>
           <dd className="text-end font-medium text-ink-900">
-            {[tc("adults", { count: adults }), ...(kids > 0 ? [tc("children", { count: kids })] : []), ...(infants > 0 ? [t("infants", { count: infants })] : [])].join(locale === "ar" ? "، " : ", ")}
+            {guests(adults, kids, infants)}
           </dd>
         </div>
       </dl>

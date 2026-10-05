@@ -1,11 +1,13 @@
 import { query } from "../_generated/server";
 import { requireStaff } from "../lib/access";
-import { countsForCapacity, slotCapacity } from "../lib/capacity";
+import { CAPACITY_STATUSES, countsForCapacity, slotCapacity } from "../lib/capacity";
 import { isOperatingDate, omanTodayIso } from "../lib/dates";
 import { capacityUnits } from "../lib/pricing";
 
 const DAY = 86_400_000;
 const omanDate = (ts: number) => omanTodayIso(ts);
+/** Whole days from one YYYY-MM-DD to another. */
+const dayDiff = (from: string, to: string) => Math.round((Date.parse(to + "T00:00:00Z") - Date.parse(from + "T00:00:00Z")) / DAY);
 
 export const stats = query({
   args: {},
@@ -16,6 +18,12 @@ export const stats = query({
     const tomorrow = omanDate(now + DAY);
 
     const todays = await ctx.db.query("bookings").withIndex("by_date", (q) => q.eq("date", today)).take(200);
+    // Out today: starting today, plus multi-day trips that started earlier and end today or later (date <= today <= endDate)
+    const onTrip = (
+      await Promise.all((["confirmed", "in_progress"] as const).map((status) => ctx.db.query("bookings").withIndex("by_status_endDate", (q) => q.eq("status", status).gte("endDate", today)).take(500)))
+    )
+      .flat()
+      .filter((b) => b.date < today);
     const tomorrows = await ctx.db.query("bookings").withIndex("by_date", (q) => q.eq("date", tomorrow)).take(200);
     const active = (rows: typeof todays) => rows.filter((b) => ["confirmed", "in_progress"].includes(b.status));
 
@@ -75,9 +83,22 @@ export const stats = query({
     const unreadInbox = [...waiting, ...human].reduce((a, c) => a + c.unreadForStaff, 0);
     const pendingReviews = await ctx.db.query("reviews").withIndex("by_status", (q) => q.eq("status", "pending")).take(100);
 
+    // Upcoming bookings at a start time the tour no longer lists: capacity cannot place them, so staff must move them
+    // (Change booking) or restore the time. Blank times count against the first departure and are not flagged.
+    const upcoming = (await Promise.all(CAPACITY_STATUSES.map((status) => ctx.db.query("bookings").withIndex("by_status", (q) => q.eq("status", status).gte("date", today)).take(1000)))).flat();
+    const tourCache = new Map<string, { startTimes: string[] } | null>(tours.map((t) => [String(t._id), t]));
+    const offSchedule: { _id: (typeof upcoming)[number]["_id"]; reference: string; tourTitle: { en: string; ar: string }; date: string; startTime: string }[] = [];
+    for (const b of upcoming) {
+      if (!b.startTime) continue;
+      if (!tourCache.has(String(b.tourId))) tourCache.set(String(b.tourId), await ctx.db.get(b.tourId));
+      const tour = tourCache.get(String(b.tourId));
+      if (tour && !tour.startTimes.includes(b.startTime)) offSchedule.push({ _id: b._id, reference: b.reference, tourTitle: b.tourTitle, date: b.date, startTime: b.startTime });
+    }
+    offSchedule.sort((a, b) => a.date.localeCompare(b.date));
+
     return {
       today,
-      departuresToday: active(todays).sort((a, b) => (a.startTime ?? "").localeCompare(b.startTime ?? "")).map((b) => ({ _id: b._id, reference: b.reference, tourTitle: b.tourTitle, startTime: b.startTime ?? null, groupSize: b.groupSize, traveller: `${b.traveller.firstName} ${b.traveller.lastName}`, phone: b.traveller.phone, pickup: b.traveller.pickupLocation ?? b.traveller.hotel ?? null, status: b.status, guide: b.assignedGuideName ?? null })),
+      departuresToday: [...active(todays), ...onTrip].sort((a, b) => (a.startTime ?? "").localeCompare(b.startTime ?? "")).map((b) => ({ _id: b._id, reference: b.reference, tourTitle: b.tourTitle, startTime: b.startTime ?? null, groupSize: b.groupSize, adults: b.adults, children: b.children, infants: b.infants, traveller: `${b.traveller.firstName} ${b.traveller.lastName}`, phone: b.traveller.phone, pickup: b.traveller.pickupLocation ?? b.traveller.hotel ?? null, status: b.status, guide: b.assignedGuideName ?? null, tripDay: dayDiff(b.date, today) + 1, tripDays: dayDiff(b.date, b.endDate ?? b.date) + 1 })),
       departuresTomorrow: active(tomorrows).length,
       newBookings: { day: last24.length, week: last7.length, month: last30.length },
       pendingPayment: recent.filter((b) => b.status === "pending_payment" || b.status === "inquiry").length,
@@ -91,6 +112,7 @@ export const stats = query({
       waitingChats: waiting.length,
       unreadInbox,
       pendingReviews: pendingReviews.length,
+      offSchedule: offSchedule.slice(0, 20),
       revenueSeries: Array.from({ length: 14 }).map((_, i) => {
         const d = omanDate(now - (13 - i) * DAY);
         const start = new Date(d + "T00:00:00+04:00").getTime();

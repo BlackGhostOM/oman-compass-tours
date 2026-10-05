@@ -2,6 +2,8 @@
   "$schema": "./tours-import-schema.json",
   "_notes": [
     "Import from Admin → Products → Import. Each object creates or updates a tour by `code`.",
+    "The sample row's code SAMPLE-001 is refused on purpose: replace it with your own product code. Updating an existing code changes only the fields present in the row (empty values are ignored); ratings, featured status, hold hours, pay-later, itinerary and FAQs are kept unless the row sets them.",
+    "Import shows a check first (which codes will be created or updated, and any row errors) and writes nothing until you confirm.",
     "Prices are in OMR (major units). Lists use arrays here and pipe-separated values in the CSV template.",
     "category_key must match an existing category key (city_tours, day_trips, multi_day, desert_4x4, mountain_wadi, cultural, food_family, boat, hiking_camping, photography, transfers, custom).",
     "destination_keys must match existing destination keys (muscat, nizwa, wahiba, jebel_akhdar, salalah, musandam, sur, wadi_shab).",
@@ -11,7 +13,7 @@
   ],
   "tours": [
     {
-      "code": "OCT-011",
+      "code": "SAMPLE-001",
       "kind": "tour",
       "title": {
         "en": "Daymaniyat Islands Snorkeling Trip",

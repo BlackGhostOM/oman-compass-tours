@@ -2,15 +2,16 @@ import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { action, internalAction, internalMutation, internalQuery, query, type MutationCtx } from "./_generated/server";
+import { action, internalAction, internalMutation, internalQuery, query, type ActionCtx, type MutationCtx } from "./_generated/server";
 import { capturePaypalOrder } from "./gateways/paypal";
 import { configuredProviders, defaultProviderFor, getProvider } from "./gateways/registry";
 import type { NormalizedEvent, ProviderId } from "./gateways/provider";
 import { requireStaff, audit } from "./lib/access";
 import { generateToken } from "./lib/ids";
-import { remainingCapacity } from "./lib/capacity";
+import { countsForCapacity, remainingCapacity, slotOf } from "./lib/capacity";
+import { releaseCouponUse, retakeCouponUse } from "./lib/coupons";
 import { departureMs } from "./lib/dates";
-import { CHECKOUT_SESSION_COVER_MS, hasDeparted, holdCeiling, unpayableReason } from "./lib/holds";
+import { CHECKOUT_SESSION_COVER_MS, hasDeparted, holdCeiling, isLapsedHold, unpayableReason } from "./lib/holds";
 import { capacityUnits } from "./lib/pricing";
 import { baisaToMinor, FALLBACK_RATES, type Currency } from "./lib/money";
 import { currencyValidator, paymentKindValidator, paymentProviderValidator } from "./schema";
@@ -87,6 +88,7 @@ export const createPaymentRecord = internalMutation({
     amountOmr: v.number(),
     fxRate: v.number(),
     createdByStaffId: v.optional(v.id("users")),
+    paymentLinkId: v.optional(v.id("paymentLinks")),
   },
   returns: v.object({ paymentId: v.id("payments"), idempotencyKey: v.string() }),
   handler: async (ctx, args) => {
@@ -95,9 +97,14 @@ export const createPaymentRecord = internalMutation({
     if (!booking) throw new ConvexError({ code: "BOOKING_NOT_FOUND" });
     const now = Date.now();
     assertPayable(booking, now);
-    // Reuse an open session for the same booking/provider/amount (idempotent retries); it already extended the hold
+    if (args.paymentLinkId) {
+      const link = await ctx.db.get(args.paymentLinkId);
+      if (!link || link.bookingId !== booking._id) throw new ConvexError({ code: "LINK_NOT_FOUND" });
+      if (link.usedAt || link.expiresAt < now) throw new ConvexError({ code: "LINK_EXPIRED" });
+    }
+    // Reuse an open session for the same booking/provider/amount/link (idempotent retries); it already extended the hold
     const existing = await ctx.db.query("payments").withIndex("by_booking", (q) => q.eq("bookingId", args.bookingId)).take(50);
-    const open = existing.find((p) => p.provider === args.provider && p.kind === args.kind && p.amount === args.amount && p.currency === args.currency && (p.status === "created" || p.status === "pending") && p.checkoutUrl && Date.now() - p._creationTime < 55 * 60 * 1000);
+    const open = existing.find((p) => p.provider === args.provider && p.kind === args.kind && p.amount === args.amount && p.currency === args.currency && p.paymentLinkId === args.paymentLinkId && (p.status === "created" || p.status === "pending") && p.checkoutUrl && Date.now() - p._creationTime < 55 * 60 * 1000);
     if (open) return { paymentId: open._id, idempotencyKey: open.idempotencyKey };
     if ((booking.status === "inquiry" || booking.status === "pending_payment") && booking.amountPaid <= 0 && booking.holdExpiresAt !== undefined) {
       // The provider page stays open for up to an hour: keep the place for it, but never past the hold's ceiling
@@ -149,13 +156,6 @@ function assertPayable(booking: Doc<"bookings">, now: number) {
   if (reason) throw new ConvexError({ code: "HOLD_EXPIRED", reason });
 }
 
-/** Takes a coupon use again for a booking re-confirmed after its hold expired (the expiry gave the use back). */
-async function retakeCoupon(ctx: MutationCtx, code: string | undefined) {
-  if (!code) return;
-  const c = await ctx.db.query("coupons").withIndex("by_code", (q) => q.eq("code", code)).unique();
-  if (c) await ctx.db.patch(c._id, { usedCount: c.usedCount + 1 });
-}
-
 export type PaidOutcome = "confirmed" | "reconfirmed" | "recorded" | "needs_attention";
 
 /**
@@ -166,8 +166,11 @@ export type PaidOutcome = "confirmed" | "reconfirmed" | "recorded" | "needs_atte
  * - inquiry / pending_payment: the hold already owns its place (holds count for capacity), so covering the deposit
  *   confirms it, unless the departure has passed.
  * - confirmed / in_progress / completed: a balance payment, recorded (with a receipt when receiptPaymentId is given).
- * - cancelled because the hold expired, departure still ahead and the place still free (excluding itself):
- *   re-confirmed, and its coupon use taken again.
+ * - cancelled because the hold lapsed (expired, or superseded by the same browser booking again), departure still
+ *   ahead and the place still free (excluding itself):
+ *   re-confirmed, and its coupon use taken again. A superseded booking whose replacement is paid or confirmed is
+ *   flagged (superseded_paid) instead; an unpaid replacement hold is released in its favour.
+ * - a provider payment that takes amountPaid above the total is flagged "overpaid" and staff are notified.
  * - anything else (cancelled, refunded, departed): the status is kept and the money recorded, the booking is flagged
  *   needsAttention, an audit row is written, staff are notified and the customer gets a dedicated email.
  *
@@ -224,25 +227,130 @@ export async function confirmPaidBooking(
     return "needs_attention";
   };
 
-  if (booking.status === "inquiry" || booking.status === "pending_payment") {
+  const decide = async (): Promise<PaidOutcome> => {
+    if (booking.status === "inquiry" || booking.status === "pending_payment") {
+      if (departed) return await flag("payment_after_departure");
+      return coversDeposit ? await confirm("confirmed") : await record();
+    }
+    if (booking.status === "confirmed" || booking.status === "in_progress" || booking.status === "completed") return await record();
     if (departed) return await flag("payment_after_departure");
-    return coversDeposit ? await confirm("confirmed") : await record();
+    if (isLapsedHold(booking) && coversDeposit && tour) {
+      // A superseded booking was replaced by the same browser booking the departure again. A replacement that is
+      // paid or confirmed means this party already has its place: flag it so staff refund one of the two. A
+      // replacement that is still an unpaid hold is the same party, so this payment takes its place and it is released.
+      let replacement: Doc<"bookings"> | null = null;
+      if (booking.cancellationReason === "superseded" && booking.supersededByBookingId) {
+        const r = await ctx.db.get(booking.supersededByBookingId);
+        if (r && countsForCapacity(r.status)) {
+          const unpaidHold = (r.status === "inquiry" || r.status === "pending_payment") && r.amountPaid <= 0;
+          if (!unpaidHold) return await flag("superseded_paid");
+          replacement = r;
+        }
+      }
+      const sameDeparture = !!replacement && replacement.date === booking.date && slotOf(tour, replacement) === startTime;
+      const freed = replacement && sameDeparture ? capacityUnits(tour, replacement.adults, replacement.children) : 0;
+      const remaining = await remainingCapacity(ctx, tour, booking.date, startTime, { excludeBookingId: booking._id });
+      if (remaining + freed < capacityUnits(tour, booking.adults, booking.children)) return await flag("no_capacity");
+      if (replacement) {
+        await ctx.db.patch(replacement._id, { status: "cancelled", cancellationReason: "superseded", supersededByBookingId: booking._id, cancelledAt: now, holdExpiresAt: undefined, updatedAt: now });
+        await releaseCouponUse(ctx, replacement);
+        await ctx.db.insert("auditLogs", { action: "booking.superseded", entityType: "bookings", entityId: replacement._id, before: { status: replacement.status }, after: { status: "cancelled", supersededByBookingId: booking._id }, createdAt: now });
+      }
+      await retakeCouponUse(ctx, booking);
+      await ctx.db.insert("auditLogs", { actorId: opts.actor?._id, actorEmail: opts.actor?.email, action: "booking.reconfirmed_after_payment", entityType: "bookings", entityId: booking._id, before: { status: "cancelled", cancellationReason: booking.cancellationReason }, after: { status: "confirmed", releasedBookingId: replacement?._id }, createdAt: now });
+      return await confirm("reconfirmed");
+    }
+    return await flag(booking.status === "refunded" ? "payment_on_refunded" : "payment_on_cancelled");
+  };
+
+  const outcome = await decide();
+  // More than the total was paid (an old-amount checkout finished after a change, a link and the booking page both
+  // paid, ...): the money is kept, but staff are flagged and told so they can refund the excess. Staff payments are
+  // capped at the outstanding amount, and a flagged booking has already been reported.
+  if (!staffPayment && outcome !== "needs_attention" && booking.amountPaid > booking.total) {
+    const excess = booking.amountPaid - booking.total;
+    const current = await ctx.db.get(booking._id);
+    if (current && !current.needsAttention) await ctx.db.patch(booking._id, { needsAttention: true, attentionReason: "overpaid" });
+    await ctx.db.insert("auditLogs", { action: "payment.overpaid", entityType: "bookings", entityId: booking._id, after: { amountPaid: booking.amountPaid, total: booking.total, excess, paymentId: opts.receiptPaymentId }, createdAt: now });
+    await ctx.scheduler.runAfter(0, internal.bookingEmails.notifyStaffOverpaid, { bookingId: booking._id, excess });
   }
-  if (booking.status === "confirmed" || booking.status === "in_progress" || booking.status === "completed") return await record();
-  if (departed) return await flag("payment_after_departure");
-  if (booking.status === "cancelled" && booking.cancellationReason === "hold_expired" && coversDeposit && tour) {
-    const remaining = await remainingCapacity(ctx, tour, booking.date, startTime, { excludeBookingId: booking._id });
-    if (remaining < capacityUnits(tour, booking.adults, booking.children)) return await flag("no_capacity");
-    await retakeCoupon(ctx, booking.couponCode);
-    await ctx.db.insert("auditLogs", { actorId: opts.actor?._id, actorEmail: opts.actor?.email, action: "booking.reconfirmed_after_payment", entityType: "bookings", entityId: booking._id, before: { status: "cancelled", cancellationReason: "hold_expired" }, after: { status: "confirmed" }, createdAt: now });
-    return await confirm("reconfirmed");
-  }
-  return await flag(booking.status === "refunded" ? "payment_on_refunded" : "payment_on_cancelled");
+  return outcome;
 }
 
 /* ------------------------------------------------------------------ */
 /* Public action: start a hosted checkout                              */
 /* ------------------------------------------------------------------ */
+
+type CheckoutResult = { checkoutUrl: string; paymentId: Id<"payments">; amount: number; currency: string };
+
+/**
+ * Opens a hosted checkout for `amountOmr` (baisa) on a booking: the payment row (createPaymentRecord re-checks the
+ * booking atomically and extends an unpaid hold), then the provider session. Shared by startCheckout (booking page)
+ * and startLinkCheckout (staff payment link).
+ */
+async function openHostedCheckout(
+  ctx: ActionCtx,
+  args: {
+    booking: Doc<"bookings">;
+    fx: Record<string, number>;
+    provider: ProviderId;
+    currency: Currency;
+    kind: Doc<"payments">["kind"];
+    amountOmr: number;
+    locale: "en" | "ar";
+    origin: string;
+    cancelUrl: string;
+    paymentLinkId?: Id<"paymentLinks">;
+  },
+): Promise<CheckoutResult> {
+  const { booking, fx } = args;
+  if (args.amountOmr <= 0) throw new ConvexError({ code: "NOTHING_TO_PAY" });
+  const provider = getProvider(args.provider);
+  if (!provider.isConfigured()) throw new ConvexError({ code: "PROVIDER_NOT_CONFIGURED", provider: args.provider });
+
+  const currency = provider.settlementCurrency(args.currency) as Currency;
+  const rate = currency === "OMR" ? 1 : (fx[currency] ?? FALLBACK_RATES[currency]);
+  const amountMinor = baisaToMinor(args.amountOmr, currency, rate);
+
+  const { paymentId, idempotencyKey }: { paymentId: Id<"payments">; idempotencyKey: string } = await ctx.runMutation(internal.payments.createPaymentRecord, {
+    bookingId: booking._id,
+    provider: args.provider,
+    kind: args.kind,
+    amount: amountMinor,
+    currency,
+    amountOmr: args.amountOmr,
+    fxRate: rate,
+    paymentLinkId: args.paymentLinkId,
+  });
+
+  const existing: Doc<"payments"> | null = await ctx.runQuery(internal.payments.getPayment, { paymentId });
+  if (existing?.checkoutUrl && existing.status === "pending") {
+    return { checkoutUrl: existing.checkoutUrl, paymentId, amount: amountMinor, currency };
+  }
+
+  const base = `${args.origin}/${args.locale}/checkout/${booking.reference}`;
+  const successUrl = `${base}/success?t=${booking.voucherToken}&p=${args.provider}&pid=${paymentId}${args.provider === "paypal" ? "&token={ORDER_ID}" : ""}`;
+  try {
+    const result = await provider.createCheckout({
+      paymentId: String(paymentId),
+      bookingReference: booking.reference,
+      amountMinor,
+      currency,
+      description: `${booking.tourTitle.en} · ${booking.date} · ${booking.reference}`,
+      customer: { email: booking.traveller.email, name: `${booking.traveller.firstName} ${booking.traveller.lastName}`, phone: booking.traveller.phone },
+      successUrl: successUrl.replace("{ORDER_ID}", ""),
+      cancelUrl: args.cancelUrl,
+      locale: args.locale,
+      metadata: { bookingId: String(booking._id) },
+      idempotencyKey,
+    });
+    await ctx.runMutation(internal.payments.attachSession, { paymentId, providerSessionId: result.providerSessionId, checkoutUrl: result.checkoutUrl, providerCustomerId: result.providerCustomerId });
+    return { checkoutUrl: result.checkoutUrl, paymentId, amount: amountMinor, currency };
+  } catch (err) {
+    await ctx.runMutation(internal.payments.markFailed, { paymentId, reason: (err as Error).message });
+    throw new ConvexError({ code: "PROVIDER_ERROR", message: (err as Error).message });
+  }
+}
 
 export const startCheckout = action({
   args: {
@@ -255,7 +363,7 @@ export const startCheckout = action({
     origin: v.string(),
   },
   returns: v.object({ checkoutUrl: v.string(), paymentId: v.id("payments"), amount: v.number(), currency: v.string() }),
-  handler: async (ctx, args): Promise<{ checkoutUrl: string; paymentId: Id<"payments">; amount: number; currency: string }> => {
+  handler: async (ctx, args): Promise<CheckoutResult> => {
     const data: { booking: Doc<"bookings">; fx: Record<string, number> } | null = await ctx.runQuery(internal.payments.getBookingForCheckout, { reference: args.reference, token: args.token });
     if (!data) throw new ConvexError({ code: "BOOKING_NOT_FOUND" });
     const { booking, fx } = data;
@@ -263,58 +371,79 @@ export const startCheckout = action({
     assertPayable(booking, Date.now());
     if (!isAllowedOrigin(args.origin)) throw new ConvexError({ code: "INVALID_ORIGIN" });
 
-    const provider = getProvider(args.provider);
-    if (!provider.isConfigured()) throw new ConvexError({ code: "PROVIDER_NOT_CONFIGURED", provider: args.provider });
-
     // Amount in OMR (baisa)
     const outstanding = Math.max(0, booking.total - booking.amountPaid);
-    let amountOmr: number;
-    if (args.kind === "deposit") amountOmr = Math.min(outstanding, Math.max(0, booking.depositDue - booking.amountPaid));
-    else amountOmr = outstanding;
-    if (amountOmr <= 0) throw new ConvexError({ code: "NOTHING_TO_PAY" });
+    const amountOmr = args.kind === "deposit" ? Math.min(outstanding, Math.max(0, booking.depositDue - booking.amountPaid)) : outstanding;
 
-    const currency = provider.settlementCurrency(args.currency) as Currency;
-    const rate = currency === "OMR" ? 1 : (fx[currency] ?? FALLBACK_RATES[currency]);
-    const amountMinor = baisaToMinor(amountOmr, currency, rate);
-
-    const { paymentId, idempotencyKey }: { paymentId: Id<"payments">; idempotencyKey: string } = await ctx.runMutation(internal.payments.createPaymentRecord, {
-      bookingId: booking._id,
+    return await openHostedCheckout(ctx, {
+      booking,
+      fx,
       provider: args.provider,
+      currency: args.currency,
       kind: args.kind === "full" && booking.amountPaid > 0 ? "balance" : args.kind,
-      amount: amountMinor,
-      currency,
       amountOmr,
-      fxRate: rate,
+      locale: args.locale,
+      origin: args.origin,
+      cancelUrl: `${args.origin}/${args.locale}/checkout/${booking.reference}?t=${booking.voucherToken}&cancelled=1`,
     });
+  },
+});
 
-    const existing: Doc<"payments"> | null = await ctx.runQuery(internal.payments.getPayment, { paymentId });
-    if (existing?.checkoutUrl && existing.status === "pending") {
-      return { checkoutUrl: existing.checkoutUrl, paymentId, amount: amountMinor, currency };
-    }
+export const getLinkForCheckout = internalQuery({
+  args: { token: v.string() },
+  handler: async (ctx, { token }) => {
+    const link = await ctx.db.query("paymentLinks").withIndex("by_token", (q) => q.eq("token", token)).unique();
+    if (!link) return null;
+    const booking = await ctx.db.get(link.bookingId);
+    if (!booking) return null;
+    const rates = await ctx.db.query("fxRates").take(20);
+    const fx: Record<string, number> = { ...FALLBACK_RATES };
+    for (const r of rates) fx[r.quote] = r.rate;
+    return { link, booking, fx };
+  },
+});
 
-    const base = `${args.origin}/${args.locale}/checkout/${booking.reference}`;
-    const successUrl = `${base}/success?t=${booking.voucherToken}&p=${args.provider}&pid=${paymentId}${args.provider === "paypal" ? "&token={ORDER_ID}" : ""}`;
-    const cancelUrl = `${base}?t=${booking.voucherToken}&cancelled=1`;
-    try {
-      const result = await provider.createCheckout({
-        paymentId: String(paymentId),
-        bookingReference: booking.reference,
-        amountMinor,
-        currency,
-        description: `${booking.tourTitle.en} · ${booking.date} · ${booking.reference}`,
-        customer: { email: booking.traveller.email, name: `${booking.traveller.firstName} ${booking.traveller.lastName}`, phone: booking.traveller.phone },
-        successUrl: successUrl.replace("{ORDER_ID}", ""),
-        cancelUrl,
-        locale: args.locale,
-        metadata: { bookingId: String(booking._id) },
-        idempotencyKey,
-      });
-      await ctx.runMutation(internal.payments.attachSession, { paymentId, providerSessionId: result.providerSessionId, checkoutUrl: result.checkoutUrl, providerCustomerId: result.providerCustomerId });
-      return { checkoutUrl: result.checkoutUrl, paymentId, amount: amountMinor, currency };
-    } catch (err) {
-      await ctx.runMutation(internal.payments.markFailed, { paymentId, reason: (err as Error).message });
-      throw new ConvexError({ code: "PROVIDER_ERROR", message: (err as Error).message });
-    }
+/** Statuses a staff payment link can collect money for (a confirmed booking's balance included). */
+const LINK_PAYABLE_STATUSES: readonly Doc<"bookings">["status"][] = ["inquiry", "pending_payment", "confirmed"];
+
+/** What a staff link charges now: its amount, never more than is still owed. */
+const linkAmountDue = (link: Pick<Doc<"paymentLinks">, "amountOmr">, b: Pick<Doc<"bookings">, "total" | "amountPaid">) => Math.min(link.amountOmr, Math.max(0, b.total - b.amountPaid));
+
+/**
+ * Hosted checkout for a staff-issued payment link (WhatsApp / phone bookings): charges the link's amount (capped at
+ * what is still owed), the balance of a confirmed booking included, and records the link on the payment so the
+ * webhook marks it used.
+ */
+export const startLinkCheckout = action({
+  args: {
+    token: v.string(),
+    provider: providerIdValidator,
+    currency: currencyValidator,
+    locale: v.union(v.literal("en"), v.literal("ar")),
+    origin: v.string(),
+  },
+  returns: v.object({ checkoutUrl: v.string(), paymentId: v.id("payments"), amount: v.number(), currency: v.string() }),
+  handler: async (ctx, args): Promise<CheckoutResult> => {
+    const data: { link: Doc<"paymentLinks">; booking: Doc<"bookings">; fx: Record<string, number> } | null = await ctx.runQuery(internal.payments.getLinkForCheckout, { token: args.token });
+    if (!data) throw new ConvexError({ code: "LINK_NOT_FOUND" });
+    const { link, booking, fx } = data;
+    if (link.usedAt || link.expiresAt < Date.now()) throw new ConvexError({ code: "LINK_EXPIRED" });
+    if (!LINK_PAYABLE_STATUSES.includes(booking.status)) throw new ConvexError({ code: "BOOKING_NOT_PAYABLE", status: booking.status });
+    assertPayable(booking, Date.now());
+    if (!isAllowedOrigin(args.origin)) throw new ConvexError({ code: "INVALID_ORIGIN" });
+    const amountOmr = linkAmountDue(link, booking);
+    return await openHostedCheckout(ctx, {
+      booking,
+      fx,
+      provider: args.provider,
+      currency: args.currency,
+      kind: booking.amountPaid > 0 ? "balance" : amountOmr >= booking.total ? "full" : "deposit",
+      amountOmr,
+      locale: args.locale,
+      origin: args.origin,
+      cancelUrl: `${args.origin}/${args.locale}/pay/${link.token}?cancelled=1`,
+      paymentLinkId: link._id,
+    });
   },
 });
 
@@ -428,6 +557,8 @@ export const applyEvent = internalMutation({
         // The money is taken whatever happens next: confirmPaidBooking confirms, records, or flags it for staff
         const outcome = await confirmPaidBooking(ctx, { ...booking, amountPaid }, now, { receiptPaymentId: payment._id });
         const statusAfter = (await ctx.db.get(booking._id))?.status ?? booking.status;
+        // A staff payment link is single-use: paid means used
+        if (payment.paymentLinkId) await ctx.db.patch(payment.paymentLinkId, { usedAt: now, paymentId: payment._id });
         await ctx.db.insert("auditLogs", { action: "payment.succeeded", entityType: "bookings", entityId: booking._id, before: { status: booking.status, amountPaid: booking.amountPaid }, after: { status: statusAfter, amountPaid, provider, eventId: event.eventId, outcome }, createdAt: now });
         // Loyalty: 1 point per OMR
         if (booking.userId) {
@@ -564,17 +695,6 @@ export const reconcile = action({
   },
 });
 
-/** Staff-issued payment link (WhatsApp / phone bookings). */
-export const createPaymentLink = internalMutation({
-  args: { bookingId: v.id("bookings"), amountOmr: v.number(), kind: paymentKindValidator, description: v.optional(v.string()), staffId: v.id("users"), expiresInHours: v.number() },
-  returns: v.object({ token: v.string() }),
-  handler: async (ctx, args) => {
-    const token = generateToken(32);
-    await ctx.db.insert("paymentLinks", { bookingId: args.bookingId, token, amountOmr: args.amountOmr, kind: args.kind, description: args.description, expiresAt: Date.now() + args.expiresInHours * 3_600_000, createdByStaffId: args.staffId });
-    return { token };
-  },
-});
-
 export const paymentLinkByToken = query({
   args: { token: v.string() },
   handler: async (ctx, { token }) => {
@@ -582,10 +702,28 @@ export const paymentLinkByToken = query({
     if (!link) return null;
     const booking = await ctx.db.get(link.bookingId);
     if (!booking) return null;
-    const expired = link.expiresAt < Date.now();
+    const now = Date.now();
+    const expired = link.expiresAt < now;
     const used = !!link.usedAt;
-    // An expired or used link must not keep granting the voucher token (and with it the booking details) forever.
-    return { reference: booking.reference, voucherToken: expired || used ? "" : booking.voucherToken, amountOmr: link.amountOmr, kind: link.kind, description: link.description ?? null, expired, used, tourTitle: booking.tourTitle, date: booking.date };
+    const amountDue = linkAmountDue(link, booking);
+    // Cancelled or refunded, an unpaid hold that ran out, a departed tour, or nothing left to pay: the page says so
+    // instead of offering Pay
+    const payable = !expired && !used && LINK_PAYABLE_STATUSES.includes(booking.status) && !unpayableReason(booking, now) && amountDue > 0;
+    // An expired, used or unpayable link must not keep granting the voucher token (and with it the booking details).
+    return {
+      reference: booking.reference,
+      voucherToken: payable ? booking.voucherToken : "",
+      amountOmr: payable ? amountDue : link.amountOmr,
+      kind: link.kind,
+      description: link.description ?? null,
+      expired,
+      used,
+      payable,
+      /** Nothing left to pay (the balance was settled another way). */
+      settled: !used && booking.total - booking.amountPaid <= 0,
+      tourTitle: booking.tourTitle,
+      date: booking.date,
+    };
   },
 });
 

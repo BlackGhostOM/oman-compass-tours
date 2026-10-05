@@ -8,6 +8,7 @@ import { ArrowLeft, ArrowUp, ArrowDown, ImagePlus, Plus, Star, Trash2 } from "lu
 import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
 import { vehiclesNeeded } from "../../../convex/lib/pricing";
+import { normalizeStartTimes } from "../../../convex/lib/dates";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { useSearchParams } from "next/navigation";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -22,8 +23,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { LocalizedField, LocalizedListField, PageHeader, Panel } from "@/components/admin/ui";
 import { MediaUrlField } from "@/components/admin/media-url-field";
+import { useConfirm } from "@/components/admin/confirm-dialog";
 
-type TourDoc = Doc<"tours"> & { media: (Doc<"tourMedia"> & { url: string | null })[]; seasons: Doc<"pricingSeasons">[]; availability: Doc<"availability">[]; addOns: Doc<"addOns">[] };
+type TourDoc = Doc<"tours"> & { media: (Doc<"tourMedia"> & { url: string | null })[]; seasons: Doc<"pricingSeasons">[]; availability: Doc<"availability">[]; availabilityTruncated?: boolean; addOns: Doc<"addOns">[] };
+/** Upcoming bookings at start times this save would remove (START_TIME_IN_USE), and where staff move them. */
+type TimeConflict = { times: string[]; references: string[]; count: number; status?: "draft" | "published"; nextTimes: string[] };
 type Itinerary = { time?: string; title: LocalizedString; body: LocalizedString };
 type Faq = { question: LocalizedString; answer: LocalizedString };
 
@@ -66,11 +70,14 @@ function initial(t: TourDoc | null) {
     minGroup: t?.minGroup ?? 1,
     maxGroup: t?.maxGroup ?? 6,
     defaultCapacityPerSlot: t?.defaultCapacityPerSlot ?? 6,
+    // Text, so "not set" (each departure counted on its own) stays apart from a number
+    concurrentCapacity: t?.concurrentCapacity != null ? String(t.concurrentCapacity) : "",
     difficulty: (t?.difficulty ?? "easy") as "easy" | "moderate" | "challenging",
     pricingModel: (t?.pricingModel ?? "per_person") as "per_group" | "per_person" | "tiered" | "per_vehicle",
     priceGroupOmr: t?.priceGroup ? t.priceGroup / 1000 : 0,
     priceAdultOmr: t?.priceAdult ? t.priceAdult / 1000 : 0,
-    priceChildOmr: t?.priceChild ? t.priceChild / 1000 : 0,
+    // Text, so a deliberate 0 (children free) stays apart from "not set"
+    priceChildOmr: t?.priceChild != null ? String(t.priceChild / 1000) : "",
     tierFirstAdultOmr: t?.tieredPricing ? t.tieredPricing.firstAdult / 1000 : 0,
     tierFirstTwoOmr: t?.tieredPricing ? t.tieredPricing.firstTwoAdults / 1000 : 0,
     tierExtraAdultOmr: t?.tieredPricing ? t.tieredPricing.extraAdult / 1000 : 0,
@@ -119,12 +126,28 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
   const [uploading, setUploading] = useState(false);
   const [season, setSeason] = useState({ name: L(), startDate: "", endDate: "", priceAdultOmr: "", priceGroupOmr: "", priceChildOmr: "" });
   const [avail, setAvail] = useState({ date: "", toDate: "", startTime: "", capacity: "", isBlackout: false, note: "" });
+  const [timeConflict, setTimeConflict] = useState<TimeConflict | null>(null);
+  const [remap, setRemap] = useState<Record<string, string>>({});
+  const [confirmDialog, confirm] = useConfirm();
+  // Start times are checked as staff type (the server normalises "8:30" to "08:30" and refuses anything else)
+  // Separated by commas, the Arabic comma (what Arabic keyboards type) or semicolons
+  const startTimeCheck = normalizeStartTimes(f.startTimes.split(/[,،;]/));
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((s) => ({ ...s, [k]: v }));
 
-  async function save(nextStatus?: "draft" | "published") {
+  async function save(nextStatus?: "draft" | "published", timeRemap?: { from: string; to: string }[], remapOverride?: boolean) {
     if (!f.code.trim() || !(f.title.en.trim() || f.title.ar.trim()) || !f.categoryId) {
       toast.error(t("missingRequired"));
       setTab("content");
+      return;
+    }
+    if (startTimeCheck.invalid.length > 0 || ((nextStatus ?? f.status) === "published" && startTimeCheck.times.length === 0)) {
+      toast.error(t("startTimesInvalid"));
+      setTab("details");
+      return;
+    }
+    if ((nextStatus ?? f.status) === "published" && f.pricingModel === "per_person" && f.priceChildOmr.trim() === "") {
+      toast.error(t("priceChildRequired"));
+      setTab("pricing");
       return;
     }
     setBusy(true);
@@ -135,11 +158,11 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
         data: {
           code: f.code.trim(), kind: f.kind, title: f.title, slug: f.slug.en || f.slug.ar ? f.slug : undefined, summary: f.summary, description: f.description, highlights: f.highlights, itinerary: f.itinerary, inclusions: f.inclusions, exclusions: f.exclusions, faqs: f.faqs,
           categoryId: f.categoryId as Id<"categories">, secondaryCategoryIds: f.secondaryCategoryIds as Id<"categories">[], destinationIds: f.destinationIds as Id<"destinations">[],
-          durationLabel: f.durationLabel, durationMinutes: f.durationMinutes, durationDays: f.durationDays, startTimes: f.startTimes.split(",").map((s) => s.trim()).filter(Boolean),
+          durationLabel: f.durationLabel, durationMinutes: f.durationMinutes, durationDays: f.durationDays, startTimes: startTimeCheck.times,
           operatingWeekdays: f.operatingWeekdays, fixedDepartureDates: f.fixedDepartureDates.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean), departureType: f.departureType,
           meetingPoint: f.meetingLabel.en || f.meetingLabel.ar ? { label: f.meetingLabel, address: f.meetingAddress || undefined, lat: num(f.meetingLat), lng: num(f.meetingLng) } : undefined,
-          pickupIncluded: f.pickupIncluded, guideLanguages: f.guideLanguages.split(",").map((s) => s.trim()).filter(Boolean), minGroup: f.minGroup, maxGroup: f.maxGroup, defaultCapacityPerSlot: f.defaultCapacityPerSlot, difficulty: f.difficulty,
-          pricingModel: f.pricingModel, priceGroupOmr: f.priceGroupOmr || undefined, priceAdultOmr: f.priceAdultOmr || undefined, priceChildOmr: f.priceChildOmr || undefined,
+          pickupIncluded: f.pickupIncluded, guideLanguages: f.guideLanguages.split(",").map((s) => s.trim()).filter(Boolean), minGroup: f.minGroup, maxGroup: f.maxGroup, defaultCapacityPerSlot: f.defaultCapacityPerSlot, concurrentCapacity: f.concurrentCapacity.trim() === "" ? null : Number(f.concurrentCapacity), difficulty: f.difficulty,
+          pricingModel: f.pricingModel, priceGroupOmr: f.priceGroupOmr || undefined, priceAdultOmr: f.priceAdultOmr || undefined, priceChildOmr: f.pricingModel === "per_person" ? num(f.priceChildOmr) : undefined,
           tieredOmr: f.pricingModel === "tiered" ? { firstAdult: f.tierFirstAdultOmr || 0, firstTwoAdults: f.tierFirstTwoOmr || 0, extraAdult: f.tierExtraAdultOmr || 0, extraChild: f.tierExtraChildOmr || 0 } : undefined,
           vehicleOmr: f.pricingModel === "per_vehicle" ? { pricePerVehicle: f.vehiclePriceOmr || 0, maxAdults: f.vehicleMaxAdults || 4, seats: f.vehicleSeats || 6 } : undefined,
           childAgeMax: f.childAgeMax, infantAgeMax: 2, compareAtPriceFromOmr: f.compareAtPriceFromOmr || undefined,
@@ -149,13 +172,33 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
           status: nextStatus ?? f.status, isFeatured: f.isFeatured, featuredOrder: f.isFeatured ? f.featuredOrder : undefined, tags: f.tags.split(",").map((s) => s.trim()).filter(Boolean),
           seo: { title: f.seoTitle.en ? f.seoTitle : undefined, description: f.seoDescription.en ? f.seoDescription : undefined },
         },
+        timeRemap,
+        remapOverride,
       });
       toast.success(t("saved"));
+      setTimeConflict(null);
+      setRemap({});
+      set("startTimes", startTimeCheck.times.join(", "));
       if (!tour) router.replace(`/admin/products/${id}?tab=${tab}`);
       else if (nextStatus) set("status", nextStatus);
     } catch (err) {
-      const code = err instanceof ConvexError ? (err.data as { code?: string; field?: string }) : undefined;
-      toast.error(code?.code ? `${t("error")}: ${code.code}${code.field ? ` (${code.field})` : ""}` : t("error"));
+      const code = err instanceof ConvexError ? (err.data as { code?: string; field?: string; times?: string[]; references?: string[]; count?: number; departures?: { date: string; time: string; capacity: number; booked: number }[] }) : undefined;
+      if (code?.code === "REMAP_OVER_CAPACITY" && timeRemap) {
+        // Moving the bookings would overbook a departure: say which, and move them only if staff confirm
+        setBusy(false);
+        const items = (code.departures ?? []).map((d) => t("remapOverItem", { date: d.date, time: d.time, booked: d.booked, capacity: d.capacity }));
+        if (await confirm({ title: t("remapOverTitle"), items, body: t("remapOverBody"), confirm: t("remapOverConfirm"), cancel: t("timeConflictCancel"), danger: true })) await save(nextStatus, timeRemap, true);
+        return;
+      }
+      if (code?.code === "START_TIME_IN_USE") {
+        // Bookings still use a time this save removes: ask where they move instead of hiding them from capacity
+        setTimeConflict({ times: code.times ?? [], references: code.references ?? [], count: code.count ?? 0, status: nextStatus, nextTimes: startTimeCheck.times });
+        setRemap(Object.fromEntries((code.times ?? []).map((x) => [x, startTimeCheck.times[0] ?? ""])));
+        setTab("details");
+        toast.error(t("startTimesInUse"));
+      } else {
+        toast.error(code?.code ? `${t("error")}: ${code.code}${code.field ? ` (${code.field})` : ""}` : t("error"));
+      }
     } finally {
       setBusy(false);
     }
@@ -182,6 +225,7 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
 
   return (
     <div className="space-y-6">
+      {confirmDialog}
       <PageHeader
         eyebrow={f.code || t("newEyebrow")}
         title={tour ? pick(tour.title, locale) : t("newTitle")}
@@ -261,7 +305,13 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
               <LocalizedField label={t("durationLabel")} value={f.durationLabel} onChange={(v) => set("durationLabel", v)} />
               <div className="space-y-1.5"><Label>{t("durationMinutes")}</Label><Input type="number" value={f.durationMinutes} onChange={(e) => set("durationMinutes", Number(e.target.value))} /></div>
               <div className="space-y-1.5"><Label>{t("durationDays")}</Label><Input type="number" min={1} value={f.durationDays} onChange={(e) => set("durationDays", Number(e.target.value))} /></div>
-              <div className="space-y-1.5"><Label>{t("startTimes")}</Label><Input value={f.startTimes} onChange={(e) => set("startTimes", e.target.value)} placeholder="08:00, 14:00" dir="ltr" /></div>
+              <div className="space-y-1.5">
+                <Label htmlFor="te-start-times">{t("startTimes")}</Label>
+                <Input id="te-start-times" value={f.startTimes} onChange={(e) => { set("startTimes", e.target.value); setTimeConflict(null); }} onBlur={() => { if (startTimeCheck.invalid.length === 0) set("startTimes", startTimeCheck.times.join(", ")); }} placeholder="08:00, 14:00" dir="ltr" aria-invalid={startTimeCheck.invalid.length > 0} aria-describedby="te-start-times-hint" />
+                <p id="te-start-times-hint" className={`text-xs ${startTimeCheck.invalid.length > 0 ? "text-danger" : "text-muted-foreground"}`}>
+                  {startTimeCheck.invalid.length > 0 ? t("startTimesBad", { times: startTimeCheck.invalid.join(", ") }) : t("startTimesHint")}
+                </p>
+              </div>
               <div className="space-y-1.5"><Label>{t("guideLanguages")}</Label><Input value={f.guideLanguages} onChange={(e) => set("guideLanguages", e.target.value)} placeholder="en, ar" dir="ltr" /></div>
               <div className="space-y-1.5"><Label>{t("difficulty")}</Label><Select value={f.difficulty} onValueChange={(v) => set("difficulty", v as typeof f.difficulty)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="easy">{t("difficulties.easy")}</SelectItem><SelectItem value="moderate">{t("difficulties.moderate")}</SelectItem><SelectItem value="challenging">{t("difficulties.challenging")}</SelectItem></SelectContent></Select></div>
               <div className="space-y-1.5"><Label>{t("minGroup")}</Label><Input type="number" min={1} value={f.minGroup} onChange={(e) => set("minGroup", Number(e.target.value))} /></div>
@@ -271,7 +321,35 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
                 <Input type="number" min={1} value={f.defaultCapacityPerSlot} onChange={(e) => set("defaultCapacityPerSlot", Number(e.target.value))} />
                 {f.pricingModel !== "per_person" && <p className="text-xs text-muted-foreground">{f.pricingModel === "per_vehicle" ? t("capacityUnitVehicles") : t("capacityUnitDepartures")}</p>}
               </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="te-concurrent">{t("concurrentCapacity")}</Label>
+                <Input id="te-concurrent" type="number" min={1} value={f.concurrentCapacity} onChange={(e) => set("concurrentCapacity", e.target.value)} placeholder={t("concurrentCapacityPlaceholder")} aria-describedby="te-concurrent-hint" />
+                <p id="te-concurrent-hint" className="text-xs text-muted-foreground">{t("concurrentCapacityHint")}</p>
+              </div>
             </div>
+            {timeConflict && (
+              <div role="alert" className="mt-4 space-y-3 rounded-lg border border-warning/40 bg-warning/10 p-4 text-sm">
+                <p className="font-medium">{t("timeConflictTitle", { count: timeConflict.count })}</p>
+                <p className="text-muted-foreground">{t("timeConflictBody", { references: timeConflict.references.join(", ") })}</p>
+                <div className="flex flex-wrap gap-4">
+                  {timeConflict.times.map((from) => (
+                    <div key={from} className="flex items-center gap-2">
+                      <span dir="ltr" className="font-medium">{from}</span>
+                      <span aria-hidden>→</span>
+                      <Select value={remap[from] ?? ""} onValueChange={(v) => setRemap({ ...remap, [from]: v })}>
+                        <SelectTrigger className="w-28" aria-label={t("timeConflictMove", { time: from })}><SelectValue /></SelectTrigger>
+                        <SelectContent>{timeConflict.nextTimes.map((x) => <SelectItem key={x} value={x}>{x}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" disabled={busy || timeConflict.times.some((x) => !remap[x])} onClick={() => save(timeConflict.status, timeConflict.times.map((from) => ({ from, to: remap[from] })))} className="bg-gold-gradient text-navy-950">{t("timeConflictApply")}</Button>
+                  <Button size="sm" variant="outline" onClick={() => setTimeConflict(null)}>{t("timeConflictCancel")}</Button>
+                </div>
+                <p className="text-xs text-muted-foreground">{t("timeConflictHint")}</p>
+              </div>
+            )}
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>{t("operatingDays")}</Label>
@@ -330,7 +408,7 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
               {f.pricingModel === "per_person" && (
                 <>
                   <div className="space-y-1.5"><Label>{t("priceAdult")}</Label><Input type="number" step="0.001" value={f.priceAdultOmr} onChange={(e) => set("priceAdultOmr", Number(e.target.value))} /></div>
-                  <div className="space-y-1.5"><Label>{t("priceChild")}</Label><Input type="number" step="0.001" value={f.priceChildOmr} onChange={(e) => set("priceChildOmr", Number(e.target.value))} /></div>
+                  <div className="space-y-1.5"><Label>{t("priceChild")}</Label><Input type="number" step="0.001" min={0} value={f.priceChildOmr} onChange={(e) => set("priceChildOmr", e.target.value)} /><p className="text-xs text-muted-foreground">{t("priceChildHint")}</p></div>
                   <div className="space-y-1.5"><Label>{t("childAgeMax")}</Label><Input type="number" min={3} max={17} value={f.childAgeMax} onChange={(e) => e.target.value !== "" && set("childAgeMax", Number(e.target.value))} /></div>
                 </>
               )}
@@ -383,18 +461,22 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
                 {tour.seasons.map((s) => (
                   <li key={s._id} className="flex items-center gap-3 py-2">
                     <span className="flex-1">{pick(s.name, locale)} · {s.startDate} → {s.endDate}</span>
-                    <span dir="ltr" className="text-muted-foreground">{s.priceAdult ? `A ${s.priceAdult / 1000}` : ""} {s.priceChild ? `C ${s.priceChild / 1000}` : ""} {s.priceGroup ? `G ${s.priceGroup / 1000}` : ""}</span>
+                    <span dir="ltr" className="text-muted-foreground">{s.priceAdult !== undefined ? `A ${s.priceAdult / 1000}` : ""} {s.priceChild !== undefined ? `C ${s.priceChild / 1000}` : ""} {s.priceGroup !== undefined ? `G ${s.priceGroup / 1000}` : ""}</span>
                     <Button variant="ghost" size="icon-sm" className="text-danger" onClick={() => removeSeason({ id: s._id })}><Trash2 className="size-4" /></Button>
                   </li>
                 ))}
               </ul>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
                 <div className="sm:col-span-2"><LocalizedField label={t("seasonName")} value={season.name} onChange={(v) => setSeason({ ...season, name: v })} /></div>
                 <div className="space-y-1.5"><Label>{t("from")}</Label><Input type="date" value={season.startDate} onChange={(e) => setSeason({ ...season, startDate: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label>{t("to")}</Label><Input type="date" value={season.endDate} onChange={(e) => setSeason({ ...season, endDate: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label>{t("to")}</Label><Input type="date" min={season.startDate || undefined} value={season.endDate} onChange={(e) => setSeason({ ...season, endDate: e.target.value })} /></div>
                 <div className="space-y-1.5"><Label>{f.pricingModel === "per_group" ? t("priceGroup") : t("priceAdult")}</Label><Input type="number" step="0.001" value={f.pricingModel === "per_group" ? season.priceGroupOmr : season.priceAdultOmr} onChange={(e) => setSeason(f.pricingModel === "per_group" ? { ...season, priceGroupOmr: e.target.value } : { ...season, priceAdultOmr: e.target.value })} /></div>
-                <div className="flex items-end"><Button size="sm" disabled={!season.startDate || !season.endDate || season.endDate < season.startDate} onClick={async () => { const price = (x: string) => (x.trim() === "" ? undefined : Number(x)); try { await upsertSeason({ tourId: tour._id, name: season.name, startDate: season.startDate, endDate: season.endDate, priceAdultOmr: price(season.priceAdultOmr), priceGroupOmr: price(season.priceGroupOmr), priceChildOmr: price(season.priceChildOmr), isActive: true }); setSeason({ name: L(), startDate: "", endDate: "", priceAdultOmr: "", priceGroupOmr: "", priceChildOmr: "" }); toast.success(t("saved")); } catch { toast.error(t("seasonInvalid")); } }}><Plus className="size-4" /> {t("add")}</Button></div>
+                {f.pricingModel === "per_person" && (
+                  <div className="space-y-1.5"><Label>{t("priceChild")}</Label><Input type="number" step="0.001" min={0.001} placeholder={t("seasonChildAuto")} value={season.priceChildOmr} onChange={(e) => setSeason({ ...season, priceChildOmr: e.target.value })} /></div>
+                )}
+                <div className="flex items-end"><Button size="sm" disabled={!season.startDate || !season.endDate || season.endDate < season.startDate || f.pricingModel === "tiered" || f.pricingModel === "per_vehicle"} onClick={async () => { const price = (x: string) => (x.trim() === "" ? undefined : Number(x)); try { await upsertSeason({ tourId: tour._id, name: season.name, startDate: season.startDate, endDate: season.endDate, priceAdultOmr: f.pricingModel === "per_person" ? price(season.priceAdultOmr) : undefined, priceGroupOmr: f.pricingModel === "per_group" ? price(season.priceGroupOmr) : undefined, priceChildOmr: f.pricingModel === "per_person" ? price(season.priceChildOmr) : undefined, isActive: true }); setSeason({ name: L(), startDate: "", endDate: "", priceAdultOmr: "", priceGroupOmr: "", priceChildOmr: "" }); toast.success(t("saved")); } catch { toast.error(t("seasonInvalid")); } }}><Plus className="size-4" /> {t("add")}</Button></div>
               </div>
+              {f.pricingModel === "per_person" && <p className="mt-2 text-xs text-muted-foreground">{t("seasonChildHint")}</p>}
             </Panel>
           )}
         </TabsContent>
@@ -447,7 +529,7 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
                 </div>
               </div>
               <ul className="mt-4 divide-y divide-border text-sm">
-                {tour.availability.sort((a, b) => a.date.localeCompare(b.date)).map((a) => (
+                {[...tour.availability].sort((a, b) => a.date.localeCompare(b.date) || (a.startTime ?? "").localeCompare(b.startTime ?? "")).map((a) => (
                   <li key={a._id} className="flex items-center gap-3 py-2">
                     <span className="w-28" dir="ltr">{a.date}</span>
                     <span className="w-16" dir="ltr">{a.startTime ?? t("allSlots")}</span>
@@ -456,6 +538,7 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
                   </li>
                 ))}
               </ul>
+              {tour.availabilityTruncated && <p className="mt-2 text-xs text-muted-foreground">{t("availabilityTruncated")}</p>}
             </Panel>
           )}
         </TabsContent>

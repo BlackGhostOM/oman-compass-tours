@@ -5,8 +5,9 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { assertInt, assertString, enforceRateLimit, getViewer, isStaff } from "./lib/access";
 import { generateBookingReference, generateToken } from "./lib/ids";
-import { addDaysIso, BOOKING_HORIZON_DAYS, dateProblem, isOperatingDate, omanTodayIso } from "./lib/dates";
+import { addDaysIso, BOOKING_HORIZON_DAYS, dateProblem, isOperatingDate, lastTourDay, omanTodayIso } from "./lib/dates";
 import { maxUnpaidHoldsPerSlot, remainingCapacity, unpaidWebHoldsOn } from "./lib/capacity";
+import { releaseCouponUse } from "./lib/coupons";
 import { CHECKOUT_SESSION_COVER_MS, fallbackHoldExpiry, holdCeiling, holdExpiryFor, loadHoldSettings } from "./lib/holds";
 import { addOnAppliesTo, capacityUnits, computeQuote, INFANT_MAX, isFreeCancellation, type PricingCoupon } from "./lib/pricing";
 import { localeValidator, paymentProviderValidator, travellerValidator } from "./schema";
@@ -20,13 +21,6 @@ const addOnSelectionValidator = v.array(v.object({ addOnId: v.id("addOns"), quan
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
 
-/** Gives a coupon use back when an unpaid booking is cancelled, so throwaway holds cannot exhaust a usage limit. */
-async function releaseCoupon(ctx: MutationCtx, code: string | undefined) {
-  if (!code) return;
-  const c = await ctx.db.query("coupons").withIndex("by_code", (q) => q.eq("code", code)).unique();
-  if (c && c.usedCount > 0) await ctx.db.patch(c._id, { usedCount: c.usedCount - 1 });
-}
-
 async function loadCoupon(ctx: QueryCtx | MutationCtx, code?: string): Promise<(PricingCoupon & { _id: Id<"coupons"> }) | null | undefined> {
   if (!code) return null;
   const c = await ctx.db.query("coupons").withIndex("by_code", (q) => q.eq("code", code.trim().toUpperCase())).unique();
@@ -34,15 +28,32 @@ async function loadCoupon(ctx: QueryCtx | MutationCtx, code?: string): Promise<(
   return { ...c, _id: c._id, tourIds: c.tourIds?.map(String) };
 }
 
+/** Most seasons read for one quote (a tour with years of past seasons still finds the one covering the date). */
+const SEASON_SCAN_LIMIT = 500;
+
+/**
+ * The season priced on this date. Seasons are walked from the latest start backwards, so when seasons overlap the most
+ * specific one wins (a New Year peak inside a winter season), and however many past seasons exist the current one is found.
+ */
 async function loadSeason(ctx: QueryCtx | MutationCtx, tourId: Id<"tours">, date: string) {
-  const seasons = await ctx.db.query("pricingSeasons").withIndex("by_tour", (q) => q.eq("tourId", tourId).lte("startDate", date)).take(50);
-  return seasons.find((s) => s.isActive && s.endDate >= date) ?? null;
+  let scanned = 0;
+  for await (const s of ctx.db.query("pricingSeasons").withIndex("by_tour", (q) => q.eq("tourId", tourId).lte("startDate", date)).order("desc")) {
+    if (s.isActive && s.endDate >= date) return s;
+    if (++scanned >= SEASON_SCAN_LIMIT) break;
+  }
+  return null;
 }
 
-async function buildQuote(
+/**
+ * The website quote for a party on a date (season, extras, coupon). honourCoupon is for staff amendments: the booking
+ * already redeemed the code, so its date window, active flag, usage limit and early-bird rule no longer apply; only
+ * the deal's own conditions (minimum spend, group, eligible tour) are checked against the new party.
+ */
+export async function buildQuote(
   ctx: QueryCtx | MutationCtx,
   tour: Doc<"tours">,
   args: { date: string; adults: number; children: number; infants: number; addOns: { addOnId: Id<"addOns">; quantity: number }[]; couponCode?: string },
+  opts: { honourCoupon?: boolean } = {},
 ) {
   const season = await loadSeason(ctx, tour._id, args.date);
   const addOns = [];
@@ -55,7 +66,8 @@ async function buildQuote(
       addOns.push({ addOn: { _id: String(a._id), name: a.name, price: a.price, priceType: a.priceType }, quantity });
     }
   }
-  const coupon = await loadCoupon(ctx, args.couponCode);
+  const loaded = await loadCoupon(ctx, args.couponCode);
+  const coupon = loaded && opts.honourCoupon ? { ...loaded, isActive: true, startsAt: undefined, endsAt: undefined, usageLimit: undefined, earlyBirdDays: undefined } : loaded;
   const quote = computeQuote({
     tour,
     tourId: String(tour._id),
@@ -205,7 +217,14 @@ export const saveDraft = mutation({
     if (serialized.length > 20_000) throw new ConvexError({ code: "TOO_LARGE" });
     const data = JSON.parse(serialized);
     if (existing) {
-      await ctx.db.patch(existing._id, { step: assertInt(args.step, 1, 5, "step"), data, lastTouchedAt: Date.now(), userId: viewer?._id ?? existing.userId, locale: args.locale });
+      await ctx.db.patch(existing._id, {
+        step: assertInt(args.step, 1, 5, "step"),
+        data,
+        lastTouchedAt: Date.now(),
+        userId: viewer?._id ?? existing.userId,
+        locale: args.locale,
+        ...(existing.resumeToken ? {} : { resumeToken: generateToken(32) }),
+      });
       return existing._id;
     }
     return await ctx.db.insert("bookingDrafts", {
@@ -216,7 +235,37 @@ export const saveDraft = mutation({
       data,
       locale: args.locale,
       lastTouchedAt: Date.now(),
+      resumeToken: generateToken(32),
     });
+  },
+});
+
+/**
+ * Opens a draft from the "continue your booking" email link (?resume=<token>) in this browser: the draft moves to
+ * the current sessionKey (or, when this browser already has a draft for the tour, its choices are copied into that
+ * one), so getDraft returns it and the wizard restores it through sanitizeSelection like any other draft.
+ * Returns false for an unknown token, another tour, or a draft that already became a booking.
+ */
+export const adoptDraft = mutation({
+  args: { resumeToken: v.string(), sessionKey: v.string(), tourId: v.id("tours") },
+  returns: v.boolean(),
+  handler: async (ctx, { resumeToken, sessionKey, tourId }) => {
+    assertString(sessionKey, 64, "sessionKey", 8);
+    if (resumeToken.length < 20 || resumeToken.length > 64) return false;
+    await enforceRateLimit(ctx, `draft:${sessionKey}`, 120, 60 * 60 * 1000);
+    const source = await ctx.db.query("bookingDrafts").withIndex("by_resumeToken", (q) => q.eq("resumeToken", resumeToken)).unique();
+    if (!source || source.tourId !== tourId || source.convertedBookingId) return false;
+    if (source.sessionKey === sessionKey) return true;
+    const drafts = await ctx.db.query("bookingDrafts").withIndex("by_session", (q) => q.eq("sessionKey", sessionKey)).take(20);
+    const mine = drafts.find((x) => x.tourId === tourId && !x.convertedBookingId);
+    const now = Date.now();
+    if (mine) {
+      // Keep remindedAt, so resuming never leads to a second "still waiting" email
+      await ctx.db.patch(mine._id, { step: source.step, data: source.data, locale: source.locale, lastTouchedAt: now, remindedAt: source.remindedAt ?? mine.remindedAt });
+    } else {
+      await ctx.db.patch(source._id, { sessionKey, lastTouchedAt: now });
+    }
+    return true;
   },
 });
 
@@ -275,6 +324,23 @@ export const create = mutation({
       holdExpiresAt = fallbackHoldExpiry(args.date, args.startTime, now, holdSettings);
     }
 
+    // The same browser booking this departure again (e.g. back from an abandoned checkout) must not be blocked by its
+    // own unpaid pay-now hold: its earlier pending_payment booking here is cancelled first, giving back its place and
+    // coupon use. A payment that still lands on it re-confirms it like a lapsed hold, place permitting (confirmPaidBooking).
+    // Rolled back with everything else if this booking then fails.
+    const drafts = await ctx.db.query("bookingDrafts").withIndex("by_session", (q) => q.eq("sessionKey", args.sessionKey)).take(20);
+    const superseded: Id<"bookings">[] = [];
+    for (const d of drafts) {
+      if (d.tourId !== tour._id || !d.convertedBookingId) continue;
+      const prev = await ctx.db.get(d.convertedBookingId);
+      if (!prev || prev.status !== "pending_payment" || prev.amountPaid > 0 || prev.source !== "web") continue;
+      if (prev.date !== args.date || (prev.startTime || tour.startTimes[0]) !== args.startTime) continue;
+      await ctx.db.patch(prev._id, { status: "cancelled", cancellationReason: "superseded", cancelledAt: now, updatedAt: now });
+      await releaseCouponUse(ctx, prev);
+      superseded.push(prev._id);
+      await ctx.db.insert("auditLogs", { action: "booking.superseded", entityType: "bookings", entityId: prev._id, before: { status: prev.status }, after: { status: "cancelled" }, createdAt: now });
+    }
+
     const { quote, coupon } = await buildQuote(ctx, tour, args);
     if (args.couponCode && quote.couponError) throw new ConvexError({ code: "COUPON_INVALID", reason: quote.couponError });
 
@@ -320,6 +386,7 @@ export const create = mutation({
       tourId: tour._id,
       tourTitle: tour.title,
       date: args.date,
+      endDate: lastTourDay(args.date, tour.durationDays),
       startTime: args.startTime,
       adults: args.adults,
       children: args.children,
@@ -348,6 +415,9 @@ export const create = mutation({
       updatedAt: now,
     });
 
+    // Link each superseded booking to its replacement, so a late payment on it can tell whether this one is still live
+    for (const prevId of superseded) await ctx.db.patch(prevId, { supersededByBookingId: bookingId });
+
     // Release the place exactly when the hold runs out (the 15-minute cron stays as a backstop)
     if (!free) await ctx.scheduler.runAt(holdExpiresAt, internal.bookings.expireHold, { id: bookingId });
 
@@ -375,7 +445,6 @@ export const create = mutation({
     if (coupon) await ctx.db.patch(coupon._id, { usedCount: coupon.usedCount + 1 });
 
     // Link + convert the draft
-    const drafts = await ctx.db.query("bookingDrafts").withIndex("by_session", (q) => q.eq("sessionKey", args.sessionKey)).take(20);
     for (const d of drafts) if (d.tourId === tour._id && !d.convertedBookingId) await ctx.db.patch(d._id, { convertedBookingId: bookingId });
 
     // Notifications: a free booking is confirmed now; reserve-now-pay-later gets an immediate hold email;
@@ -442,7 +511,7 @@ export const byToken = query({
     return {
       ...publicBooking(b),
       items,
-      tour: tour ? { slug: tour.slug, durationLabel: tour.durationLabel, durationDays: tour.durationDays, durationMinutes: tour.durationMinutes, meetingPoint: tour.meetingPoint ?? null, freeCancellationHours: tour.freeCancellationHours, pickupIncluded: tour.pickupIncluded, inclusions: tour.inclusions } : null,
+      tour: tour ? { slug: tour.slug, durationLabel: tour.durationLabel, durationDays: tour.durationDays, durationMinutes: tour.durationMinutes, startTimes: tour.startTimes, meetingPoint: tour.meetingPoint ?? null, freeCancellationHours: tour.freeCancellationHours, pickupIncluded: tour.pickupIncluded, inclusions: tour.inclusions } : null,
     };
   },
 });
@@ -483,8 +552,10 @@ async function expireIfDue(ctx: MutationCtx, b: Doc<"bookings">, now: number): P
     return false;
   }
   await ctx.db.patch(b._id, { status: "cancelled", cancellationReason: "hold_expired", cancelledAt: now, updatedAt: now });
-  await releaseCoupon(ctx, b.couponCode);
+  await releaseCouponUse(ctx, b);
   await ctx.db.insert("auditLogs", { action: "booking.hold_expired", entityType: "bookings", entityId: b._id, before: { status: b.status }, after: { status: "cancelled" }, createdAt: now });
+  // A booking staff put on hold (WhatsApp, phone) lapsing unpaid is something they follow up on, so tell them
+  if (b.createdByStaffId) await ctx.scheduler.runAfter(0, internal.bookingEmails.notifyStaffHoldExpired, { bookingId: b._id });
   return true;
 }
 
@@ -517,6 +588,15 @@ export const expireHolds = internalMutation({
   },
 });
 
+/**
+ * Hourly lifecycle by the trip's last day (bookings.endDate, Oman calendar), so multi-day guests are never sent the
+ * review request mid-trip:
+ * - confirmed with date <= today: in_progress while the trip runs, completed once its last day has passed;
+ * - in_progress whose last day has passed: completed.
+ * Every move to completed sends the review request once (reviewRequestedAt). Rows without endDate (not backfilled)
+ * sort first in by_status_endDate; they get it written here, which moves them out of the range, so they never block
+ * the rest. Every row read is changed, so the next run continues where a full batch stopped.
+ */
 export const markInProgressAndCompleted = internalMutation({
   args: {},
   returns: v.object({ started: v.number(), completed: v.number() }),
@@ -525,21 +605,32 @@ export const markInProgressAndCompleted = internalMutation({
     const today = omanTodayIso(now);
     let started = 0;
     let completed = 0;
+    const tours = new Map<string, Doc<"tours"> | null>();
+    const endOf = async (b: Doc<"bookings">) => {
+      if (b.endDate) return b.endDate;
+      const key = String(b.tourId);
+      if (!tours.has(key)) tours.set(key, await ctx.db.get(b.tourId));
+      return lastTourDay(b.date, tours.get(key)?.durationDays);
+    };
+    const complete = async (b: Doc<"bookings">, endDate: string) => {
+      await ctx.db.patch(b._id, { status: "completed", completedAt: now, endDate, reviewRequestedAt: b.reviewRequestedAt ?? now, updatedAt: now });
+      if (!b.reviewRequestedAt) await ctx.scheduler.runAfter(0, internal.bookingEmails.sendReviewRequest, { bookingId: b._id });
+      completed++;
+    };
     const confirmed = await ctx.db.query("bookings").withIndex("by_status", (q) => q.eq("status", "confirmed").lte("date", today)).take(200);
     for (const b of confirmed) {
-      if (b.date === today) {
-        await ctx.db.patch(b._id, { status: "in_progress", updatedAt: now });
+      const endDate = await endOf(b);
+      if (endDate < today) await complete(b, endDate);
+      else {
+        await ctx.db.patch(b._id, { status: "in_progress", endDate, updatedAt: now });
         started++;
-      } else if (b.date < today) {
-        await ctx.db.patch(b._id, { status: "completed", completedAt: now, updatedAt: now });
-        completed++;
       }
     }
-    const inProgress = await ctx.db.query("bookings").withIndex("by_status", (q) => q.eq("status", "in_progress").lt("date", today)).take(200);
+    const inProgress = await ctx.db.query("bookings").withIndex("by_status_endDate", (q) => q.eq("status", "in_progress").lt("endDate", today)).take(200);
     for (const b of inProgress) {
-      await ctx.db.patch(b._id, { status: "completed", completedAt: now, updatedAt: now });
-      await ctx.scheduler.runAfter(0, internal.bookingEmails.sendReviewRequest, { bookingId: b._id });
-      completed++;
+      const endDate = await endOf(b);
+      if (endDate < today) await complete(b, endDate);
+      else if (!b.endDate) await ctx.db.patch(b._id, { endDate });
     }
     return { started, completed };
   },
@@ -599,7 +690,7 @@ export const requestCancellation = mutation({
     const now = Date.now();
     if (b.amountPaid === 0) {
       await ctx.db.patch(b._id, { status: "cancelled", cancelledAt: now, cancellationReason: reason?.slice(0, 500) ?? "customer", updatedAt: now });
-      await releaseCoupon(ctx, b.couponCode);
+      await releaseCouponUse(ctx, b);
       return { status: "cancelled", refundEligible: false };
     }
     // Paid bookings: mark cancelled; refund is processed by staff through the provider adapter.

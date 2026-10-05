@@ -3,6 +3,8 @@
  * client (live price summary). All amounts are integers in baisa.
  */
 
+import { omanTodayIso } from "./dates";
+
 export type L = { en: string; ar: string };
 
 export type TieredPricing = {
@@ -79,7 +81,7 @@ export function capacityUnits(tour: Pick<PricingTour, "pricingModel" | "vehicleP
  * JSON import, so no path can publish a tour that would quote 0 OMR — or a
  * tiered card where two adults cost less than one.
  */
-export function pricingProblem(tour: Pick<PricingTour, "pricingModel" | "priceGroup" | "priceAdult" | "tieredPricing" | "vehiclePricing">): string | null {
+export function pricingProblem(tour: Pick<PricingTour, "pricingModel" | "priceGroup" | "priceAdult" | "priceChild" | "tieredPricing" | "vehiclePricing">): string | null {
   switch (tour.pricingModel) {
     case "per_group":
       return (tour.priceGroup ?? 0) > 0 ? null : "priceGroup";
@@ -91,7 +93,9 @@ export function pricingProblem(tour: Pick<PricingTour, "pricingModel" | "priceGr
     case "per_vehicle":
       return (tour.vehiclePricing?.pricePerVehicle ?? 0) > 0 ? null : "vehiclePricing";
     default:
-      return (tour.priceAdult ?? 0) > 0 ? null : "priceAdult";
+      if (!((tour.priceAdult ?? 0) > 0)) return "priceAdult";
+      // A child price must be set on purpose (0 = children go free); a missing one would silently charge half the adult price
+      return tour.priceChild != null && tour.priceChild >= 0 ? null : "priceChild";
   }
 }
 
@@ -136,10 +140,33 @@ export type PricingCoupon = {
 };
 
 export type PricingSeason = {
+  /** Shown next to the seasonal price lines ("Adult · Winter peak") so the customer sees why the price differs. */
+  name?: L | null;
   priceGroup?: number | null;
   priceAdult?: number | null;
   priceChild?: number | null;
 };
+
+/** A season price only overrides when it is a real positive amount (a 0 or negative typo falls back to the tour). */
+function seasonPrice(x: number | undefined | null): number | undefined {
+  return typeof x === "number" && Number.isFinite(x) && x > 0 ? x : undefined;
+}
+
+/**
+ * Per-person prices the engine charges (baisa), for display and for computeQuote alike, so the tour page never shows a
+ * child price different from the one charged. A child price of 0 means children go free. Without a stored child price
+ * a child pays half the adult price. When a season changes the adult price but sets no child price, the child price
+ * moves in proportion, so a child never pays more than an adult in a low season.
+ */
+export function perPersonPrices(tour: Pick<PricingTour, "priceAdult" | "priceChild">, season?: PricingSeason | null): { adult: number; child: number; seasonal: boolean } {
+  const baseAdult = tour.priceAdult ?? 0;
+  const baseChild = tour.priceChild != null && tour.priceChild >= 0 ? tour.priceChild : Math.round(baseAdult / 2);
+  const sAdult = seasonPrice(season?.priceAdult);
+  const sChild = seasonPrice(season?.priceChild);
+  const adult = sAdult ?? baseAdult;
+  const child = sChild ?? (sAdult !== undefined ? (baseAdult > 0 ? Math.round((baseChild * sAdult) / baseAdult) : Math.round(sAdult / 2)) : baseChild);
+  return { adult, child, seasonal: sAdult !== undefined || sChild !== undefined };
+}
 
 export type QuoteInput = {
   tour: PricingTour;
@@ -174,6 +201,8 @@ export type Quote = {
   groupSize: number;
   couponCode?: string;
   couponError?: CouponError;
+  /** True when a pricing season changed the price of this quote. */
+  seasonal?: boolean;
 };
 
 export type CouponError =
@@ -195,17 +224,22 @@ export function computeQuote(input: QuoteInput): Quote {
   const groupSize = adults + children;
   const items: QuoteItem[] = [];
 
-  // A season price only overrides when it is a real positive amount (a 0 or negative typo falls back to the tour)
-  const seasonPrice = (x: number | undefined | null) => (typeof x === "number" && Number.isFinite(x) && x > 0 ? x : undefined);
-  const priceGroup = seasonPrice(season?.priceGroup) ?? tour.priceGroup ?? 0;
-  const priceAdult = seasonPrice(season?.priceAdult) ?? tour.priceAdult ?? 0;
-  const priceChild = seasonPrice(season?.priceChild) ?? tour.priceChild ?? Math.round(priceAdult / 2);
+  const seasonGroup = seasonPrice(season?.priceGroup);
+  const priceGroup = seasonGroup ?? tour.priceGroup ?? 0;
+  const pp = perPersonPrices(tour, season);
+  const priceAdult = pp.adult;
+  const priceChild = pp.child;
+  // Seasonal lines carry the season's name, so a price above (or below) the tour page's is explained
+  const seasonal = (label: L, applies: boolean): L =>
+    applies && season?.name && (season.name.en || season.name.ar)
+      ? { en: `${label.en} · ${season.name.en || season.name.ar}`, ar: `${label.ar} · ${season.name.ar || season.name.en}` }
+      : label;
 
   let subtotal = 0;
   if (tour.pricingModel === "per_group") {
     items.push({
       kind: "group",
-      label: { en: `Private group (up to ${tour.maxGroup})`, ar: `مجموعة خاصة (حتى ${tour.maxGroup})` },
+      label: seasonal({ en: `Private group (up to ${tour.maxGroup})`, ar: `مجموعة خاصة (حتى ${tour.maxGroup})` }, seasonGroup !== undefined),
       quantity: 1,
       unitPrice: priceGroup,
       total: priceGroup,
@@ -250,11 +284,11 @@ export function computeQuote(input: QuoteInput): Quote {
     subtotal = vehicles * cfg.pricePerVehicle;
   } else {
     if (adults > 0) {
-      items.push({ kind: "adult", label: { en: "Adult", ar: "بالغ" }, quantity: adults, unitPrice: priceAdult, total: adults * priceAdult });
+      items.push({ kind: "adult", label: seasonal({ en: "Adult", ar: "بالغ" }, pp.seasonal), quantity: adults, unitPrice: priceAdult, total: adults * priceAdult });
       subtotal += adults * priceAdult;
     }
     if (children > 0) {
-      items.push({ kind: "child", label: { en: "Child", ar: "طفل" }, quantity: children, unitPrice: priceChild, total: children * priceChild });
+      items.push({ kind: "child", label: seasonal({ en: "Child", ar: "طفل" }, pp.seasonal), quantity: children, unitPrice: priceChild, total: children * priceChild });
       subtotal += children * priceChild;
     }
   }
@@ -276,7 +310,8 @@ export function computeQuote(input: QuoteInput): Quote {
   let couponError: CouponError | undefined;
   let couponCode: string | undefined;
   if (input.coupon) {
-    const err = validateCoupon(input.coupon, { subtotal, groupSize, date: input.date, tourId: input.tourId, now: input.now ?? Date.now() });
+    // The minimum spend is checked on the same base the discount applies to (tour price plus extras)
+    const err = validateCoupon(input.coupon, { subtotal: subtotal + addOnsTotal, groupSize, date: input.date, tourId: input.tourId, now: input.now ?? Date.now() });
     if (err) {
       couponError = err;
     } else {
@@ -296,11 +331,13 @@ export function computeQuote(input: QuoteInput): Quote {
   const depositPercent = Math.min(100, Math.max(1, Number.isFinite(tour.depositPercent) ? tour.depositPercent : 100));
   const depositDue = depositPercent >= 100 ? total : Math.round((total * depositPercent) / 100);
 
-  return { items, subtotal, addOnsTotal, discountTotal, total, depositDue, balanceDue: total - depositDue, groupSize, couponCode, couponError };
+  const seasonApplied = tour.pricingModel === "per_group" ? seasonGroup !== undefined : tour.pricingModel === "per_person" ? pp.seasonal : false;
+  return { items, subtotal, addOnsTotal, discountTotal, total, depositDue, balanceDue: total - depositDue, groupSize, couponCode, couponError, seasonal: seasonApplied || undefined };
 }
 
 export function validateCoupon(
   c: PricingCoupon,
+  /** subtotal: the tour price plus extras, before the discount. */
   ctx: { subtotal: number; groupSize: number; date: string; tourId: string; now: number },
 ): CouponError | undefined {
   if (!c.isActive) return "inactive";
@@ -311,9 +348,9 @@ export function validateCoupon(
   if (c.minGroupSize !== undefined && ctx.groupSize < c.minGroupSize) return "min_group";
   if (c.tourIds && c.tourIds.length > 0 && !c.tourIds.includes(ctx.tourId)) return "tour_not_eligible";
   if (c.earlyBirdDays !== undefined) {
-    const tourDate = new Date(ctx.date + "T00:00:00Z").getTime();
-    const daysAhead = (tourDate - ctx.now) / 86_400_000;
-    if (daysAhead < c.earlyBirdDays) return "early_bird";
+    // Whole calendar days between Oman's today and the tour date: "30 days ahead" includes a tour exactly 30 days away
+    const daysAhead = (Date.parse(ctx.date + "T00:00:00Z") - Date.parse(omanTodayIso(ctx.now) + "T00:00:00Z")) / 86_400_000;
+    if (!(daysAhead >= c.earlyBirdDays)) return "early_bird";
   }
   return undefined;
 }

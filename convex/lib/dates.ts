@@ -91,6 +91,48 @@ export function isOperatingDate(tour: object, iso: string): boolean {
   return true;
 }
 
+/** The last calendar day of a departure (the start date for day tours, start + durationDays - 1 for multi-day). */
+export function lastTourDay(date: string, durationDays: number | undefined): string {
+  const days = Number.isFinite(durationDays) ? Math.max(1, Math.floor(durationDays!)) : 1;
+  return days > 1 ? addDaysIso(date, days - 1) : date;
+}
+
+const START_TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** True for a 24-hour "HH:MM" departure time (what bookings store and the wizard sends). */
+export function isStartTime(s: unknown): s is string {
+  return typeof s === "string" && START_TIME_RE.test(s);
+}
+
+/**
+ * One staff-typed departure time as "HH:MM", or null when it cannot be read. Accepts H:MM, HH:MM, H.MM and HH.MM
+ * (Arabic-Indic digits too) and zero-pads the hour, so "8:30" or "8.30" becomes "08:30".
+ */
+export function normalizeStartTime(raw: string): string | null {
+  const s = raw.trim().replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)).replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0));
+  const m = /^(\d{1,2})[:.٫](\d{2})$/.exec(s);
+  if (!m) return null;
+  const time = `${m[1].padStart(2, "0")}:${m[2]}`;
+  return START_TIME_RE.test(time) ? time : null;
+}
+
+/**
+ * [D] A tour's start-time list as staff typed it, normalised: every entry trimmed and zero-padded (normalizeStartTime),
+ * blanks dropped, duplicates removed and sorted. `invalid` lists the entries that are not a time (e.g. "25:00", "8h").
+ * Callers decide whether an empty list is allowed (drafts) or not (published tours).
+ */
+export function normalizeStartTimes(list: readonly string[]): { times: string[]; invalid: string[] } {
+  const times = new Set<string>();
+  const invalid: string[] = [];
+  for (const raw of list) {
+    if (!raw.trim()) continue;
+    const time = normalizeStartTime(raw);
+    if (time) times.add(time);
+    else invalid.push(raw.trim());
+  }
+  return { times: [...times].sort(), invalid };
+}
+
 /** The first date in [from, to] on which the tour runs, or null when there is none. */
 export function firstOperatingDate(tour: object, from: string, to: string): string | null {
   for (let d = from; d <= to; d = addDaysIso(d, 1)) if (isOperatingDate(tour, d)) return d;

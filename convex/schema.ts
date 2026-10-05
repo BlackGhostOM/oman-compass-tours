@@ -251,6 +251,11 @@ export default defineSchema({
     minGroup: v.number(),
     maxGroup: v.number(),
     defaultCapacityPerSlot: v.number(),
+    /**
+     * Optional cap on units out at the same time on any day (same units as defaultCapacityPerSlot), across every start
+     * time and every overlapping multi-day departure. Unset = each departure is counted on its own.
+     */
+    concurrentCapacity: v.optional(v.number()),
     difficulty: v.optional(
       v.union(v.literal("easy"), v.literal("moderate"), v.literal("challenging")),
     ),
@@ -354,10 +359,13 @@ export default defineSchema({
     lastTouchedAt: v.number(),
     remindedAt: v.optional(v.number()),
     convertedBookingId: v.optional(v.id("bookings")),
+    /** Secret for the "continue your booking" email link, so the draft opens on any device. */
+    resumeToken: v.optional(v.string()),
   })
     .index("by_session", ["sessionKey"])
     .index("by_user", ["userId"])
-    .index("by_lastTouched", ["lastTouchedAt"]),
+    .index("by_lastTouched", ["lastTouchedAt"])
+    .index("by_resumeToken", ["resumeToken"]),
 
   bookings: defineTable({
     reference: v.string(), // e.g. OCT-2A9F3K
@@ -365,6 +373,8 @@ export default defineSchema({
     tourId: v.id("tours"),
     tourTitle: localized, // snapshot
     date: v.string(),
+    /** Last calendar day of the trip (date + durationDays - 1; = date for day tours). Missing on rows not yet backfilled. */
+    endDate: v.optional(v.string()),
     startTime: v.optional(v.string()),
     adults: v.number(),
     children: v.number(),
@@ -376,6 +386,8 @@ export default defineSchema({
     addOnsTotal: v.number(),
     discountTotal: v.number(),
     couponCode: v.optional(v.string()),
+    /** The coupon use was given back (unpaid booking cancelled); lib/coupons takes it again if the booking returns. */
+    couponReleased: v.optional(v.boolean()),
     total: v.number(),
     depositDue: v.number(),
     amountPaid: v.number(),
@@ -407,6 +419,8 @@ export default defineSchema({
     internalNotes: v.optional(v.string()),
     customerNotes: v.optional(v.string()),
     cancellationReason: v.optional(v.string()),
+    /** Set on a booking cancelled as "superseded": the booking that replaced it (confirmPaidBooking checks it). */
+    supersededByBookingId: v.optional(v.id("bookings")),
     cancelledAt: v.optional(v.number()),
     confirmedAt: v.optional(v.number()),
     completedAt: v.optional(v.number()),
@@ -427,6 +441,8 @@ export default defineSchema({
     // Capacity reads only the statuses that hold a place, for one date or a range (lib/capacity)
     .index("by_tour_status_date", ["tourId", "status", "date"])
     .index("by_status", ["status", "date"])
+    // Trip lifecycle (in progress until the last day) and "on a trip today" views
+    .index("by_status_endDate", ["status", "endDate"])
     .index("by_date", ["date"])
     .index("by_holdExpiry", ["status", "holdExpiresAt"])
     .index("by_voucherToken", ["voucherToken"])
@@ -468,6 +484,8 @@ export default defineSchema({
     paidAt: v.optional(v.number()),
     refundedAmount: v.number(),
     createdByStaffId: v.optional(v.id("users")),
+    /** The staff payment link this checkout was started from (marked used when the payment succeeds). */
+    paymentLinkId: v.optional(v.id("paymentLinks")),
     updatedAt: v.number(),
   })
     .index("by_booking", ["bookingId"])

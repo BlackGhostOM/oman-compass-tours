@@ -91,6 +91,11 @@ export function StepPayment({
               <span>
                 <span className="block font-heading text-base text-navy-950">{t("payLater")}</span>
                 <span className="block text-xs text-ink-500">{t("payLaterHintUntil", { deadline: formatOmanDateTime(payLaterDeadline, locale) })}</span>
+                {quote && (
+                  <span className="mt-1 block text-xs text-ink-900">
+                    {t("payLaterAmount", { hasDeposit: quote.depositDue < quote.total ? "yes" : "no", total: formatOmr(quote.total, locale), deposit: formatOmr(quote.depositDue, locale) })}
+                  </span>
+                )}
               </span>
             </button>
           )}

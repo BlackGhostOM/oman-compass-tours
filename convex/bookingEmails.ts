@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalAction, internalMutation, type ActionCtx } from "./_generated/server";
 import { button, escapeHtml, layout, row, sendEmail, STAFF_EMAIL, table, type Locale } from "./lib/email";
+import { guestsLine } from "./lib/guests";
 
 const SITE_URL = () => process.env.SITE_URL ?? "http://localhost:3000";
 
@@ -27,22 +28,36 @@ function links(b: Doc<"bookings">, locale: Locale) {
   };
 }
 
+/**
+ * What an unpaid booking needs to be confirmed: the rest of the deposit when the tour takes one (the balance is then
+ * paid to the guide at the start of the trip), or 0 when the full amount is due.
+ */
+function depositToConfirm(b: Doc<"bookings">): number {
+  const unpaid = b.status === "inquiry" || b.status === "pending_payment";
+  return unpaid && b.depositDue < b.total && b.depositDue > b.amountPaid ? b.depositDue - b.amountPaid : 0;
+}
+
 function summaryTable(b: BookingWithTour, locale: Locale): string {
   const t = locale === "ar"
-    ? { ref: "رقم الحجز", tour: "الجولة", date: "التاريخ", time: "وقت البدء", guests: "الضيوف", pickup: "الاستلام", total: "الإجمالي", paid: "المدفوع", balance: "المتبقي" }
-    : { ref: "Reference", tour: "Tour", date: "Date", time: "Start time", guests: "Guests", pickup: "Pickup", total: "Total", paid: "Paid", balance: "Balance due" };
-  const guests = locale === "ar" ? `${b.adults} بالغ · ${b.children} طفل · ${b.infants} رضيع` : `${b.adults} adult(s) · ${b.children} child(ren) · ${b.infants} infant(s)`;
+    ? { ref: "رقم الحجز", tour: "الجولة", date: "التاريخ", time: "وقت البدء", guests: "الضيوف", pickup: "الاستلام", total: "الإجمالي", paid: "المدفوع", deposit: "العربون المطلوب للتأكيد", balance: "المتبقي", balanceGuide: "المتبقي (يُدفع لمرشدك عند بداية الرحلة)" }
+    : { ref: "Reference", tour: "Tour", date: "Date", time: "Start time", guests: "Guests", pickup: "Pickup", total: "Total", paid: "Paid", deposit: "Deposit to confirm", balance: "Balance due", balanceGuide: "Balance (paid to your guide at the start of the trip)" };
+  const deposit = depositToConfirm(b);
+  // Once a deposit has confirmed the booking, or while only a deposit is asked for, the rest is settled with the guide
+  const confirmed = b.status === "confirmed" || b.status === "in_progress";
+  const balanceLabel = deposit > 0 || (confirmed && b.depositDue < b.total) ? t.balanceGuide : t.balance;
   return table(
     [
       row(t.ref, `<strong>${b.reference}</strong>`),
       row(t.tour, escapeHtml(b.tourTitle[locale])),
       row(t.date, dateLabel(b.date, locale)),
       row(t.time, b.startTime ?? "—"),
-      row(t.guests, guests),
+      row(t.guests, guestsLine(b, locale)),
       row(t.pickup, escapeHtml(b.traveller.pickupLocation ?? b.traveller.hotel ?? "—")),
       row(t.total, omr(b.total, locale)),
       row(t.paid, omr(b.amountPaid, locale)),
-      row(t.balance, omr(Math.max(0, b.total - b.amountPaid), locale)),
+      ...(deposit > 0 ? [row(t.deposit, `<strong>${omr(deposit, locale)}</strong>`)] : []),
+      // With a deposit still to pay, the guide row is what is left after it (total - depositDue), so the rows add up
+      row(balanceLabel, omr(Math.max(0, b.total - b.amountPaid - deposit), locale)),
     ].join(""),
   );
 }
@@ -83,6 +98,32 @@ export const sendConfirmation = internalAction({
   },
 });
 
+/** Staff changed the booking (date, start time, party or price, or the tour's departure time moved): the new details. */
+export const sendBookingChanged = internalAction({
+  args: { bookingId: v.id("bookings") },
+  returns: v.null(),
+  handler: async (ctx, { bookingId }) => {
+    const b = await loadBooking(ctx, bookingId);
+    if (!b || b.status === "cancelled" || b.status === "refunded") return null;
+    const locale = b.locale;
+    const l = links(b, locale);
+    const title = locale === "ar" ? `تم تحديث حجزك ${b.reference}` : `Your booking ${b.reference} has been updated`;
+    const intro = locale === "ar"
+      ? `مرحبًا ${escapeHtml(b.traveller.firstName)}، قمنا بتحديث حجزك. هذه هي التفاصيل المحدّثة، ويرجى الاعتماد عليها بدلًا من أي رسالة سابقة.`
+      : `Hello ${escapeHtml(b.traveller.firstName)}, we have updated your booking. These are the current details; please use them instead of any earlier email.`;
+    const pay = b.status === "inquiry" || b.status === "pending_payment" ? button(l.checkout, locale === "ar" ? "إتمام الدفع" : "Complete payment") : button(l.voucher, locale === "ar" ? "تحميل القسيمة المحدّثة (PDF)" : "Download the updated voucher (PDF)");
+    const html = layout(
+      locale,
+      title,
+      `<p>${intro}</p>${summaryTable(b, locale)}${pay}
+       <p><a href="${l.confirmation}" style="color:#DDB97A">${locale === "ar" ? "عرض الحجز" : "View booking"}</a> · <a href="${l.whatsapp}" style="color:#DDB97A">${locale === "ar" ? "تواصل معنا عبر واتساب" : "Questions? WhatsApp us"}</a></p>`,
+    );
+    const result = await sendEmail({ to: b.traveller.email, subject: title, html });
+    await logEmail(ctx, "booking_changed", b.traveller.email, locale, bookingId, result);
+    return null;
+  },
+});
+
 export const sendHoldCreated = internalAction({
   args: { bookingId: v.id("bookings") },
   returns: v.null(),
@@ -93,9 +134,15 @@ export const sendHoldCreated = internalAction({
     const l = links(b, locale);
     const expires = b.holdExpiresAt ? new Intl.DateTimeFormat(locale === "ar" ? "ar-OM" : "en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Muscat" }).format(new Date(b.holdExpiresAt)) : "";
     const title = locale === "ar" ? `تم حجز مكانك مؤقتًا — ${b.reference}` : `Your place is reserved — ${b.reference}`;
+    const deposit = depositToConfirm(b);
+    const depositNote = deposit > 0
+      ? locale === "ar"
+        ? ` يكفي دفع عربون قدره <strong>${omr(deposit, locale)}</strong> لتأكيد حجزك، ويُدفع المتبقي لمرشدك عند بداية الرحلة.`
+        : ` A deposit of <strong>${omr(deposit, locale)}</strong> confirms your booking; the balance is paid to your guide at the start of the trip.`
+      : "";
     const body = locale === "ar"
-      ? `<p>مرحبًا ${escapeHtml(b.traveller.firstName)}، حجزنا مكانك مؤقتًا. يُرجى إتمام الدفع قبل <strong>${expires}</strong> (بتوقيت عُمان) لتأكيد الحجز.</p>`
-      : `<p>Hello ${escapeHtml(b.traveller.firstName)}, we have reserved your place. Please complete payment before <strong>${expires}</strong> (Oman time) to confirm the booking.</p>`;
+      ? `<p>مرحبًا ${escapeHtml(b.traveller.firstName)}، حجزنا مكانك مؤقتًا. يُرجى إتمام الدفع قبل <strong>${expires}</strong> (بتوقيت عُمان) لتأكيد الحجز.${depositNote}</p>`
+      : `<p>Hello ${escapeHtml(b.traveller.firstName)}, we have reserved your place. Please complete payment before <strong>${expires}</strong> (Oman time) to confirm the booking.${depositNote}</p>`;
     const html = layout(locale, title, `${body}${summaryTable(b, locale)}${button(l.checkout, locale === "ar" ? "إتمام الدفع" : "Complete payment")}<p><a href="${l.whatsapp}" style="color:#DDB97A">WhatsApp</a></p>`);
     const result = await sendEmail({ to: b.traveller.email, subject: title, html });
     await logEmail(ctx, "booking_hold", b.traveller.email, locale, bookingId, result);
@@ -215,6 +262,7 @@ const ATTENTION_REASONS: Record<string, string> = {
   payment_on_refunded: "the booking was already refunded",
   payment_after_departure: "the departure time had already passed",
   no_capacity: "the hold had expired and the departure no longer has room for this party",
+  superseded_paid: "the customer had already booked this departure again and that newer booking is paid or confirmed",
 };
 
 export const notifyStaffPaymentOnUnpayable = internalAction({
@@ -227,6 +275,20 @@ export const notifyStaffPaymentOnUnpayable = internalAction({
     const html = layout("en", `Payment received on ${b.status} booking ${b.reference}`, `<p><strong>Action needed:</strong> a payment was taken but the booking could not be confirmed because ${escapeHtml(why)}. The status was left as <strong>${b.status}</strong> and the booking is flagged in the dashboard. Contact the customer to rebook or refund. The customer was told the team will be in touch.</p>${summaryTable(b, "en")}<p>${escapeHtml(b.traveller.firstName)} ${escapeHtml(b.traveller.lastName)} · ${escapeHtml(b.traveller.email)} · <a href="https://wa.me/${b.traveller.phone.replace(/[^0-9]/g, "")}" style="color:#DDB97A">${escapeHtml(b.traveller.phone)}</a></p>${button(`${SITE_URL()}/en/admin/bookings/${b._id}`, "Open in dashboard")}`);
     const result = await sendEmail({ to: STAFF_EMAIL, subject: `[Action needed] Payment on ${b.status} booking ${b.reference}`, html, replyTo: b.traveller.email });
     await logEmail(ctx, "staff_payment_on_unpayable", STAFF_EMAIL, "en", bookingId, result);
+    return null;
+  },
+});
+
+/** A provider payment took amountPaid above the booking total: staff refund the excess (the customer is not emailed). */
+export const notifyStaffOverpaid = internalAction({
+  args: { bookingId: v.id("bookings"), excess: v.number() },
+  returns: v.null(),
+  handler: async (ctx, { bookingId, excess }) => {
+    const b = await loadBooking(ctx, bookingId);
+    if (!b) return null;
+    const html = layout("en", `Overpayment on ${b.reference}`, `<p><strong>Action needed:</strong> the customer has paid <strong>${omr(excess, "en")}</strong> more than the booking total (for example an old-amount checkout finished after the booking was changed, or the balance was paid twice). The booking is flagged in the dashboard. Refund the excess, then mark it as handled.</p>${summaryTable(b, "en")}<p>${escapeHtml(b.traveller.firstName)} ${escapeHtml(b.traveller.lastName)} · ${escapeHtml(b.traveller.email)} · <a href="https://wa.me/${b.traveller.phone.replace(/[^0-9]/g, "")}" style="color:#DDB97A">${escapeHtml(b.traveller.phone)}</a></p>${button(`${SITE_URL()}/en/admin/bookings/${b._id}`, "Open in dashboard")}`);
+    const result = await sendEmail({ to: STAFF_EMAIL, subject: `[Action needed] Overpayment on ${b.reference}`, html, replyTo: b.traveller.email });
+    await logEmail(ctx, "staff_overpaid", STAFF_EMAIL, "en", bookingId, result);
     return null;
   },
 });
@@ -257,6 +319,20 @@ export const notifyStaffCancellation = internalAction({
   },
 });
 
+/** A booking staff put on hold (WhatsApp, phone, office) ran out unpaid and was released: they follow up. */
+export const notifyStaffHoldExpired = internalAction({
+  args: { bookingId: v.id("bookings") },
+  returns: v.null(),
+  handler: async (ctx, { bookingId }) => {
+    const b = await loadBooking(ctx, bookingId);
+    if (!b) return null;
+    const html = layout("en", `Hold expired: ${b.reference}`, `<p>The unpaid hold on this ${escapeHtml(b.source)} booking ran out, so it was cancelled and its place released. The customer was not emailed. Contact them to rebook or to take the payment, then reinstate it from the dashboard if the place is still free.</p>${summaryTable(b, "en")}<p>${escapeHtml(b.traveller.firstName)} ${escapeHtml(b.traveller.lastName)} · ${escapeHtml(b.traveller.email)} · <a href="https://wa.me/${b.traveller.phone.replace(/[^0-9]/g, "")}" style="color:#DDB97A">${escapeHtml(b.traveller.phone)}</a></p>${button(`${SITE_URL()}/en/admin/bookings/${b._id}`, "Open in dashboard")}`);
+    const result = await sendEmail({ to: STAFF_EMAIL, subject: `[Hold expired] ${b.reference} · ${b.tourTitle.en} · ${b.date}`, html, replyTo: b.traveller.email });
+    await logEmail(ctx, "staff_hold_expired", STAFF_EMAIL, "en", bookingId, result);
+    return null;
+  },
+});
+
 /* ------------------------------------------------------------------ */
 /* Abandoned booking follow-up                                         */
 /* ------------------------------------------------------------------ */
@@ -270,6 +346,12 @@ export const createAbandonedLead = internalMutation({
     const data = (d.data ?? {}) as { traveller?: { firstName?: string; lastName?: string; email?: string; phone?: string } };
     const email = data.traveller?.email;
     if (!email) {
+      await ctx.db.patch(draftId, { remindedAt: Date.now() });
+      return null;
+    }
+    // Booked since (on this or another device): no "still waiting" email and no lead for staff
+    const bookedSince = await ctx.db.query("bookings").withIndex("by_email", (q) => q.eq("traveller.email", email.trim().toLowerCase())).order("desc").take(20);
+    if (bookedSince.some((b) => b.tourId === d.tourId && b._creationTime > d._creationTime)) {
       await ctx.db.patch(draftId, { remindedAt: Date.now() });
       return null;
     }
@@ -304,7 +386,8 @@ export const followUpAbandonedDrafts = internalAction({
       const data = (d.data ?? {}) as { traveller?: { firstName?: string; email?: string }; tourSlug?: string };
       if (!leadId || !data.traveller?.email) continue;
       const locale = d.locale;
-      const url = `${SITE_URL()}/${locale}/book/${data.tourSlug ?? ""}`;
+      // The resume token opens the saved draft on any device (adoptDraft); older drafts have none
+      const url = `${SITE_URL()}/${locale}/book/${data.tourSlug ?? ""}${d.resumeToken ? `?resume=${encodeURIComponent(d.resumeToken)}` : ""}`;
       const html = layout(locale, locale === "ar" ? "حجزك ما زال بانتظارك" : "Your booking is still waiting", `<p>${locale === "ar" ? `مرحبًا ${escapeHtml(data.traveller.firstName ?? "")}، لاحظنا أنك بدأت حجزًا ولم تكمله. حفظنا اختياراتك؛ يمكنك المتابعة من حيث توقفت.` : `Hello ${escapeHtml(data.traveller.firstName ?? "")}, we noticed you started a booking and did not finish. Your choices are saved — pick up where you left off.`}</p>${button(url, locale === "ar" ? "متابعة الحجز" : "Continue booking")}<p><a href="https://wa.me/96892255028" style="color:#DDB97A">WhatsApp +968 9225 5028</a></p>`);
       const result = await sendEmail({ to: data.traveller.email, subject: locale === "ar" ? "حجزك ما زال بانتظارك — بوصلة عُمان" : "Your Oman Compass booking is still waiting", html });
       await ctx.runMutation(internal.notifications.log, { channel: "email", template: "abandoned_draft", to: data.traveller.email, locale, status: result.status, providerMessageId: result.id, error: result.error });

@@ -15,6 +15,7 @@ import { site } from "@/lib/site";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProviderPicker, type Currency, type ProviderId } from "@/components/booking/provider-picker";
+import { rebookHref } from "@/components/booking/selection";
 
 export function CheckoutPanel({ reference, token }: { reference: string; token: string }) {
   const locale = useLocale() as "en" | "ar";
@@ -78,7 +79,9 @@ export function CheckoutPanel({ reference, token }: { reference: string; token: 
     );
   }
 
-  if (booking.status === "confirmed" || booking.status === "in_progress" || booking.status === "completed") {
+  // A confirmed (or running) booking with money still owed, e.g. after the online deposit, can pay the balance here
+  const balanceDue = (booking.status === "confirmed" || booking.status === "in_progress") && outstanding > 0 && !booking.needsAttention;
+  if ((booking.status === "confirmed" || booking.status === "in_progress" || booking.status === "completed") && !balanceDue) {
     return (
       <div className="rounded-xl border border-success/40 bg-white p-8 text-center">
         <CheckCircle2 className="mx-auto size-10 text-success" />
@@ -110,7 +113,7 @@ export function CheckoutPanel({ reference, token }: { reference: string; token: 
       <div className="rounded-xl border border-sand-200 bg-white p-8 text-center">
         <AlertTriangle className="mx-auto size-10 text-warning" />
         <h2 className="mt-3 font-heading text-lg text-navy-950">{t("cancelled")}</h2>
-        <Button asChild className="mt-4"><Link href={`/book/${pick(booking.tour?.slug, locale)}`}>{t("rebook")}</Link></Button>
+        <Button asChild className="mt-4"><Link href={rebookHref(pick(booking.tour?.slug, locale), booking)}>{t("rebook")}</Link></Button>
       </div>
     );
   }
@@ -122,7 +125,7 @@ export function CheckoutPanel({ reference, token }: { reference: string; token: 
         <h2 className="mt-3 font-heading text-lg text-navy-950">{t("holdExpiredTitle")}</h2>
         <p className="mx-auto mt-2 max-w-prose text-sm text-ink-500">{unpayable === "departed" ? t("departedBody") : t("holdExpiredBody")}</p>
         <div className="mt-4 flex flex-wrap justify-center gap-3">
-          {unpayable === "hold_expired" && <Button asChild><Link href={`/book/${pick(booking.tour?.slug, locale)}`}>{t("rebook")}</Link></Button>}
+          {unpayable === "hold_expired" && <Button asChild><Link href={rebookHref(pick(booking.tour?.slug, locale), booking)}>{t("rebook")}</Link></Button>}
           <Button asChild variant="outline"><a href={whatsappHref} target="_blank" rel="noopener noreferrer">{t("whatsapp")}</a></Button>
         </div>
       </div>
@@ -138,6 +141,11 @@ export function CheckoutPanel({ reference, token }: { reference: string; token: 
       <div className="space-y-6 rounded-xl border border-sand-200 bg-white p-5 sm:p-8">
         {params.get("cancelled") && (
           <p className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-ink-900">{t("paymentCancelled")}</p>
+        )}
+        {balanceDue && (
+          <p className="flex items-center gap-2 rounded-lg border border-success/40 bg-success/10 p-3 text-sm text-ink-900">
+            <CheckCircle2 className="size-4 shrink-0 text-success" /> {t("balanceDueNotice")}
+          </p>
         )}
         {holdLeft !== null && (
           <p className="flex items-center gap-2 text-sm text-ink-500">

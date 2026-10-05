@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useMutation, useQuery } from "convex/react";
+import { ConvexError } from "convex/values";
 import { ArrowDown, ArrowUp, ImagePlus, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../../../../convex/_generated/api";
 import type { Doc, Id } from "../../../../../convex/_generated/dataModel";
+import { omanTodayIso } from "../../../../../convex/lib/dates";
 import { pick, type LocalizedString } from "@/lib/content";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -271,6 +273,15 @@ function TeamTab() {
 }
 
 /* ---------------- Coupons ---------------- */
+/**
+ * The Oman calendar day of a coupon start or end (coupon windows run from 00:00 to 23:59 Muscat time). Ends saved
+ * before this rule were 23:59:59 UTC, which is already the next morning in Muscat, so those still show their own day.
+ */
+function couponDay(ms: number, isEnd = false): string {
+  if (isEnd && ms % 86_400_000 === 86_399_000) return new Date(ms).toISOString().slice(0, 10);
+  return omanTodayIso(ms);
+}
+
 function CouponsTab() {
   const t = useTranslations("admin.content.coupons");
   const locale = useLocale();
@@ -298,18 +309,19 @@ function CouponsTab() {
           <div className="grid gap-3 sm:grid-cols-4">
             <div className="space-y-1.5"><Label>{t("code")}</Label><Input value={editing.code} onChange={(e) => setEditing({ ...editing, code: e.target.value.toUpperCase() })} dir="ltr" /></div>
             <div className="space-y-1.5"><Label>{t("type")}</Label><Select value={editing.type} onValueChange={(v) => setEditing({ ...editing, type: v as "percent" | "fixed" })}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="percent">%</SelectItem><SelectItem value="fixed">OMR</SelectItem></SelectContent></Select></div>
-            <div className="space-y-1.5"><Label>{t("value")}</Label><Input type="number" value={editing.value} onChange={(e) => setEditing({ ...editing, value: Number(e.target.value) })} /></div>
+            <div className="space-y-1.5"><Label>{t("value")}</Label><Input type="number" {...(editing.type === "percent" ? { step: 1, min: 1, max: 100 } : { step: 0.001, min: 0.001 })} value={editing.value} onChange={(e) => setEditing({ ...editing, value: Number(e.target.value) })} />{editing.type === "percent" && <p className="text-xs text-muted-foreground">{t("percentHint")}</p>}</div>
             <div className="space-y-1.5"><Label>{t("usageLimit")}</Label><Input type="number" value={editing.usageLimit ?? ""} onChange={(e) => setEditing({ ...editing, usageLimit: e.target.value ? Number(e.target.value) : undefined })} /></div>
             <div className="space-y-1.5"><Label>{t("minSubtotal")}</Label><Input type="number" value={editing.minSubtotalOmr ?? ""} onChange={(e) => setEditing({ ...editing, minSubtotalOmr: e.target.value ? Number(e.target.value) : undefined })} /></div>
             <div className="space-y-1.5"><Label>{t("maxDiscount")}</Label><Input type="number" value={editing.maxDiscountOmr ?? ""} onChange={(e) => setEditing({ ...editing, maxDiscountOmr: e.target.value ? Number(e.target.value) : undefined })} /></div>
             <div className="space-y-1.5"><Label>{t("minGroup")}</Label><Input type="number" value={editing.minGroupSize ?? ""} onChange={(e) => setEditing({ ...editing, minGroupSize: e.target.value ? Number(e.target.value) : undefined })} /></div>
             <div className="space-y-1.5"><Label>{t("earlyBird")}</Label><Input type="number" value={editing.earlyBirdDays ?? ""} onChange={(e) => setEditing({ ...editing, earlyBirdDays: e.target.value ? Number(e.target.value) : undefined })} /></div>
-            <div className="space-y-1.5"><Label>{t("startsAt")}</Label><Input type="date" value={editing.startsAt ? new Date(editing.startsAt).toISOString().slice(0, 10) : ""} onChange={(e) => setEditing({ ...editing, startsAt: e.target.value ? new Date(e.target.value).getTime() : undefined })} /></div>
-            <div className="space-y-1.5"><Label>{t("endsAt")}</Label><Input type="date" value={editing.endsAt ? new Date(editing.endsAt).toISOString().slice(0, 10) : ""} onChange={(e) => setEditing({ ...editing, endsAt: e.target.value ? new Date(e.target.value).getTime() + 86_399_000 : undefined })} /></div>
+            <div className="space-y-1.5"><Label>{t("startsAt")}</Label><Input type="date" value={editing.startsAt ? couponDay(editing.startsAt) : ""} onChange={(e) => setEditing({ ...editing, startsAt: e.target.value ? Date.parse(`${e.target.value}T00:00:00+04:00`) : undefined })} /></div>
+            <div className="space-y-1.5"><Label>{t("endsAt")}</Label><Input type="date" value={editing.endsAt ? couponDay(editing.endsAt, true) : ""} onChange={(e) => setEditing({ ...editing, endsAt: e.target.value ? Date.parse(`${e.target.value}T23:59:59.999+04:00`) : undefined })} /></div>
             <div className="flex items-end gap-2"><Switch checked={editing.isActive} onCheckedChange={(v) => setEditing({ ...editing, isActive: v })} /><Label>{t("active")}</Label></div>
           </div>
+          <p className="text-xs text-muted-foreground">{t("datesHint")}</p>
           <LocalizedField label={t("name")} value={editing.name} onChange={(v) => setEditing({ ...editing, name: v })} />
-          <div className="flex gap-2"><Button size="sm" className="bg-gold-gradient text-navy-950" onClick={async () => { try { await upsert({ id: editing._id, code: editing.code, name: editing.name, type: editing.type, value: editing.value, minSubtotalOmr: editing.minSubtotalOmr, maxDiscountOmr: editing.maxDiscountOmr, startsAt: editing.startsAt, endsAt: editing.endsAt, usageLimit: editing.usageLimit, minGroupSize: editing.minGroupSize, earlyBirdDays: editing.earlyBirdDays, isActive: editing.isActive }); setEditing(null); toast.success(t("saved")); } catch { toast.error(t("error")); } }}>{t("save")}</Button><Button size="sm" variant="ghost" onClick={() => setEditing(null)}>{t("cancel")}</Button></div>
+          <div className="flex gap-2"><Button size="sm" className="bg-gold-gradient text-navy-950" onClick={async () => { try { await upsert({ id: editing._id, code: editing.code, name: editing.name, type: editing.type, value: editing.value, minSubtotalOmr: editing.minSubtotalOmr, maxDiscountOmr: editing.maxDiscountOmr, startsAt: editing.startsAt, endsAt: editing.endsAt, usageLimit: editing.usageLimit, minGroupSize: editing.minGroupSize, earlyBirdDays: editing.earlyBirdDays, isActive: editing.isActive }); setEditing(null); toast.success(t("saved")); } catch (err) { toast.error(err instanceof ConvexError && (err.data as { field?: string })?.field === "percent" ? t("percentHint") : t("error")); } }}>{t("save")}</Button><Button size="sm" variant="ghost" onClick={() => setEditing(null)}>{t("cancel")}</Button></div>
         </div>
       )}
     </Panel>

@@ -7,7 +7,7 @@ import { internalAction } from "./_generated/server";
 import { faqAsText } from "./lib/faq";
 
 type KB = {
-  tours: { code: string; title: { en: string; ar: string }; slug: { en: string; ar: string }; summary: { en: string; ar: string }; durationLabel: { en: string; ar: string }; pricingModel: string; priceFrom: number; priceAdult: number | null; priceChild: number | null; priceGroup: number | null; tieredPricing?: { firstAdult: number; firstTwoAdults: number; extraAdult: number; extraChild: number } | null; vehiclePricing?: { pricePerVehicle: number; maxAdults: number; seats: number } | null; maxGroup: number; startTimes: string[]; freeCancellationHours: number; depositPercent: number; inclusions: string[]; pickupIncluded: boolean }[];
+  tours: { code: string; title: { en: string; ar: string }; slug: { en: string; ar: string }; summary: { en: string; ar: string }; durationLabel: { en: string; ar: string }; pricingModel: string; priceFrom: number; priceAdult: number | null; priceChild: number | null; priceGroup: number | null; tieredPricing?: { firstAdult: number; firstTwoAdults: number; extraAdult: number; extraChild: number } | null; vehiclePricing?: { pricePerVehicle: number; maxAdults: number; seats: number } | null; minGroup?: number; maxGroup: number; startTimes: string[]; freeCancellationHours: number; depositPercent: number; inclusions: string[]; pickupIncluded: boolean }[];
   policies: string;
   hours: unknown;
 };
@@ -51,9 +51,15 @@ function contactRule(ctx: PromptContext): string {
   return lines.join(" ");
 }
 
+/** Who can book a tour online: "groups 2–4 guests" (adults and children; infants never count toward these limits). */
+function groupLimits(min: number, max: number): string {
+  const lo = Math.max(1, min);
+  return `${lo > 1 ? `minimum ${lo} guests, ` : ""}groups ${lo}–${max} guests (infants not counted)`;
+}
+
 function buildSystemPrompt(kb: KB, locale: "en" | "ar", siteUrl: string, ctx: PromptContext): string {
   const tours = kb.tours
-    .map((t) => `- ${t.code} · ${t.title.en} / ${t.title.ar} · ${t.durationLabel.en} · ${t.pricingModel === "per_group" ? `${omr(t.priceGroup ?? t.priceFrom)} per private group (up to ${t.maxGroup})` : t.pricingModel === "tiered" && t.tieredPricing ? `${omr(t.tieredPricing.firstAdult)} for 1 adult, ${omr(t.tieredPricing.firstTwoAdults)} for 2 adults, +${omr(t.tieredPricing.extraAdult)} each extra adult, +${omr(t.tieredPricing.extraChild)} per child, infants free` : t.pricingModel === "per_vehicle" && t.vehiclePricing ? `${omr(t.vehiclePricing.pricePerVehicle)} per 4WD (each carries up to ${t.vehiclePricing.maxAdults} adults / ${t.vehiclePricing.seats} guests; larger parties take more vehicles)` : `${omr(t.priceAdult ?? t.priceFrom)} per adult${t.priceChild ? `, ${omr(t.priceChild)} per child` : ""}`} · starts ${t.startTimes.join("/")} · free cancellation ${t.freeCancellationHours}h · deposit ${t.depositPercent}% · pickup ${t.pickupIncluded ? "included" : "not included"} · includes: ${t.inclusions.slice(0, 5).join(", ")} · book: ${siteUrl}/${locale}/tours/${t.slug[locale]}`)
+    .map((t) => `- ${t.code} · ${t.title.en} / ${t.title.ar} · ${t.durationLabel.en} · ${t.pricingModel === "per_group" ? `${omr(t.priceGroup ?? t.priceFrom)} per private group` : t.pricingModel === "tiered" && t.tieredPricing ? `${omr(t.tieredPricing.firstAdult)} for 1 adult, ${omr(t.tieredPricing.firstTwoAdults)} for 2 adults, +${omr(t.tieredPricing.extraAdult)} each extra adult, +${omr(t.tieredPricing.extraChild)} per child, infants free` : t.pricingModel === "per_vehicle" && t.vehiclePricing ? `${omr(t.vehiclePricing.pricePerVehicle)} per 4WD (each carries up to ${t.vehiclePricing.maxAdults} adults / ${t.vehiclePricing.seats} guests; larger parties take more vehicles, up to ${t.maxGroup} guests in total)` : `${omr(t.priceAdult ?? t.priceFrom)} per adult${t.priceChild ? `, ${omr(t.priceChild)} per child` : ""}`} · ${groupLimits(t.minGroup ?? 1, t.maxGroup)} · starts ${t.startTimes.join("/")} · free cancellation ${t.freeCancellationHours}h · deposit ${t.depositPercent}% · pickup ${t.pickupIncluded ? "included" : "not included"} · includes: ${t.inclusions.slice(0, 5).join(", ")} · book: ${siteUrl}/${locale}/tours/${t.slug[locale]}`)
     .join("\n");
   return `You are the virtual concierge of Oman Compass Tours Company, a licensed Omani tour operator in Muscat (Ministry of Heritage & Tourism licence 1440944, rated 5.0 on Tripadvisor, #1 of 46 experiences in Muscat). Office hours: Mon 07:30–19:00, Tue–Sun 07:30–19:30 Oman time. WhatsApp/phone +968 9225 5028, email omancompasstours@gmail.com. Website: ${siteUrl}.
 
@@ -77,7 +83,7 @@ TRANSFER POLICY. You have written ${ctx.assistantReplies} reply(ies) so far in t
 
 Respond ONLY with a JSON object: {"reply": string, "confidence": number between 0 and 1, "handoff": boolean, "offerHandoff": boolean, "askedContact": boolean (true if this reply asks for their name, number or email), "finalAsk": boolean (true if this reply is the one last request made because the visitor is leaving), "declinedContact": boolean (true if the visitor's latest message clearly refuses to share contact details), "visitor": {"name"?: string, "phone"?: string, "email"?: string, "preferredChannel"?: string}}. No markdown fences.
 
-CATALOGUE
+CATALOGUE (only recommend a tour when the party fits its group limits: below the minimum or above the maximum it cannot be booked online, so suggest another tour or a tailor-made trip with the team)
 ${tours}
 
 POLICIES (summary)

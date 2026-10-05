@@ -2,7 +2,7 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import { useQuery } from "convex/react";
-import { ArrowRight, Phone } from "lucide-react";
+import { AlertTriangle, ArrowRight, Phone } from "lucide-react";
 import { api } from "../../../../convex/_generated/api";
 import { Link } from "@/i18n/navigation";
 import { formatOmr, pick } from "@/lib/content";
@@ -13,6 +13,7 @@ import { MiniBars, PageHeader, Panel, StatCard, StatusBadge } from "@/components
 export default function AdminOverviewPage() {
   const locale = useLocale();
   const t = useTranslations("admin.overview");
+  const tb = useTranslations("admin.bookings");
   const stats = useQuery(api.admin.overview.stats);
   if (!stats) return <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}</div>;
 
@@ -34,6 +35,18 @@ export default function AdminOverviewPage() {
         <StatCard label={t("pendingReviews")} value={stats.pendingReviews} />
       </div>
 
+      {stats.offSchedule.length > 0 && (
+        <div role="alert" className="rounded-xl border border-warning/40 bg-warning/10 p-4">
+          <p className="flex items-center gap-2 font-medium"><AlertTriangle className="size-4 text-warning" /> {t("offScheduleTitle", { count: stats.offSchedule.length })}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{t("offScheduleBody")}</p>
+          <ul className="mt-2 flex flex-wrap gap-2 text-sm">
+            {stats.offSchedule.map((o) => (
+              <li key={o._id}><Link href={`/admin/bookings/${o._id}`} className="rounded-md border border-border bg-card px-2 py-1 hover:text-gold-700"><span dir="ltr">{o.reference}</span> · {pick(o.tourTitle, locale)} · <span dir="ltr">{o.date} {o.startTime}</span></Link></li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-3">
         <Panel title={t("departuresTitle")} className="lg:col-span-2" actions={<Button asChild variant="ghost" size="sm"><Link href="/admin/bookings">{t("allBookings")} <ArrowRight className="size-4 rtl-flip" /></Link></Button>}>
           {stats.departuresToday.length === 0 ? (
@@ -45,7 +58,7 @@ export default function AdminOverviewPage() {
                   <span className="w-12 font-heading text-gold-700 dark:text-gold-400" dir="ltr">{d.startTime ?? "—"}</span>
                   <div className="min-w-0 flex-1">
                     <Link href={`/admin/bookings/${d._id}`} className="font-medium text-foreground hover:text-gold-700">{pick(d.tourTitle, locale)}</Link>
-                    <p className="text-xs text-muted-foreground">{d.reference} · {d.traveller} · {t("guests", { count: d.groupSize })}{d.pickup ? ` · ${d.pickup}` : ""}{d.guide ? ` · ${t("guide")}: ${d.guide}` : ""}</p>
+                    <p className="text-xs text-muted-foreground">{d.tripDays > 1 ? `${t("tripDay", { day: d.tripDay, days: d.tripDays })} · ` : ""}{d.reference} · {d.traveller} · {tb("party", { adults: d.adults, children: d.children, infants: d.infants })}{d.pickup ? ` · ${d.pickup}` : ""}{d.guide ? ` · ${t("guide")}: ${d.guide}` : ""}</p>
                   </div>
                   <StatusBadge status={d.status} />
                   <Button asChild variant="ghost" size="icon-sm" aria-label="WhatsApp" title="WhatsApp"><a href={`https://wa.me/${d.phone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer"><Phone className="size-4 text-[#25D366]" /></a></Button>

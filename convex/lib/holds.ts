@@ -65,7 +65,8 @@ export function hasDeparted(date: string, startTime: string | undefined | null, 
 }
 
 /**
- * Why an unpaid booking can no longer be paid online, or null when it still can. Confirmed bookings (balance) stay payable.
+ * Why an unpaid booking can no longer be paid online, or null when it still can. Confirmed and in-progress bookings
+ * (a balance still owed) stay payable.
  *
  * Mirrors bookings.expireIfDue: a hold is only released when nothing has been paid and holdExpiresAt is set. A partly
  * paid hold, or a legacy unpaid booking with no holdExpiresAt, keeps its place, so it stays payable until departure.
@@ -74,12 +75,20 @@ export function unpayableReason(
   b: { status: string; holdExpiresAt?: number | null; date: string; startTime?: string | null; amountPaid?: number | null },
   now: number,
 ): "status" | "hold_expired" | "departed" | null {
-  if (b.status === "confirmed") return null;
+  if (b.status === "confirmed" || b.status === "in_progress") return null;
   if (b.status !== "inquiry" && b.status !== "pending_payment") return "status";
   if (hasDeparted(b.date, b.startTime, now)) return "departed";
   if ((b.amountPaid ?? 0) > 0 || b.holdExpiresAt == null) return null;
   if (b.holdExpiresAt <= now) return "hold_expired";
   return null;
+}
+
+/**
+ * An unpaid hold that was released without anyone deciding against the booking: it ran out (hold_expired), or the same
+ * browser booked the same departure again (superseded). A payment still arriving on it may re-confirm it.
+ */
+export function isLapsedHold(b: { status: string; cancellationReason?: string | null }): boolean {
+  return b.status === "cancelled" && (b.cancellationReason === "hold_expired" || b.cancellationReason === "superseded");
 }
 
 /**

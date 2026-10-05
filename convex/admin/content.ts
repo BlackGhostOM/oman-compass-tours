@@ -94,13 +94,24 @@ export const upsertCoupon = mutation({
     const staff = await requireStaff(ctx);
     const code = args.code.trim().toUpperCase();
     if (!/^[A-Z0-9_-]{3,24}$/.test(code)) throw new ConvexError({ code: "INVALID_CODE" });
-    if (args.type === "percent" && (args.value <= 0 || args.value > 100)) throw new ConvexError({ code: "INVALID_VALUE" });
-    if (args.type === "fixed" && args.value <= 0) throw new ConvexError({ code: "INVALID_VALUE" });
+    // Stored exactly as customers get it: percent is a whole number 1-100 (7.5 would silently become 8, 0.4 a 0% code
+    // that still uses up the limit); a fixed amount is stored in baisa and must stay above 0
+    const value = args.type === "fixed" ? Math.round(args.value * 1000) : args.value;
+    if (args.type === "percent" && !(Number.isInteger(value) && value >= 1 && value <= 100)) throw new ConvexError({ code: "INVALID_VALUE", field: "percent" });
+    if (args.type === "fixed" && !(Number.isFinite(args.value) && value >= 1 && args.value <= 100_000)) throw new ConvexError({ code: "INVALID_VALUE" });
     const clash = await ctx.db.query("coupons").withIndex("by_code", (q) => q.eq("code", code)).unique();
     if (clash && clash._id !== args.id) throw new ConvexError({ code: "CODE_TAKEN" });
-    const doc = { code, name: args.name, type: args.type, value: args.type === "fixed" ? Math.round(args.value * 1000) : Math.round(args.value), minSubtotal: args.minSubtotalOmr ? Math.round(args.minSubtotalOmr * 1000) : undefined, maxDiscount: args.maxDiscountOmr ? Math.round(args.maxDiscountOmr * 1000) : undefined, tourIds: args.tourIds, startsAt: args.startsAt, endsAt: args.endsAt, usageLimit: args.usageLimit, minGroupSize: args.minGroupSize, earlyBirdDays: args.earlyBirdDays, isActive: args.isActive, usedCount: clash?.usedCount ?? 0 };
-    if (args.id) { await ctx.db.patch(args.id, doc); await audit(ctx, staff, "coupon.update", "coupons", String(args.id), undefined, { code }); return args.id; }
-    const id = await ctx.db.insert("coupons", doc);
+    const doc = { code, name: args.name, type: args.type, value, minSubtotal: args.minSubtotalOmr ? Math.round(args.minSubtotalOmr * 1000) : undefined, maxDiscount: args.maxDiscountOmr ? Math.round(args.maxDiscountOmr * 1000) : undefined, startsAt: args.startsAt, endsAt: args.endsAt, usageLimit: args.usageLimit, minGroupSize: args.minGroupSize, earlyBirdDays: args.earlyBirdDays, isActive: args.isActive };
+    if (args.id) {
+      const current = await ctx.db.get(args.id);
+      if (!current) throw new ConvexError({ code: "NOT_FOUND" });
+      // An edit keeps the coupon's own usage count (a rename must not restart its limit) and its tour restriction
+      // unless the form sends one
+      await ctx.db.patch(args.id, { ...doc, ...(args.tourIds !== undefined ? { tourIds: args.tourIds } : {}) });
+      await audit(ctx, staff, "coupon.update", "coupons", String(args.id), { code: current.code, usedCount: current.usedCount }, { code });
+      return args.id;
+    }
+    const id = await ctx.db.insert("coupons", { ...doc, tourIds: args.tourIds, usedCount: 0 });
     await audit(ctx, staff, "coupon.create", "coupons", String(id), undefined, { code });
     return id;
   },

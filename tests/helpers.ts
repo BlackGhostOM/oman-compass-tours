@@ -78,11 +78,14 @@ export function convexCloudUrl(): string {
   return url.replace(/\/$/, "");
 }
 
-/** Calls a public Convex query or mutation over the HTTP API. Throws with the error data when the call fails. */
-export async function convexHttp<T = unknown>(kind: "query" | "mutation", path: string, args: Record<string, unknown>): Promise<T> {
+/**
+ * Calls a public Convex query or mutation over the HTTP API. Throws with the error data when the call fails.
+ * `authToken` (a signed-in browser's Convex Auth JWT, see convexAuthToken) calls it as that user.
+ */
+export async function convexHttp<T = unknown>(kind: "query" | "mutation", path: string, args: Record<string, unknown>, authToken?: string): Promise<T> {
   const res = await fetch(`${convexCloudUrl()}/api/${kind}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...(authToken ? { authorization: `Bearer ${authToken}` } : {}) },
     body: JSON.stringify({ path, args, format: "json" }),
   });
   const body = (await res.json()) as { status: string; value?: T; errorMessage?: string; errorData?: unknown };
@@ -97,4 +100,12 @@ export async function convexHttp<T = unknown>(kind: "query" | "mutation", path: 
 /** A fresh anonymous session key in the app's own format (see use-session-key.ts). */
 export function testSessionKey(): string {
   return "s_qa" + Math.random().toString(36).slice(2, 14) + Date.now().toString(36);
+}
+
+/** The Convex Auth JWT of the user signed in on this page (DEV only), for convexHttp(..., authToken). */
+export async function convexAuthToken(page: { evaluate: <R>(fn: () => R) => Promise<R> }): Promise<string> {
+  convexCloudUrl(); // refuses anything but the DEV deployment
+  const token = await page.evaluate(() => Object.keys(window.localStorage).filter((k) => k.startsWith("__convexAuthJWT")).map((k) => window.localStorage.getItem(k))[0] ?? null);
+  if (!token) throw new Error("No Convex Auth token in localStorage: sign in first");
+  return token;
 }

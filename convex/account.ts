@@ -3,7 +3,7 @@ import { ConvexError } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { assertString, requireUser } from "./lib/access";
-import { omanTodayIso } from "./lib/dates";
+import { lastTourDay, omanTodayIso } from "./lib/dates";
 import { isFreeCancellation } from "./lib/pricing";
 
 /* ------------------------------------------------------------------ */
@@ -18,6 +18,8 @@ function summarize(b: Doc<"bookings">, tour: Doc<"tours"> | null) {
     tourSlug: tour?.slug ?? null,
     coverImage: tour?.coverImage ?? null,
     date: b.date,
+    /** Last day of the trip: a multi-day trip stays upcoming until it is over. */
+    endDate: b.endDate ?? lastTourDay(b.date, tour?.durationDays),
     startTime: b.startTime ?? null,
     durationLabel: tour?.durationLabel ?? null,
     adults: b.adults,
@@ -45,8 +47,8 @@ export const myBookings = query({
     const rows = await ctx.db.query("bookings").withIndex("by_user", (q) => q.eq("userId", user._id)).order("desc").take(200);
     const today = omanTodayIso();
     const out = await Promise.all(rows.map(async (b) => summarize(b, await ctx.db.get(b.tourId))));
-    const upcoming = out.filter((b) => b.date >= today && !["cancelled", "refunded", "completed"].includes(b.status)).sort((a, b) => a.date.localeCompare(b.date));
-    const past = out.filter((b) => b.date < today || ["cancelled", "refunded", "completed"].includes(b.status));
+    const upcoming = out.filter((b) => b.endDate >= today && !["cancelled", "refunded", "completed"].includes(b.status)).sort((a, b) => a.date.localeCompare(b.date));
+    const past = out.filter((b) => b.endDate < today || ["cancelled", "refunded", "completed"].includes(b.status));
     return { upcoming, past };
   },
 });

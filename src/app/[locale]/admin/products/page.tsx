@@ -33,6 +33,8 @@ export default function AdminProductsPage() {
   const importTours = useMutation(api.admin.products.importTours);
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
+  /** Dry-run result: which codes the import would create or update, shown for confirmation before anything is written. */
+  const [importPlan, setImportPlan] = useState<{ list: unknown[]; creates: string[]; updates: string[]; errors: string[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<Set<Id<"tours">>>(new Set());
 
@@ -60,16 +62,32 @@ export default function AdminProductsPage() {
     }
   }
 
-  async function doImport() {
+  /** Step 1: validate every row on the server without writing (dry run) and show what would change. */
+  async function checkImport() {
     setBusy(true);
     try {
       const parsed = JSON.parse(importText) as { tours?: unknown[] } | unknown[];
       const list = Array.isArray(parsed) ? parsed : (parsed.tours ?? []);
-      const r = await importTours({ tours: list });
+      const r = await importTours({ tours: list, dryRun: true });
+      setImportPlan({ list, creates: r.creates, updates: r.updates, errors: r.errors });
+    } catch (err) {
+      toast.error(`${t("importError")}: ${(err as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Step 2: staff confirmed the plan; rows with errors are skipped again by the server. */
+  async function doImport() {
+    if (!importPlan) return;
+    setBusy(true);
+    try {
+      const r = await importTours({ tours: importPlan.list });
       toast.success(t("imported", { created: r.created, updated: r.updated }));
       if (r.errors.length) toast.warning(r.errors.slice(0, 3).join("\n"));
       setImportOpen(false);
       setImportText("");
+      setImportPlan(null);
     } catch (err) {
       toast.error(`${t("importError")}: ${(err as Error).message}`);
     } finally {
@@ -159,15 +177,46 @@ export default function AdminProductsPage() {
         </div>
       )}
 
-      <Dialog open={importOpen} onOpenChange={setImportOpen}>
-        <DialogContent className="sm:max-w-2xl">
+      <Dialog open={importOpen} onOpenChange={(o) => { setImportOpen(o); if (!o) setImportPlan(null); }}>
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader><DialogTitle>{t("import")}</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">{t("importHint")}</p>
-          <Textarea rows={14} value={importText} onChange={(e) => setImportText(e.target.value)} placeholder='{"tours": [ ... ]}' className="font-mono text-xs" dir="ltr" />
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setImportOpen(false)}>{t("cancel")}</Button>
-            <Button disabled={busy || !importText.trim()} onClick={doImport} className="bg-gold-gradient text-navy-950">{busy ? t("importing") : t("runImport")}</Button>
-          </div>
+          {importPlan === null ? (
+            <>
+              <Textarea rows={14} value={importText} onChange={(e) => setImportText(e.target.value)} placeholder='{"tours": [ ... ]}' className="max-h-[50vh] font-mono text-xs" dir="ltr" />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setImportOpen(false)}>{t("cancel")}</Button>
+                <Button disabled={busy || !importText.trim()} onClick={checkImport} className="bg-gold-gradient text-navy-950">{busy ? t("importing") : t("checkImport")}</Button>
+              </div>
+            </>
+          ) : (
+            <div className="space-y-3 text-sm">
+              <p className="font-medium">{t("importPlanTitle")}</p>
+              {importPlan.updates.length > 0 && (
+                <div className="rounded-md border border-warning/40 bg-warning/10 p-3">
+                  <p>{t("importPlanUpdates", { count: importPlan.updates.length })}</p>
+                  <p className="mt-1 font-mono text-xs" dir="ltr">{importPlan.updates.join(", ")}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{t("importPlanUpdatesHint")}</p>
+                </div>
+              )}
+              {importPlan.creates.length > 0 && (
+                <div className="rounded-md border border-border p-3">
+                  <p>{t("importPlanCreates", { count: importPlan.creates.length })}</p>
+                  <p className="mt-1 font-mono text-xs" dir="ltr">{importPlan.creates.join(", ")}</p>
+                </div>
+              )}
+              {importPlan.errors.length > 0 && (
+                <div className="rounded-md border border-danger/40 bg-danger/5 p-3">
+                  <p className="text-danger">{t("importPlanErrors", { count: importPlan.errors.length })}</p>
+                  <ul className="mt-1 max-h-40 list-disc overflow-y-auto ps-5 font-mono text-xs" dir="ltr">{importPlan.errors.map((e) => <li key={e}>{e}</li>)}</ul>
+                </div>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setImportPlan(null)}>{t("importBack")}</Button>
+                <Button disabled={busy || importPlan.creates.length + importPlan.updates.length === 0} onClick={doImport} className="bg-gold-gradient text-navy-950">{busy ? t("importing") : t("runImport")}</Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
