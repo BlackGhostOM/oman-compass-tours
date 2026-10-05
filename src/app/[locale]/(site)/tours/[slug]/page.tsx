@@ -3,9 +3,9 @@ import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Check, Clock, Languages, MapPin, ShieldCheck, Users, X } from "lucide-react";
 import { api } from "../../../../../../convex/_generated/api";
-import { Link } from "@/i18n/navigation";
+import { Link, redirect } from "@/i18n/navigation";
 import { fetchPublic } from "@/lib/convex-server";
-import { decodeSlug, pick } from "@/lib/content";
+import { decodeSlug, pick, upToKey } from "@/lib/content";
 import { site } from "@/lib/site";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
@@ -49,6 +49,8 @@ export default async function TourPage({ params }: Props) {
   setRequestLocale(locale);
   const tour = await fetchPublic(api.tours.bySlug, { slug: decodeSlug(slug), locale });
   if (!tour) notFound();
+  // Reached with the other language's slug (e.g. after switching language): move to this locale's canonical URL
+  if (pick(tour.slug, locale) && decodeSlug(slug) !== pick(tour.slug, locale)) redirect({ href: `/tours/${encodeURIComponent(pick(tour.slug, locale))}`, locale });
 
   const t = await getTranslations("tour");
   const tc = await getTranslations("common");
@@ -143,7 +145,8 @@ export default async function TourPage({ params }: Props) {
                   </span>
                 )}
                 <span className="inline-flex items-center gap-1.5"><Clock className="size-4 text-gold-500" /> {pick(tour.durationLabel, locale)}</span>
-                <span className="inline-flex items-center gap-1.5"><Users className="size-4 text-gold-500" /> {t("privateUpTo", { count: tour.maxGroup })}</span>
+                <span className="inline-flex items-center gap-1.5"><Users className="size-4 text-gold-500" /> {t(upToKey(tour), { count: tour.maxGroup })}</span>
+                {tour.minGroup > 1 && <span className="inline-flex items-center gap-1.5">{t("minTravellers", { min: tour.minGroup, age: (tour.infantAgeMax ?? 2) + 1 })}</span>}
                 <span className="inline-flex items-center gap-1.5"><Languages className="size-4 text-gold-500" /> {tour.guideLanguages.map((l) => (l === "ar" ? "العربية" : "English")).join(" · ")}</span>
               </div>
             </div>

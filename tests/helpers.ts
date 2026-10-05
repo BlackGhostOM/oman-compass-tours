@@ -70,3 +70,31 @@ export const testTraveller = {
   email: `qa+${Date.now()}@example.com`,
   phoneNational: "92255028",
 };
+
+/** The DEV Convex deployment the app under test talks to (never production). */
+export function convexCloudUrl(): string {
+  const url = envLocal("NEXT_PUBLIC_CONVEX_URL") ?? "";
+  if (!url || url.includes("fantastic-sturgeon-674")) throw new Error(`Refusing to run against ${url || "an unknown deployment"}: tests use the DEV deployment only`);
+  return url.replace(/\/$/, "");
+}
+
+/** Calls a public Convex query or mutation over the HTTP API. Throws with the error data when the call fails. */
+export async function convexHttp<T = unknown>(kind: "query" | "mutation", path: string, args: Record<string, unknown>): Promise<T> {
+  const res = await fetch(`${convexCloudUrl()}/api/${kind}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ path, args, format: "json" }),
+  });
+  const body = (await res.json()) as { status: string; value?: T; errorMessage?: string; errorData?: unknown };
+  if (body.status !== "success") {
+    const err = new Error(`${path}: ${body.errorMessage ?? res.status}`) as Error & { data?: unknown };
+    err.data = body.errorData;
+    throw err;
+  }
+  return body.value as T;
+}
+
+/** A fresh anonymous session key in the app's own format (see use-session-key.ts). */
+export function testSessionKey(): string {
+  return "s_qa" + Math.random().toString(36).slice(2, 14) + Date.now().toString(36);
+}

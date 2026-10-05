@@ -43,7 +43,7 @@ export const seedContent = internalMutation({
     /* Add-ons (global) */
     for (const [i, a] of addOnsSeed.entries()) {
       const existing = await ctx.db.query("addOns").withIndex("by_key", (q) => q.eq("key", a.key)).unique();
-      const doc = { key: a.key, name: a.name, description: a.description, price: omrToBaisa(a.priceOmr), priceType: a.priceType, isActive: true, order: i };
+      const doc = { key: a.key, name: a.name, description: a.description, price: omrToBaisa(a.priceOmr), priceType: a.priceType, isActive: true, order: i, appliesToKinds: a.appliesToKinds };
       if (existing) await ctx.db.patch(existing._id, doc);
       else await ctx.db.insert("addOns", doc);
     }

@@ -1,4 +1,5 @@
 import type { Locale } from "@/i18n/routing";
+import { addDaysIso, isRealIsoDate, isoDayToInstant, omanTodayIso } from "../../convex/lib/dates";
 
 export type LocalizedString = { en: string; ar: string };
 
@@ -45,6 +46,15 @@ export function durationFromMinutes(minutes: number, locale: string): string {
 }
 
 /** Decodes a slug that may be percent-encoded (Arabic slugs). */
+/**
+ * Which "up to N guests" line a product gets: private departures say "Private", shared group trips "Shared group",
+ * and shared services (entry tickets) speak of tickets per booking.
+ */
+export function upToKey(tour: { kind?: string | null; departureType?: string | null }): "privateUpTo" | "sharedUpTo" | "ticketUpTo" {
+  if (tour.departureType !== "shared") return "privateUpTo";
+  return tour.kind === "service" ? "ticketUpTo" : "sharedUpTo";
+}
+
 export function decodeSlug(slug: string): string {
   try {
     return decodeURIComponent(slug);
@@ -53,8 +63,16 @@ export function decodeSlug(slug: string): string {
   }
 }
 
+/** A date-only "YYYY-MM-DD" is an Oman calendar day: pin it to noon in Muscat so every viewer zone prints that same day. */
+function toDisplayInstant(iso: string | number | Date): Date | null {
+  if (typeof iso === "string" && /^\d{4}-\d{2}-\d{2}$/.test(iso)) return isRealIsoDate(iso) ? isoDayToInstant(iso) : null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export function formatDate(iso: string | number | Date, locale: string, style: "short" | "long" = "long"): string {
-  const d = typeof iso === "string" && /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(iso + "T00:00:00") : new Date(iso);
+  const d = toDisplayInstant(iso);
+  if (!d) return String(iso);
   return new Intl.DateTimeFormat(locale === "ar" ? "ar-OM" : "en-GB", {
     timeZone: "Asia/Muscat",
     ...(style === "long"
@@ -63,24 +81,28 @@ export function formatDate(iso: string | number | Date, locale: string, style: "
   }).format(d);
 }
 
+/** An instant (epoch ms) as a date and time in Oman, e.g. a pay-by deadline: "6 Oct 2026, 06:30". */
+export function formatOmanDateTime(ms: number, locale: string): string {
+  return new Intl.DateTimeFormat(locale === "ar" ? "ar-OM" : "en-GB", { timeZone: "Asia/Muscat", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(ms));
+}
+
 export function formatHijri(iso: string, locale: string): string {
-  const d = new Date(iso + "T00:00:00");
+  const d = toDisplayInstant(iso);
+  if (!d) return String(iso);
   return new Intl.DateTimeFormat(locale === "ar" ? "ar-SA-u-ca-islamic-umalqura" : "en-u-ca-islamic-umalqura", {
+    timeZone: "Asia/Muscat",
     day: "numeric",
     month: "long",
     year: "numeric",
   }).format(d);
 }
 
+/** Today's date in Oman (not UTC), so the bookable window flips at Muscat midnight for every visitor. */
 export function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return omanTodayIso();
 }
 
-export function addDaysIso(iso: string, days: number): string {
-  const d = new Date(iso + "T00:00:00Z");
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
+export { addDaysIso };
 
 /** Human wording for a free-cancellation window: hours below a week, otherwise days ("72 h", "30 days"). */
 export function cancellationWindow(hours: number, locale: string): string {

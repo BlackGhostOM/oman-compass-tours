@@ -4,6 +4,10 @@ import type { LocalizedString } from "@/lib/content";
 export type BookingTour = {
   _id: Id<"tours">;
   code: string;
+  /** "service" for transfers, rentals and tickets. */
+  kind?: "tour" | "service";
+  /** "shared" for group trips and tickets other guests also book. */
+  departureType?: "private" | "shared";
   title: LocalizedString;
   slug: LocalizedString;
   summary: LocalizedString;
@@ -11,6 +15,10 @@ export type BookingTour = {
   durationLabel: LocalizedString;
   durationDays: number;
   startTimes: string[];
+  /** Weekdays the tour runs (0 = Sunday); null = every day. */
+  operatingWeekdays?: number[] | null;
+  /** Departure start dates (YYYY-MM-DD); null = any date. */
+  fixedDepartureDates?: string[] | null;
   pricingModel: "per_group" | "per_person" | "tiered" | "per_vehicle";
   priceGroup: number | null;
   priceAdult: number | null;

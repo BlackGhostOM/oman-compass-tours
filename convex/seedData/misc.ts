@@ -35,13 +35,14 @@ export const teamSeed: { name: L; roleTitle: L; bio: L; languages: string[]; ima
   },
 ];
 
-export const addOnsSeed: { key: string; name: L; description: L; priceOmr: number; priceType: "per_booking" | "per_person" }[] = [
+export const addOnsSeed: { key: string; name: L; description: L; priceOmr: number; priceType: "per_booking" | "per_person"; appliesToKinds?: ("tour" | "service")[] }[] = [
   {
     key: "private_guide_upgrade",
     name: { en: "Dedicated senior guide", ar: "مرشد أول مخصّص" },
     description: { en: "Request Musab or another senior guide for your party.", ar: "اطلب مصعب أو مرشدًا أول آخر لمجموعتك." },
     priceOmr: 20,
     priceType: "per_booking",
+    appliesToKinds: ["tour"],
   },
   {
     key: "lunch_upgrade",
@@ -49,6 +50,7 @@ export const addOnsSeed: { key: string; name: L; description: L; priceOmr: numbe
     description: { en: "Replace the picnic with a sit-down lunch at a local restaurant.", ar: "استبدل الغداء الخفيف بغداء في مطعم محلي." },
     priceOmr: 8,
     priceType: "per_person",
+    appliesToKinds: ["tour"],
   },
   {
     key: "photographer",
@@ -56,6 +58,7 @@ export const addOnsSeed: { key: string; name: L; description: L; priceOmr: numbe
     description: { en: "Your guide shoots and shares 30+ edited photos within 48 hours.", ar: "يلتقط مرشدك أكثر من 30 صورة معدّلة ويشاركها خلال 48 ساعة." },
     priceOmr: 15,
     priceType: "per_booking",
+    appliesToKinds: ["tour"],
   },
   {
     key: "child_seat",

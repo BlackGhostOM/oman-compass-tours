@@ -52,6 +52,9 @@ export function vehiclesNeeded(adults: number, children: number, cfg: VehiclePri
   return Math.max(Math.ceil(a / maxAdults), Math.ceil((a + c) / seats));
 }
 
+/** Most lap infants one booking may bring (the counter's cap; infants never take a seat). */
+export const INFANT_MAX = 6;
+
 /**
  * How much of a slot's capacity one party consumes. Private models (per_group,
  * tiered) take one departure whatever the party size; per-person tours take a
@@ -192,9 +195,11 @@ export function computeQuote(input: QuoteInput): Quote {
   const groupSize = adults + children;
   const items: QuoteItem[] = [];
 
-  const priceGroup = season?.priceGroup ?? tour.priceGroup ?? 0;
-  const priceAdult = season?.priceAdult ?? tour.priceAdult ?? 0;
-  const priceChild = season?.priceChild ?? tour.priceChild ?? Math.round(priceAdult / 2);
+  // A season price only overrides when it is a real positive amount (a 0 or negative typo falls back to the tour)
+  const seasonPrice = (x: number | undefined | null) => (typeof x === "number" && Number.isFinite(x) && x > 0 ? x : undefined);
+  const priceGroup = seasonPrice(season?.priceGroup) ?? tour.priceGroup ?? 0;
+  const priceAdult = seasonPrice(season?.priceAdult) ?? tour.priceAdult ?? 0;
+  const priceChild = seasonPrice(season?.priceChild) ?? tour.priceChild ?? Math.round(priceAdult / 2);
 
   let subtotal = 0;
   if (tour.pricingModel === "per_group") {
@@ -287,7 +292,8 @@ export function computeQuote(input: QuoteInput): Quote {
   }
 
   const total = Math.max(0, subtotal + addOnsTotal - discountTotal);
-  const depositPercent = Math.min(100, Math.max(0, tour.depositPercent));
+  // At least 1%: every tour takes a deposit, and a 0% deposit would promise "pay 0 now" while checkout charges in full
+  const depositPercent = Math.min(100, Math.max(1, Number.isFinite(tour.depositPercent) ? tour.depositPercent : 100));
   const depositDue = depositPercent >= 100 ? total : Math.round((total * depositPercent) / 100);
 
   return { items, subtotal, addOnsTotal, discountTotal, total, depositDue, balanceDue: total - depositDue, groupSize, couponCode, couponError };
@@ -313,6 +319,14 @@ export function validateCoupon(
 }
 
 /** True when the tour date/time is still inside the free-cancellation window. */
+/**
+ * Whether an extra can be offered and charged on a product: global extras with appliesToKinds only suit those
+ * kinds (a guide upgrade on a tour, never on a transfer or ticket); unset or empty means every kind.
+ */
+export function addOnAppliesTo(addOn: { appliesToKinds?: readonly string[] | null }, tour: { kind: string }): boolean {
+  return !addOn.appliesToKinds?.length || addOn.appliesToKinds.includes(tour.kind);
+}
+
 export function isFreeCancellation(date: string, startTime: string | undefined, freeCancellationHours: number, now = Date.now()): boolean {
   if (freeCancellationHours <= 0) return false;
   const start = new Date(`${date}T${startTime ?? "08:00"}:00+04:00`).getTime();

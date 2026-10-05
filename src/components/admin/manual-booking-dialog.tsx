@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useMutation, useQuery } from "convex/react";
 import { toast } from "sonner";
+import { ConvexError } from "convex/values";
 import { api } from "../../../convex/_generated/api";
 import { computeQuote } from "../../../convex/lib/pricing";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -55,7 +56,18 @@ export function ManualBookingDialog({ open, onOpenChange }: { open: boolean; onO
     if (!form.tourId) return;
     setBusy(true);
     try {
-      const r = await create({ tourId: form.tourId as Id<"tours">, date: form.date, startTime: form.startTime, adults: form.adults, children: form.children, infants: form.infants, traveller: { firstName: form.firstName, lastName: form.lastName, nationality: form.nationality, phone: form.phone, email: form.email, hotel: form.hotel || undefined, specialRequests: form.requests || undefined, preferredLanguage: form.locale }, locale: form.locale, source: form.source, totalOmr: form.totalOmr, status: form.status, amountPaidOmr: form.paidOmr || undefined, internalNotes: form.notes || undefined });
+      const args = { tourId: form.tourId as Id<"tours">, date: form.date, startTime: form.startTime, adults: form.adults, children: form.children, infants: form.infants, traveller: { firstName: form.firstName, lastName: form.lastName, nationality: form.nationality, phone: form.phone, email: form.email, hotel: form.hotel || undefined, specialRequests: form.requests || undefined, preferredLanguage: form.locale }, locale: form.locale, source: form.source, totalOmr: form.totalOmr, status: form.status, amountPaidOmr: form.paidOmr || undefined, internalNotes: form.notes || undefined };
+      let r: { bookingId: Id<"bookings">; reference: string };
+      try {
+        r = await create(args);
+      } catch (err) {
+        // Full, blacked out, not running that day or outside the group rules: staff may still create it on purpose
+        const data = err instanceof ConvexError ? (err.data as { code?: string; reasons?: string[]; remaining?: number; needed?: number }) : undefined;
+        if (data?.code !== "NEEDS_OVERRIDE") throw err;
+        const reasons = (data.reasons ?? []).map((x) => (t.has(`overrideReasons.${x}`) ? t(`overrideReasons.${x}`, { remaining: data.remaining ?? 0, needed: data.needed ?? 0 }) : x));
+        if (!window.confirm(`${t("overrideTitle")}\n\n• ${reasons.join("\n• ")}\n\n${t("overrideConfirm")}`)) return;
+        r = await create({ ...args, override: true });
+      }
       toast.success(t("created", { reference: r.reference }));
       onOpenChange(false);
       router.push(`/admin/bookings/${r.bookingId}`);

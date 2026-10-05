@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { CalendarDays, Clock, MessageCircle, ShieldCheck, Users } from "lucide-react";
 import { Link } from "@/i18n/navigation";
-import { pick, type LocalizedString, cancellationWindow } from "@/lib/content";
+import { formatOmr, pick, type LocalizedString, cancellationWindow, upToKey } from "@/lib/content";
 import { whatsappLink, site } from "@/lib/site";
 import { Button } from "@/components/ui/button";
 import { PriceTag } from "@/components/tours/price-tag";
@@ -23,7 +23,9 @@ export function BookPanel({
     priceChild?: number | null;
     priceGroup?: number | null;
     childAgeMax?: number | null;
+    infantAgeMax?: number | null;
     durationLabel: LocalizedString;
+    minGroup: number;
     maxGroup: number;
     freeCancellationHours: number;
     depositPercent: number;
@@ -32,6 +34,8 @@ export function BookPanel({
     ratingCount: number;
     externalReviewCount?: number | null;
     startTimes: string[];
+    kind?: string | null;
+    departureType?: string | null;
   };
 }) {
   const locale = useLocale();
@@ -58,9 +62,9 @@ export function BookPanel({
 
       {tour.pricingModel === "per_person" && tour.priceChild ? (
         <p className="mt-3 text-xs text-ink-500">
-          {t("childPrice", { age: tour.childAgeMax ?? 11 })}:{" "}
+          {t("childPrice", { min: (tour.infantAgeMax ?? 2) + 1, max: tour.childAgeMax ?? 11 })}:{" "}
           <span className="font-medium text-ink-900" dir="ltr">
-            {new Intl.NumberFormat(locale === "ar" ? "ar-OM" : "en-OM", { style: "currency", currency: "OMR", maximumFractionDigits: 0 }).format(tour.priceChild / 1000)}
+            {formatOmr(tour.priceChild, locale, { compact: true })}
           </span>
         </p>
       ) : null}
@@ -70,8 +74,13 @@ export function BookPanel({
           <Clock className="size-4 text-gold-500" /> {pick(tour.durationLabel, locale)}
         </li>
         <li className="flex items-center gap-2.5">
-          <Users className="size-4 text-gold-500" /> {t("privateUpTo", { count: tour.maxGroup })}
+          <Users className="size-4 text-gold-500" /> {t(upToKey(tour), { count: tour.maxGroup })}
         </li>
+        {tour.minGroup > 1 && (
+          <li className="flex items-center gap-2.5">
+            <Users className="size-4 text-gold-500" /> {t("minTravellers", { min: tour.minGroup, age: (tour.infantAgeMax ?? 2) + 1 })}
+          </li>
+        )}
         <li className="flex items-center gap-2.5">
           <CalendarDays className="size-4 text-gold-500" />
           <span dir="ltr">{tour.startTimes.join(" · ")}</span>

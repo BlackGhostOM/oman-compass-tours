@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { api } from "../../../../../../convex/_generated/api";
-import { Link } from "@/i18n/navigation";
+import { Link, redirect } from "@/i18n/navigation";
 import { fetchPublic } from "@/lib/convex-server";
 import { decodeSlug, pick } from "@/lib/content";
 import { BookingWizard } from "@/components/booking/booking-wizard";
@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export const dynamic = "force-dynamic";
 
-type Props = { params: Promise<{ locale: "en" | "ar"; slug: string }> };
+type Props = { params: Promise<{ locale: "en" | "ar"; slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, slug } = await params;
@@ -20,11 +20,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return { title: tour ? `${t("metaTitle")} · ${pick(tour.title, locale)}` : t("metaTitle"), robots: { index: false } };
 }
 
-export default async function BookPage({ params }: Props) {
+export default async function BookPage({ params, searchParams }: Props) {
   const { locale, slug } = await params;
   setRequestLocale(locale);
   const tour = await fetchPublic(api.tours.forBooking, { slug: decodeSlug(slug), locale });
   if (!tour) notFound();
+  // Reached with the other language's slug (e.g. after switching language): move to this locale's URL, keeping ?date=
+  const localized = pick(tour.slug, locale);
+  if (localized && decodeSlug(slug) !== localized) {
+    const query = new URLSearchParams();
+    for (const [k, v] of Object.entries(await searchParams)) for (const x of Array.isArray(v) ? v : v === undefined ? [] : [v]) query.append(k, x);
+    const qs = query.toString();
+    redirect({ href: `/book/${encodeURIComponent(localized)}${qs ? `?${qs}` : ""}`, locale });
+  }
   const t = await getTranslations("booking");
 
   return (

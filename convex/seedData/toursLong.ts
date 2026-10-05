@@ -77,6 +77,7 @@ export const longJourneys: TourSeed[] = [
     code: "OCT-009",
     viatorCode: "425555P33",
     kind: "tour",
+    departureType: "shared",
     title: { en: "6-Day Oman Nature, Culture & Traditions – Sharing Group Trip", ar: "6 أيام في طبيعة عُمان وثقافتها وتقاليدها: رحلة جماعية مشتركة" },
     slug: { en: "oman-nature-culture-traditions-6-day", ar: "عمان-6-أيام-جولة-جماعية" },
     summary: {
@@ -122,6 +123,8 @@ export const longJourneys: TourSeed[] = [
     durationMinutes: 6 * DAY,
     durationDays: 6,
     startTimes: ["08:00"],
+    // First day of each departure, as listed in the description and FAQ (19–24 Oct 2026, 28 Dec–2 Jan, 1–6 Feb, 27 Mar–1 Apr 2027)
+    fixedDepartureDates: ["2026-10-19", "2026-12-28", "2027-02-01", "2027-03-27"],
     pickupIncluded: true,
     guideLanguages: ["en", "ar"],
     minGroup: 1,

@@ -2,12 +2,16 @@ import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { action, internalAction, internalMutation, internalQuery, query } from "./_generated/server";
+import { action, internalAction, internalMutation, internalQuery, query, type MutationCtx } from "./_generated/server";
 import { capturePaypalOrder } from "./gateways/paypal";
 import { configuredProviders, defaultProviderFor, getProvider } from "./gateways/registry";
 import type { NormalizedEvent, ProviderId } from "./gateways/provider";
 import { requireStaff, audit } from "./lib/access";
 import { generateToken } from "./lib/ids";
+import { remainingCapacity } from "./lib/capacity";
+import { departureMs } from "./lib/dates";
+import { CHECKOUT_SESSION_COVER_MS, hasDeparted, holdCeiling, unpayableReason } from "./lib/holds";
+import { capacityUnits } from "./lib/pricing";
 import { baisaToMinor, FALLBACK_RATES, type Currency } from "./lib/money";
 import { currencyValidator, paymentKindValidator, paymentProviderValidator } from "./schema";
 
@@ -86,10 +90,29 @@ export const createPaymentRecord = internalMutation({
   },
   returns: v.object({ paymentId: v.id("payments"), idempotencyKey: v.string() }),
   handler: async (ctx, args) => {
-    // Reuse an open session for the same booking/provider/amount (idempotent retries)
+    // Re-checked here, atomically with the payment row, so a hold cannot expire between the check and the session
+    const booking = await ctx.db.get(args.bookingId);
+    if (!booking) throw new ConvexError({ code: "BOOKING_NOT_FOUND" });
+    const now = Date.now();
+    assertPayable(booking, now);
+    // Reuse an open session for the same booking/provider/amount (idempotent retries); it already extended the hold
     const existing = await ctx.db.query("payments").withIndex("by_booking", (q) => q.eq("bookingId", args.bookingId)).take(50);
     const open = existing.find((p) => p.provider === args.provider && p.kind === args.kind && p.amount === args.amount && p.currency === args.currency && (p.status === "created" || p.status === "pending") && p.checkoutUrl && Date.now() - p._creationTime < 55 * 60 * 1000);
     if (open) return { paymentId: open._id, idempotencyKey: open.idempotencyKey };
+    if ((booking.status === "inquiry" || booking.status === "pending_payment") && booking.amountPaid <= 0 && booking.holdExpiresAt !== undefined) {
+      // The provider page stays open for up to an hour: keep the place for it, but never past the hold's ceiling
+      // (the hold plus one checkout window, fixed on the first extension) nor the departure itself, so starting
+      // checkouts again and again cannot lock the place. Partly paid holds never expire, so they need no extension.
+      const tour = await ctx.db.get(booking.tourId);
+      const departure = departureMs(booking.date, booking.startTime || tour?.startTimes[0] || "00:00");
+      const ceiling = holdCeiling(booking, now);
+      let cover = Math.min(now + CHECKOUT_SESSION_COVER_MS, ceiling);
+      if (Number.isFinite(departure)) cover = Math.min(cover, departure);
+      if (cover > booking.holdExpiresAt + 60_000) {
+        await ctx.db.patch(booking._id, { holdExpiresAt: cover, holdCeilingAt: ceiling, updatedAt: now });
+        await ctx.scheduler.runAt(cover, internal.bookings.expireHold, { id: booking._id });
+      }
+    }
     const idempotencyKey = `pay_${generateToken(24)}`;
     const paymentId = await ctx.db.insert("payments", { ...args, status: "created", idempotencyKey, refundedAmount: 0, updatedAt: Date.now() });
     return { paymentId, idempotencyKey };
@@ -119,6 +142,104 @@ export const getPayment = internalQuery({
   handler: async (ctx, { paymentId }) => ctx.db.get(paymentId),
 });
 
+/** Throws HOLD_EXPIRED (expired hold or departed tour) or BOOKING_NOT_PAYABLE (status) when the booking cannot be paid online. */
+function assertPayable(booking: Doc<"bookings">, now: number) {
+  const reason = unpayableReason(booking, now);
+  if (reason === "status") throw new ConvexError({ code: "BOOKING_NOT_PAYABLE", status: booking.status });
+  if (reason) throw new ConvexError({ code: "HOLD_EXPIRED", reason });
+}
+
+/** Takes a coupon use again for a booking re-confirmed after its hold expired (the expiry gave the use back). */
+async function retakeCoupon(ctx: MutationCtx, code: string | undefined) {
+  if (!code) return;
+  const c = await ctx.db.query("coupons").withIndex("by_code", (q) => q.eq("code", code)).unique();
+  if (c) await ctx.db.patch(c._id, { usedCount: c.usedCount + 1 });
+}
+
+export type PaidOutcome = "confirmed" | "reconfirmed" | "recorded" | "needs_attention";
+
+/**
+ * [P] Applies a successful payment to its booking. Shared by the provider webhook (applyEvent) and staff
+ * recordManualPayment so both make the same decision. `booking` is the row with amountPaid already including the
+ * new payment; this writes amountPaid and the resulting status, and schedules the emails.
+ *
+ * - inquiry / pending_payment: the hold already owns its place (holds count for capacity), so covering the deposit
+ *   confirms it, unless the departure has passed.
+ * - confirmed / in_progress / completed: a balance payment, recorded (with a receipt when receiptPaymentId is given).
+ * - cancelled because the hold expired, departure still ahead and the place still free (excluding itself):
+ *   re-confirmed, and its coupon use taken again.
+ * - anything else (cancelled, refunded, departed): the status is kept and the money recorded, the booking is flagged
+ *   needsAttention, an audit row is written, staff are notified and the customer gets a dedicated email.
+ *
+ * source "staff" (recordManualPayment): staff took the money themselves, often in person at departure, so the
+ * departure check is skipped and nothing is ever emailed about an inactive booking (the caller refuses cancelled and
+ * refunded bookings it cannot re-confirm, so staff reinstate those with a status change first).
+ */
+export async function confirmPaidBooking(
+  ctx: MutationCtx,
+  booking: Doc<"bookings">,
+  now: number,
+  opts: { receiptPaymentId?: Id<"payments">; actor?: { _id: Id<"users">; email?: string } | null; source?: "provider" | "staff" } = {},
+): Promise<PaidOutcome> {
+  const staffPayment = opts.source === "staff";
+  const tour = await ctx.db.get(booking.tourId);
+  const startTime = booking.startTime || tour?.startTimes[0] || "00:00";
+  const departed = !staffPayment && hasDeparted(booking.date, startTime, now);
+  const coversDeposit = booking.amountPaid >= booking.depositDue;
+  const base = { amountPaid: booking.amountPaid, updatedAt: now };
+
+  const confirm = async (outcome: "confirmed" | "reconfirmed"): Promise<PaidOutcome> => {
+    await ctx.db.patch(booking._id, {
+      ...base,
+      status: "confirmed",
+      confirmedAt: booking.confirmedAt ?? now,
+      holdExpiresAt: undefined,
+      ...(outcome === "reconfirmed" ? { cancelledAt: undefined, cancellationReason: undefined } : {}),
+    });
+    await ctx.scheduler.runAfter(0, internal.bookingEmails.sendConfirmation, { bookingId: booking._id });
+    return outcome;
+  };
+  const record = async (): Promise<PaidOutcome> => {
+    await ctx.db.patch(booking._id, base);
+    if (opts.receiptPaymentId) await ctx.scheduler.runAfter(0, internal.bookingEmails.sendPaymentReceipt, { bookingId: booking._id, paymentId: opts.receiptPaymentId });
+    return "recorded";
+  };
+  const flag = async (reason: string): Promise<PaidOutcome> => {
+    await ctx.db.patch(booking._id, { ...base, needsAttention: true, attentionReason: reason });
+    await ctx.db.insert("auditLogs", {
+      actorId: opts.actor?._id,
+      actorEmail: opts.actor?.email,
+      action: "payment.on_unpayable_booking",
+      entityType: "bookings",
+      entityId: booking._id,
+      before: { status: booking.status },
+      after: { status: booking.status, amountPaid: booking.amountPaid, reason, paymentId: opts.receiptPaymentId },
+      createdAt: now,
+    });
+    // Staff entered this payment themselves: no "action needed" email to them and no refund email to the customer
+    if (!staffPayment) {
+      await ctx.scheduler.runAfter(0, internal.bookingEmails.notifyStaffPaymentOnUnpayable, { bookingId: booking._id, reason });
+      await ctx.scheduler.runAfter(0, internal.bookingEmails.sendPaymentOnUnpayable, { bookingId: booking._id });
+    }
+    return "needs_attention";
+  };
+
+  if (booking.status === "inquiry" || booking.status === "pending_payment") {
+    if (departed) return await flag("payment_after_departure");
+    return coversDeposit ? await confirm("confirmed") : await record();
+  }
+  if (booking.status === "confirmed" || booking.status === "in_progress" || booking.status === "completed") return await record();
+  if (departed) return await flag("payment_after_departure");
+  if (booking.status === "cancelled" && booking.cancellationReason === "hold_expired" && coversDeposit && tour) {
+    const remaining = await remainingCapacity(ctx, tour, booking.date, startTime, { excludeBookingId: booking._id });
+    if (remaining < capacityUnits(tour, booking.adults, booking.children)) return await flag("no_capacity");
+    await retakeCoupon(ctx, booking.couponCode);
+    await ctx.db.insert("auditLogs", { actorId: opts.actor?._id, actorEmail: opts.actor?.email, action: "booking.reconfirmed_after_payment", entityType: "bookings", entityId: booking._id, before: { status: "cancelled", cancellationReason: "hold_expired" }, after: { status: "confirmed" }, createdAt: now });
+    return await confirm("reconfirmed");
+  }
+  return await flag(booking.status === "refunded" ? "payment_on_refunded" : "payment_on_cancelled");
+}
+
 /* ------------------------------------------------------------------ */
 /* Public action: start a hosted checkout                              */
 /* ------------------------------------------------------------------ */
@@ -138,7 +259,8 @@ export const startCheckout = action({
     const data: { booking: Doc<"bookings">; fx: Record<string, number> } | null = await ctx.runQuery(internal.payments.getBookingForCheckout, { reference: args.reference, token: args.token });
     if (!data) throw new ConvexError({ code: "BOOKING_NOT_FOUND" });
     const { booking, fx } = data;
-    if (!["pending_payment", "inquiry", "confirmed"].includes(booking.status)) throw new ConvexError({ code: "BOOKING_NOT_PAYABLE", status: booking.status });
+    // Fails fast here; createPaymentRecord re-checks atomically and extends the hold for the provider session
+    assertPayable(booking, Date.now());
     if (!isAllowedOrigin(args.origin)) throw new ConvexError({ code: "INVALID_ORIGIN" });
 
     const provider = getProvider(args.provider);
@@ -209,6 +331,9 @@ export const capturePaypal = action({
     // The order must be one we created for this booking; otherwise the merchant credentials would capture arbitrary orders.
     const payment: Doc<"payments"> | null = await ctx.runQuery(internal.payments.getPaypalPaymentByOrder, { orderId: args.orderId });
     if (!payment || payment.bookingId !== data.booking._id) throw new ConvexError({ code: "PAYMENT_NOT_FOUND" });
+    // Never take money for a booking that can no longer be paid: the approved order is left uncaptured and lapses.
+    // Opening the checkout extended the hold, so this only refuses a booking that was cancelled or really ran out.
+    if (payment.status !== "succeeded" && unpayableReason(data.booking, Date.now())) return { status: "not_payable" };
     const result = await capturePaypalOrder(args.orderId);
     if (result.status === "succeeded" && process.env.PAYMENTS_TRUST_API_VERIFICATION === "true") {
       await ctx.runMutation(internal.payments.applyEvent, {
@@ -300,20 +425,10 @@ export const applyEvent = internalMutation({
         }
         await ctx.db.patch(payment._id, { status: "succeeded", providerPaymentId: event.providerPaymentId ?? payment.providerPaymentId, paidAt: now, rawEvent: event.raw, updatedAt: now });
         const amountPaid = booking.amountPaid + payment.amountOmr;
-        const shouldConfirm = ["pending_payment", "inquiry"].includes(booking.status) && amountPaid >= booking.depositDue;
-        await ctx.db.patch(booking._id, {
-          amountPaid,
-          status: shouldConfirm ? "confirmed" : booking.status,
-          confirmedAt: shouldConfirm ? now : booking.confirmedAt,
-          holdExpiresAt: shouldConfirm ? undefined : booking.holdExpiresAt,
-          updatedAt: now,
-        });
-        await ctx.db.insert("auditLogs", { action: "payment.succeeded", entityType: "bookings", entityId: booking._id, before: { status: booking.status, amountPaid: booking.amountPaid }, after: { status: shouldConfirm ? "confirmed" : booking.status, amountPaid, provider, eventId: event.eventId }, createdAt: now });
-        if (shouldConfirm) {
-          await ctx.scheduler.runAfter(0, internal.bookingEmails.sendConfirmation, { bookingId: booking._id });
-        } else {
-          await ctx.scheduler.runAfter(0, internal.bookingEmails.sendPaymentReceipt, { bookingId: booking._id, paymentId: payment._id });
-        }
+        // The money is taken whatever happens next: confirmPaidBooking confirms, records, or flags it for staff
+        const outcome = await confirmPaidBooking(ctx, { ...booking, amountPaid }, now, { receiptPaymentId: payment._id });
+        const statusAfter = (await ctx.db.get(booking._id))?.status ?? booking.status;
+        await ctx.db.insert("auditLogs", { action: "payment.succeeded", entityType: "bookings", entityId: booking._id, before: { status: booking.status, amountPaid: booking.amountPaid }, after: { status: statusAfter, amountPaid, provider, eventId: event.eventId, outcome }, createdAt: now });
         // Loyalty: 1 point per OMR
         if (booking.userId) {
           const user = await ctx.db.get(booking.userId);

@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { localeValidator } from "./schema";
+import { addOnAppliesTo } from "./lib/pricing";
 
 /** Card projection used by lists, carousels and related-tour rails. */
 function toCard(t: Doc<"tours">) {
@@ -173,7 +174,7 @@ export const bySlug = query({
       // Resolve storage-backed media to URLs so uploads without a cached `url` still render.
       gallery: await Promise.all(gallery.map(async (g) => ({ ...g.media, url: g.media.url ?? (g.media.storageId ? (await ctx.storage.getUrl(g.media.storageId)) ?? undefined : undefined) }))),
       destinations: destinations.filter((d): d is Doc<"destinations"> => !!d).map((d) => ({ key: d.key, name: d.name, slug: d.slug })),
-      addOns: [...addOns, ...tourAddOns].filter((a) => a.isActive),
+      addOns: [...addOns, ...tourAddOns].filter((a) => a.isActive && addOnAppliesTo(a, tour)),
       reviews: reviews.map((r) => ({
         _id: r._id,
         authorName: r.authorName,
@@ -205,11 +206,12 @@ export const slugs = query({
 export const forBooking = query({
   args: { slug: v.string(), locale: localeValidator },
   handler: async (ctx, { slug, locale }) => {
-    const tour =
-      (locale === "ar"
-        ? await ctx.db.query("tours").withIndex("by_slug_ar", (q) => q.eq("slug.ar", slug)).unique()
-        : await ctx.db.query("tours").withIndex("by_slug_en", (q) => q.eq("slug.en", slug)).unique()) ??
-      (await ctx.db.query("tours").withIndex("by_slug_en", (q) => q.eq("slug.en", slug)).unique());
+    // Either locale's slug resolves (the language switcher keeps the slug; the page then redirects to the localized one)
+    const bySlugIn = (l: "en" | "ar") =>
+      l === "ar"
+        ? ctx.db.query("tours").withIndex("by_slug_ar", (q) => q.eq("slug.ar", slug)).unique()
+        : ctx.db.query("tours").withIndex("by_slug_en", (q) => q.eq("slug.en", slug)).unique();
+    const tour = (await bySlugIn(locale)) ?? (await bySlugIn(locale === "ar" ? "en" : "ar"));
     if (!tour || tour.status !== "published") return null;
     const globalAddOns = await ctx.db.query("addOns").withIndex("by_tour", (q) => q.eq("tourId", undefined)).take(20);
     const tourAddOns = await ctx.db.query("addOns").withIndex("by_tour", (q) => q.eq("tourId", tour._id)).take(20);
@@ -218,6 +220,8 @@ export const forBooking = query({
     return {
       _id: tour._id,
       code: tour.code,
+      kind: tour.kind,
+      departureType: tour.departureType ?? "private",
       title: tour.title,
       slug: tour.slug,
       summary: tour.summary,
@@ -225,6 +229,8 @@ export const forBooking = query({
       durationLabel: tour.durationLabel,
       durationDays: tour.durationDays,
       startTimes: tour.startTimes,
+      operatingWeekdays: tour.operatingWeekdays ?? null,
+      fixedDepartureDates: tour.fixedDepartureDates ?? null,
       pricingModel: tour.pricingModel,
       priceGroup: tour.priceGroup ?? null,
       priceAdult: tour.priceAdult ?? null,
@@ -240,7 +246,7 @@ export const forBooking = query({
       allowReserveNowPayLater: tour.allowReserveNowPayLater,
       holdHours: tour.holdHours,
       pickupIncluded: tour.pickupIncluded,
-      addOns: [...globalAddOns, ...tourAddOns].filter((a) => a.isActive).map((a) => ({ _id: a._id, key: a.key, name: a.name, description: a.description ?? null, price: a.price, priceType: a.priceType })),
+      addOns: [...globalAddOns, ...tourAddOns].filter((a) => a.isActive && addOnAppliesTo(a, tour)).map((a) => ({ _id: a._id, key: a.key, name: a.name, description: a.description ?? null, price: a.price, priceType: a.priceType })),
       requiredPolicies: required.map((p) => ({ _id: p._id, key: p.key, title: p.title, versionId: p.currentVersionId! })),
     };
   },

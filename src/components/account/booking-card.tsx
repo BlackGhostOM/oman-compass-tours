@@ -8,6 +8,7 @@ import { CalendarPlus, Clock, Download, MapPin, MessageCircle, XCircle } from "l
 import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { unpayableReason } from "../../../convex/lib/holds";
 import { Link } from "@/i18n/navigation";
 import { formatDate, formatOmr, pick, type LocalizedString } from "@/lib/content";
 import { site } from "@/lib/site";
@@ -68,9 +69,11 @@ export function BookingCard({ booking }: { booking: BookingSummary }) {
   const cancel = useMutation(api.bookings.requestCancellation);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [now] = useState(() => Date.now());
   const confirmed = ["confirmed", "in_progress", "completed"].includes(booking.status);
   const cancellable = ["inquiry", "pending_payment", "confirmed"].includes(booking.status);
-  const needsPayment = booking.status === "inquiry" || booking.status === "pending_payment";
+  // Unpaid and still payable: the hold has not run out and the tour has not left
+  const needsPayment = (booking.status === "inquiry" || booking.status === "pending_payment") && !unpayableReason(booking, now);
   const pickup = typeof booking.pickup === "string" ? booking.pickup : booking.pickup ? pick(booking.pickup, locale) : null;
 
   async function doCancel() {

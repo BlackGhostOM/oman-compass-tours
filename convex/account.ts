@@ -3,6 +3,7 @@ import { ConvexError } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { mutation, query } from "./_generated/server";
 import { assertString, requireUser } from "./lib/access";
+import { omanTodayIso } from "./lib/dates";
 import { isFreeCancellation } from "./lib/pricing";
 
 /* ------------------------------------------------------------------ */
@@ -42,7 +43,7 @@ export const myBookings = query({
   handler: async (ctx) => {
     const user = await requireUser(ctx);
     const rows = await ctx.db.query("bookings").withIndex("by_user", (q) => q.eq("userId", user._id)).order("desc").take(200);
-    const today = new Date(Date.now() + 4 * 3_600_000).toISOString().slice(0, 10);
+    const today = omanTodayIso();
     const out = await Promise.all(rows.map(async (b) => summarize(b, await ctx.db.get(b.tourId))));
     const upcoming = out.filter((b) => b.date >= today && !["cancelled", "refunded", "completed"].includes(b.status)).sort((a, b) => a.date.localeCompare(b.date));
     const past = out.filter((b) => b.date < today || ["cancelled", "refunded", "completed"].includes(b.status));

@@ -4,11 +4,12 @@ import { useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
-import { Plus, Search } from "lucide-react";
+import { AlertTriangle, Plus, Search } from "lucide-react";
 import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import { Link } from "@/i18n/navigation";
 import { pick } from "@/lib/content";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -92,7 +93,12 @@ export default function AdminBookingsPage() {
                   <TableCell><div>{b.traveller}</div><div className="text-xs text-muted-foreground">{b.nationality} · {b.groupSize} {t("guestsShort")}</div></TableCell>
                   <TableCell className="text-end"><Money baisa={b.total} /></TableCell>
                   <TableCell className="text-end"><Money baisa={b.amountPaid} className={b.amountPaid >= b.total ? "text-success" : b.amountPaid > 0 ? "text-warning" : ""} /></TableCell>
-                  <TableCell><StatusBadge status={b.status} /></TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <StatusBadge status={b.status} />
+                      {b.needsAttention && <Badge className="whitespace-nowrap bg-danger/15 text-danger"><AlertTriangle className="size-3" /> {t("needsAttention")}</Badge>}
+                    </div>
+                  </TableCell>
                   <TableCell className="capitalize">{b.source}</TableCell>
                   <TableCell><DateTime value={b.createdAt} /></TableCell>
                 </TableRow>

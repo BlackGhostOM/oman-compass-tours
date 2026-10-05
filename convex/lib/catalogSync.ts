@@ -95,6 +95,10 @@ export async function syncCatalogFromSeed(ctx: MutationCtx, now: number, opts: {
       durationMinutes: t.durationMinutes,
       durationDays: t.durationDays,
       startTimes: t.startTimes,
+      // Seed rules win; otherwise keep whatever staff set in the editor
+      operatingWeekdays: t.operatingWeekdays ?? existing?.operatingWeekdays,
+      fixedDepartureDates: t.fixedDepartureDates ?? existing?.fixedDepartureDates,
+      departureType: t.departureType ?? existing?.departureType,
       meetingPoint: t.meetingPoint,
       pickupIncluded: t.pickupIncluded,
       guideLanguages: t.guideLanguages,

@@ -277,6 +277,7 @@
     "availability": "Availability",
     "available": "Available",
     "soldOut": "Sold out",
+    "noDeparture": "No tour",
     "meetingPoint": "Meeting point",
     "pickupIncluded": "Hotel pickup included",
     "faqs": "Frequently asked questions",
@@ -284,14 +285,17 @@
     "readOnTripadvisor": "Read all reviews on Tripadvisor",
     "noReviewsYet": "No site reviews yet — be the first after your tour.",
     "related": "You may also like",
-    "privateUpTo": "Private · up to {count} guests",
-    "childPrice": "Child (up to {age} yrs)",
+    "privateUpTo": "Private · up to {count, plural, one {# guest} other {# guests}}",
+    "childPrice": "Child ({min}–{max} yrs)",
+    "minTravellers": "Minimum {min} travellers aged {age}+ (infants not counted)",
     "depositOnly": "Only {percent}% deposit to confirm",
     "checkAvailability": "Check availability & book",
     "askOnWhatsapp": "Ask on WhatsApp",
     "reserveNowPayLater": "Reserve now, pay later available",
     "bookNow": "Book now",
-    "pricePlaceholder": "Price to be confirmed"
+    "pricePlaceholder": "Price to be confirmed",
+    "sharedUpTo": "Shared group · up to {count, plural, one {# guest} other {# guests}}",
+    "ticketUpTo": "Up to {count, plural, one {# ticket} other {# tickets}} per booking"
   },
   "gallery": {
     "openImage": "Open image {n} of {total}",
@@ -627,6 +631,12 @@
       "title": "This page has drifted off the map",
       "body": "The link may be outdated or the page may have moved. Let us guide you back.",
       "home": "Back to home"
+    },
+    "boundary": {
+      "title": "Something went off course",
+      "body": "This page hit an unexpected problem. Please try again; if it keeps happening, message us on WhatsApp and we will sort it out.",
+      "retry": "Try again",
+      "home": "Back to home"
     }
   },
   "booking": {
@@ -634,6 +644,8 @@
     "eyebrow": "Secure booking",
     "backToTour": "← Back to tour details",
     "draftRestored": "We restored your saved booking.",
+    "draftUpdated": "We restored your saved booking and updated it to match current availability. Please check your date, time and guests.",
+    "editSelection": "Change date & guests",
     "autosave": "Your progress is saved automatically so you can come back later.",
     "steps": {
       "label": "Booking steps",
@@ -651,31 +663,71 @@
       "total": "Total",
       "depositNow": "Deposit now ({percent}%)",
       "balanceLater": "Balance paid to your guide at the start of the trip (cash or card)",
-      "soldOut": "Not enough availability for this group ({remaining} left). Please choose another date or time."
+      "couponNotApplied": "Code {code} is not applied to this booking.",
+      "soldOut": "Not enough availability for this group ({remaining} left). Please choose another date or time.",
+      "soldOutSeats": "{remaining, plural, =0 {No places are left} one {Only 1 place is left} other {Only # places are left}} at this time, and your group needs {needed}. Please choose another date or time.",
+      "soldOutVehicles": "{remaining, plural, =0 {No 4WDs are left} one {Only 1 4WD is left} other {Only # 4WDs are left}} on this departure (each carries up to {maxAdults} adults or {seats} guests), and your group needs {needed, plural, one {# vehicle} other {# vehicles}}. Please choose another date or time, or message us on WhatsApp.",
+      "slotFull": "This departure is already booked. Please choose another date or time.",
+      "unavailableReasons": {
+        "invalid_date": "This date is not valid. Please pick a day from the calendar.",
+        "past": "Bookings open from tomorrow onwards. Please choose a later date.",
+        "too_far": "We take online bookings up to {days} days ahead. Please choose an earlier date, or message us on WhatsApp for later trips.",
+        "not_operating": "This tour does not run on this date. Please choose one of the available days.",
+        "invalid_start_time": "This start time is no longer offered. Please choose another time.",
+        "below_min_group": "This tour requires at least {min} guests aged {age}+ (infants are not counted).",
+        "above_max_group": "Up to {max} guests per online booking. For a larger group, please message us on WhatsApp.",
+        "too_many_infants": "One lap infant per adult. For more infants, please message us on WhatsApp."
+      }
     },
     "dates": {
       "title": "Choose your date, time and guests",
       "subtitle": "Every departure is private to your party.",
       "legend": "Greyed-out dates are unavailable.",
+      "runsOn": "Runs every {days} only; other dates are greyed out.",
+      "fixedDepartures": "Fixed group departures only: {dates}. Choose the first day of a departure.",
+      "noUpcomingDepartures": "No upcoming departures are open for online booking. Please contact us on WhatsApp.",
       "startTime": "Start time",
       "spotsLeft": "{count} left",
+      "timeSwitched": "The {from} departure no longer has room for your group on this date, so we selected {to}.",
       "guests": "Guests",
       "adults": "Adults",
-      "adultsHint": "12 years and above",
+      "adultsHint": "{min} years and above",
       "children": "Children",
       "childrenHint": "Ages {min}–{max}",
       "infants": "Infants",
       "infantsHint": "0–{max} years · free",
       "perGroupNote": "Private-group price covers up to {max} guests in one vehicle.",
-      "perVehicleNote": "Each 4WD carries up to {maxAdults} adults ({seats} guests in total); larger parties get another vehicle added automatically.",
-      "minGroup": "This tour requires at least {min} guests.",
-      "maxGroup": "This tour takes up to {max} guests per booking.",
+      "perVehicleNote": "Each 4WD carries up to {maxAdults} adults ({seats} guests in total). Extra vehicles are added automatically, up to {max} guests per online booking.",
+      "minGroup": "This tour requires at least {min} guests aged {age}+ (infants are not counted).",
+      "maxGroup": "Up to {max} guests per online booking. For a larger group, <link>message us on WhatsApp</link> and we will gladly arrange it.",
+      "largeGroupMessage": "Hello Oman Compass Tours, I would like to book {tour} for a group of more than {max} guests.",
+      "infantsLimit": "One infant per adult, seated on the adult's lap. For more infants, <link>message us on WhatsApp</link>.",
+      "childSeatHint": "Up to one per child or infant",
+      "counter": {
+        "adults": {
+          "increase": "Add one adult",
+          "decrease": "Remove one adult"
+        },
+        "children": {
+          "increase": "Add one child",
+          "decrease": "Remove one child"
+        },
+        "infants": {
+          "increase": "Add one infant",
+          "decrease": "Remove one infant"
+        },
+        "childSeats": {
+          "increase": "Add one child seat",
+          "decrease": "Remove one child seat"
+        }
+      },
       "addOns": "Add-ons",
       "addOnsHint": "Optional extras, added to your total.",
       "free": "Free",
       "perBooking": "per booking",
       "coupon": "Coupon code (optional)",
       "couponApplied": "Coupon applied: −{amount}",
+      "removeCoupon": "Remove code",
       "couponErrors": {
         "not_found": "This code is not valid.",
         "inactive": "This code is no longer active.",
@@ -686,7 +738,12 @@
         "min_group": "This code needs a larger group.",
         "early_bird": "This code only applies when booking further in advance.",
         "tour_not_eligible": "This code does not apply to this tour."
-      }
+      },
+      "couponPlaceholder": "Promo code",
+      "laterDepartures": "Later departures open for online booking {days} days ahead; to reserve one now, message us on WhatsApp.",
+      "onlyLaterDepartures": "The next departures open for online booking {days} days ahead. To reserve one now, please message us on WhatsApp.",
+      "subtitleShared": "You join a shared group on the departure you choose, so other guests may travel with you.",
+      "subtitleTicket": "Choose your visit date and the number of tickets."
     },
     "traveller": {
       "title": "Lead traveller",
@@ -730,24 +787,34 @@
       "payNowHint": "Instant confirmation, voucher by email.",
       "payLater": "Reserve now, pay later",
       "payLaterHint": "We hold your place for {hours} hours while you arrange payment.",
+      "payLaterHintUntil": "We hold your place until {deadline} (Oman time) while you arrange payment.",
       "noneConfigured": "Online payment is temporarily unavailable — choose 'Reserve now, pay later' or contact us on WhatsApp.",
       "secure": "Payments are processed on the provider's secure page. Your card details never reach our servers.",
       "processing": "Creating your booking…",
       "reserveCta": "Reserve my place",
-      "payCta": "Continue to secure payment"
+      "payCta": "Continue to secure payment",
+      "coveredTitle": "Covered by your code",
+      "coveredHint": "Nothing to pay. Your booking is confirmed straight away and your voucher is sent by email.",
+      "confirmCta": "Confirm my booking"
     },
     "errors": {
       "UNKNOWN": "We could not create the booking. Please try again or contact us on WhatsApp.",
       "SOLD_OUT": "This date or time just sold out. Please choose another.",
-      "DATE_IN_PAST": "Please choose a future date.",
+      "DATE_IN_PAST": "Please choose a date from tomorrow onwards.",
+      "DATE_OUT_OF_RANGE": "This date is beyond our online booking window. Please choose an earlier date or message us on WhatsApp.",
+      "DATE_NOT_OPERATING": "This tour does not run on the chosen date. Please pick one of the available days.",
+      "HOLD_LIMIT": "This departure already has several reservations waiting for payment. Please choose “Pay now” to secure your place, or message us on WhatsApp.",
       "INVALID_ARGUMENT": "Please check the traveller details.",
+      "INVALID_SELECTION": "Please check your date, start time and number of guests.",
       "BELOW_MIN_GROUP": "This tour requires a larger group.",
-      "ABOVE_MAX_GROUP": "This tour cannot take a group this large — contact us for a second vehicle.",
+      "ABOVE_MAX_GROUP": "This group is larger than we can book online for this tour. Please message us on WhatsApp and we will gladly arrange it.",
+      "TOO_MANY_INFANTS": "One lap infant per adult. For more infants, please message us on WhatsApp.",
       "POLICIES_NOT_ACCEPTED": "Please accept the policies to continue.",
       "COUPON_INVALID": "The coupon code is not valid for this booking.",
       "RATE_LIMITED": "Too many attempts. Please wait a moment.",
-      "PAY_LATER_NOT_ALLOWED": "This tour must be paid at booking.",
-      "TOUR_NOT_FOUND": "This tour is no longer available."
+      "PAY_LATER_NOT_ALLOWED": "“Reserve now, pay later” is not available for this departure. Please pay now to secure your place.",
+      "TOUR_NOT_FOUND": "This tour is no longer available.",
+      "PRICE_UNAVAILABLE": "We could not price this date online. Please choose another date or message us on WhatsApp."
     }
   },
   "checkout": {
@@ -763,6 +830,12 @@
     "rebook": "Book again",
     "paymentCancelled": "The payment was cancelled. You can try again or choose another method.",
     "holdUntil": "Your place is held for about {hours} more hour(s).",
+    "holdLeftMinutes": "Your place is held for {minutes, plural, one {# more minute} other {# more minutes}}, until {time} (Oman time).",
+    "holdLeftHours": "Your place is held until {time} (Oman time), about {hours, plural, one {# more hour} other {# more hours}}.",
+    "holdExpiredTitle": "Your hold has expired",
+    "holdExpiredBody": "The time to pay for this reservation has run out and the place has been released. You have not been charged. Please book again, or message us on WhatsApp and we will gladly help.",
+    "departedBody": "This departure has already left, so the booking can no longer be paid online. Message us on WhatsApp and we will help you find another date.",
+    "whatsapp": "Message us on WhatsApp",
     "depositOption": "Pay the deposit",
     "fullOption": "Pay in full",
     "secure": "You will be redirected to the provider's PCI-compliant page. We never see or store card numbers.",
@@ -775,7 +848,8 @@
     "errors": {
       "notConfigured": "This payment method is not available right now. Please choose another or contact us.",
       "provider": "The payment provider returned an error:",
-      "generic": "Something went wrong starting the payment. Please try again."
+      "generic": "Something went wrong starting the payment. Please try again.",
+      "holdExpired": "This reservation has expired, so it can no longer be paid. Please book again."
     },
     "providers": {
       "displayCurrency": "Show prices in",
@@ -806,7 +880,13 @@
       "waitingBody": "We are waiting for the payment provider to confirm. This usually takes a few seconds.",
       "slow": "Taking longer than usual? Your booking will confirm automatically once the provider notifies us — you can safely close this page.",
       "viewBooking": "View booking",
-      "failed": "The payment did not go through. You can try again from the checkout page."
+      "failed": "The payment did not go through. You can try again from the checkout page.",
+      "expiredTitle": "This reservation has expired",
+      "expiredBody": "The hold ran out before your payment was confirmed. If a payment was taken, it will show here within a few minutes and our team will contact you to rebook or refund it. Otherwise, please book again or message us on WhatsApp.",
+      "paidUnpayableTitle": "Payment received, our team will contact you",
+      "paidUnpayableBody": "Your payment reached us safely, but this booking was no longer active when it arrived (the hold had run out, it had been cancelled, or the departure had passed). We will contact you shortly to rebook or refund you in full. You can also message us on WhatsApp.",
+      "whatsapp": "Message us on WhatsApp",
+      "rebook": "Book again"
     },
     "payLinkCta": "Continue to secure payment"
   },
@@ -818,6 +898,12 @@
     "holdTitle": "Your place is reserved",
     "confirmedBody": "A confirmation with your voucher has been sent to {email}.",
     "holdBody": "Complete payment within {hours} hour(s) to confirm. We have emailed you the details.",
+    "holdBodyUntil": "Complete payment before {deadline} (Oman time) to confirm. We have emailed you the details.",
+    "holdExpiredTitle": "Your hold has expired",
+    "holdExpiredBody": "The time to pay for this reservation has run out and the place has been released. You have not been charged. Please book again, or message us on WhatsApp and we will gladly help.",
+    "departedBody": "This departure has already left, so the booking can no longer be paid online. Message us on WhatsApp and we will help you find another date.",
+    "paidUnpayableTitle": "Payment received, our team will contact you",
+    "paidUnpayableBody": "Your payment reached us safely, but this booking was no longer active when it arrived (the hold had run out, it had been cancelled, or the departure had passed). We will contact you shortly to rebook or refund you in full. You can also message us on WhatsApp.",
     "countdown": "{d}d {h}h {m}m until your tour",
     "payPrompt": "Pay {amount} to confirm your booking.",
     "payNow": "Pay now",
@@ -839,7 +925,9 @@
     "createAccountBody": "Create an account to see vouchers, manage bookings and earn loyalty points.",
     "createAccount": "Create my account",
     "helpTitle": "Need help?",
-    "helpBody": "Our team is available 7 days a week."
+    "helpBody": "Our team is available 7 days a week.",
+    "rebook": "Book again",
+    "whatsapp": "Message us on WhatsApp"
   },
   "bookingStatus": {
     "inquiry": "Reserved — awaiting payment",
@@ -1232,7 +1320,16 @@
         "saving": "Creating…",
         "create": "Create booking",
         "created": "Booking {reference} created.",
-        "error": "Could not create the booking."
+        "error": "Could not create the booking.",
+        "overrideTitle": "This booking breaks the departure's rules:",
+        "overrideConfirm": "Create it anyway?",
+        "overrideReasons": {
+          "blackout": "The date or start time is blacked out",
+          "not_operating": "The tour does not run on this date",
+          "no_capacity": "Not enough room ({remaining} free, this booking needs {needed})",
+          "group_size": "The group size is outside the tour's minimum or maximum",
+          "too_many_infants": "More infants than adults"
+        }
       },
       "searchPlaceholder": "Search reference, name, email, phone…",
       "allStatuses": "All statuses",
@@ -1241,6 +1338,7 @@
       "to": "To",
       "empty": "No bookings match.",
       "guestsShort": "pax",
+      "needsAttention": "Needs attention",
       "cols": {
         "reference": "Reference",
         "tour": "Tour",
@@ -1262,8 +1360,20 @@
         "workflow": "Status workflow",
         "workflowHint": "Highlighted transitions follow the workflow; greyed ones force a change and are recorded in the audit log.",
         "forceHint": "Force this status",
+        "needsOverride": "Not enough room left on this departure ({remaining} free, this booking needs {needed}). Restore it anyway and overbook?",
         "statusUpdated": "Status updated.",
         "holdExpires": "Hold expires",
+        "attentionTitle": "Payment needs follow-up",
+        "attentionBody": "A payment was taken but could not confirm this booking because {reason}. Contact the customer to rebook or refund, then mark it as handled.",
+        "attentionReasons": {
+          "payment_on_cancelled": "the booking was already cancelled",
+          "payment_on_refunded": "the booking was already refunded",
+          "payment_after_departure": "the departure had already left",
+          "no_capacity": "the hold had expired and the departure no longer has room",
+          "other": "of an unexpected state"
+        },
+        "clearAttention": "Mark as handled",
+        "attentionCleared": "Marked as handled.",
         "traveller": "Traveller",
         "name": "Name",
         "phone": "Phone",
@@ -1304,7 +1414,10 @@
         "regenerateVoucher": "Rotate voucher token",
         "regenerated": "Voucher token rotated.",
         "policiesAccepted": "Customer accepted {count} policy versions",
-        "back": "Back to bookings"
+        "back": "Back to bookings",
+        "errors": {
+          "BOOKING_NOT_PAYABLE": "This booking is cancelled or refunded. Reinstate it with a status change first, then record the payment."
+        }
       },
       "manualCta": "Manual booking"
     },
@@ -1391,6 +1504,10 @@
         "durationMinutes": "Duration (minutes)",
         "durationDays": "Days",
         "startTimes": "Start times",
+        "operatingDays": "Operating days",
+        "operatingDaysHint": "Leave every day unticked if the tour runs daily. Otherwise customers can only book the ticked weekdays.",
+        "fixedDepartures": "Fixed departure dates",
+        "fixedDeparturesHint": "Start dates as YYYY-MM-DD, separated by commas or new lines. When set, only these dates can be booked and they take priority over operating days.",
         "guideLanguages": "Guide languages",
         "difficulty": "Difficulty",
         "difficulties": {
@@ -1448,7 +1565,7 @@
         "coverUrl": "Cover image URL",
         "videoUrl": "Video URL",
         "availabilityTitle": "Availability & blackout dates",
-        "availabilityHint": "Default capacity per slot is {capacity}. Add an override to change capacity or block a date.",
+        "availabilityHint": "Default capacity per slot is {capacity}. Add an override to change capacity or block a date. An “All slots” capacity applies to each start time on that date, and 0 closes the day.",
         "date": "Date",
         "time": "Slot",
         "allSlots": "All slots",
@@ -1468,7 +1585,13 @@
         "blackoutDates": "Block these dates",
         "pickDateFirst": "Pick a date first",
         "appliedDays": "Applied to {days} day(s).",
-        "blackoutNote": "Blocking here only stops bookings on the chosen dates. To hide this product from the website entirely, use “Save as draft (hidden)” above, or tick several products in the list and choose “Hide from site”."
+        "blackoutNote": "Blocking here only stops bookings on the chosen dates. To hide this product from the website entirely, use “Save as draft (hidden)” above, or tick several products in the list and choose “Hide from site”.",
+        "departureType": "Departure type",
+        "departureTypes": {
+          "private": "Private (one party per departure)",
+          "shared": "Shared (group trip or ticket)"
+        },
+        "seasonInvalid": "Check the season: the dates must be in order and every price above 0."
       },
       "selectAll": "Select all",
       "selected": "{count} selected",

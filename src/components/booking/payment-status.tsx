@@ -4,9 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useAction, useQuery } from "convex/react";
-import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Loader2 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Link, useRouter } from "@/i18n/navigation";
+import { pick } from "@/lib/content";
+import { site } from "@/lib/site";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -25,6 +27,8 @@ export function PaymentStatus({ reference, token }: { reference: string; token: 
   const verify = useAction(api.payments.verifyWithProvider);
   const [elapsed, setElapsed] = useState(0);
   const captured = useRef(false);
+  /** PayPal refused to capture because the booking could no longer be paid (no money taken). */
+  const [notPayable, setNotPayable] = useState(false);
   const verified = useRef(false);
 
   const provider = params.get("p");
@@ -35,7 +39,11 @@ export function PaymentStatus({ reference, token }: { reference: string; token: 
   useEffect(() => {
     if (provider === "paypal" && paypalOrder && !captured.current) {
       captured.current = true;
-      void capturePaypal({ reference, token, orderId: paypalOrder }).catch(() => {});
+      void capturePaypal({ reference, token, orderId: paypalOrder })
+        .then((r) => {
+          if (r.status === "not_payable") setNotPayable(true);
+        })
+        .catch(() => {});
     }
   }, [provider, paypalOrder, capturePaypal, reference, token]);
 
@@ -70,6 +78,29 @@ export function PaymentStatus({ reference, token }: { reference: string; token: 
   }
   const confirmed = ["confirmed", "in_progress", "completed"].includes(booking.status);
   const failed = booking.payments.some((p) => p.status === "failed") && !confirmed;
+  const inactive = booking.status === "cancelled" || booking.status === "refunded";
+  // Paid, but the booking could not be confirmed (cancelled, expired or departed): staff follow up, stop spinning
+  const paidUnpayable = !confirmed && (booking.needsAttention || (inactive && booking.amountPaid > 0));
+  // Cancelled with nothing paid: give the webhook a moment in case the payment is still on its way
+  const expired = !confirmed && !paidUnpayable && (notPayable || (inactive && elapsed >= 15));
+  const whatsappHref = `https://wa.me/${site.whatsappNumber}?text=${encodeURIComponent(`Payment status for booking ${reference}`)}`;
+
+  if (paidUnpayable || expired) {
+    return (
+      <div className="rounded-xl border border-warning/40 bg-white p-8 text-center">
+        {paidUnpayable ? <AlertTriangle className="mx-auto size-12 text-warning" /> : <Clock className="mx-auto size-12 text-warning" />}
+        <h2 className="mt-4 font-heading text-xl text-navy-950">{paidUnpayable ? t("paidUnpayableTitle") : t("expiredTitle")}</h2>
+        <p className="mx-auto mt-2 max-w-prose text-sm text-ink-500">{paidUnpayable ? t("paidUnpayableBody") : t("expiredBody")}</p>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <Button asChild className="bg-gold-gradient text-navy-950"><a href={whatsappHref} target="_blank" rel="noopener noreferrer">{t("whatsapp")}</a></Button>
+          {!paidUnpayable && booking.tour && <Button asChild variant="outline"><Link href={`/book/${pick(booking.tour.slug, locale)}`}>{t("rebook")}</Link></Button>}
+          <Button asChild variant="outline"><Link href={`/booking/${reference}?t=${token}`}>{t("viewBooking")}</Link></Button>
+        </div>
+        <p className="mt-6 text-xs text-ink-500" dir="ltr">{reference}</p>
+        <p className="sr-only" aria-live="polite">{paidUnpayable ? t("paidUnpayableTitle") : t("expiredTitle")}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-xl border border-sand-200 bg-white p-8 text-center">

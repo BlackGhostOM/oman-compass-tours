@@ -6,6 +6,7 @@ import { assertInt, audit, requireStaff } from "../lib/access";
 import { faqValidator, itineraryDayValidator, localized, localizedOptional, mediaValidator, pricingModelValidator, seoValidator } from "../schema";
 import { releaseStorageRefs } from "../lib/mediaRefs";
 import { priceFromOf, pricingProblem } from "../lib/pricing";
+import { isRealIsoDate } from "../lib/dates";
 
 const slugify = (s: string) =>
   s
@@ -67,6 +68,12 @@ const tourInput = {
   durationMinutes: v.number(),
   durationDays: v.number(),
   startTimes: v.array(v.string()),
+  /** Weekdays the tour runs, 0 = Sunday; omitted or empty = every day. */
+  operatingWeekdays: v.optional(v.array(v.number())),
+  /** Departure start dates (YYYY-MM-DD); when set, only these dates are bookable. */
+  fixedDepartureDates: v.optional(v.array(v.string())),
+  /** "shared" for group trips and tickets other guests also book; omitted = private. */
+  departureType: v.optional(v.union(v.literal("private"), v.literal("shared"))),
   meetingPoint: v.optional(v.object({ label: localized, address: v.optional(v.string()), lat: v.optional(v.number()), lng: v.optional(v.number()), mapsUrl: v.optional(v.string()) })),
   pickupIncluded: v.boolean(),
   guideLanguages: v.array(v.string()),
@@ -115,10 +122,20 @@ export const upsert = mutation({
     assertInt(data.minGroup, 1, 200, "minGroup");
     assertInt(data.maxGroup, data.minGroup, 500, "maxGroup");
     assertInt(data.defaultCapacityPerSlot, 1, 500, "capacity");
-    assertInt(data.depositPercent, 0, 100, "depositPercent");
+    // Every tour takes a deposit (1-100%): 0% would promise "pay 0 now" and then charge the full price at checkout
+    assertInt(data.depositPercent, 1, 100, "depositPercent");
+    // Age bands follow these settings (infants 0..infantAgeMax, children ..childAgeMax, adults above), so they must not overlap
+    const infantAgeMax = assertInt(data.infantAgeMax ?? 2, 0, 5, "infantAgeMax");
+    if (data.childAgeMax !== undefined) assertInt(data.childAgeMax, infantAgeMax + 1, 17, "childAgeMax");
     assertInt(data.freeCancellationHours, 0, 720, "freeCancellationHours");
     assertInt(data.holdHours, 1, 168, "holdHours");
     assertInt(data.durationDays, 1, 60, "durationDays");
+    // Operating rules: unique and sorted, and an empty list is stored as "not set" (runs every day)
+    const operatingWeekdays = [...new Set(data.operatingWeekdays ?? [])].sort((a, b) => a - b);
+    for (const d of operatingWeekdays) assertInt(d, 0, 6, "operatingWeekdays");
+    const fixedDepartureDates = [...new Set((data.fixedDepartureDates ?? []).map((d) => d.trim()))].sort();
+    if (fixedDepartureDates.length > 200) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "fixedDepartureDates" });
+    for (const d of fixedDepartureDates) if (!isRealIsoDate(d)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "fixedDepartureDates" });
     const priceGroup = omr(data.priceGroupOmr, "priceGroupOmr");
     const priceAdult = omr(data.priceAdultOmr, "priceAdultOmr");
     const priceChild = omr(data.priceChildOmr, "priceChildOmr");
@@ -155,6 +172,8 @@ export const upsert = mutation({
     const doc = {
       ...rest,
       slug,
+      operatingWeekdays: operatingWeekdays.length > 0 ? operatingWeekdays : undefined,
+      fixedDepartureDates: fixedDepartureDates.length > 0 ? fixedDepartureDates : undefined,
       priceGroup,
       priceAdult,
       priceChild,
@@ -301,6 +320,12 @@ export const upsertSeason = mutation({
   returns: v.id("pricingSeasons"),
   handler: async (ctx, args) => {
     await requireStaff(ctx);
+    // A season price replaces the tour price, so 0, negative or absurd values would sell tours free or broken
+    for (const [field, x] of [["priceGroupOmr", args.priceGroupOmr], ["priceAdultOmr", args.priceAdultOmr], ["priceChildOmr", args.priceChildOmr]] as const) {
+      if (x !== undefined && !(Number.isFinite(x) && x > 0 && x <= 100_000)) throw new ConvexError({ code: "INVALID_ARGUMENT", field });
+    }
+    if (args.priceGroupOmr === undefined && args.priceAdultOmr === undefined && args.priceChildOmr === undefined) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "price" });
+    if (!isRealIsoDate(args.startDate) || !isRealIsoDate(args.endDate) || args.startDate > args.endDate) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "dates" });
     const omr = (x?: number) => (x === undefined ? undefined : Math.round(x * 1000));
     const doc = { tourId: args.tourId, name: args.name, startDate: args.startDate, endDate: args.endDate, priceGroup: omr(args.priceGroupOmr), priceAdult: omr(args.priceAdultOmr), priceChild: omr(args.priceChildOmr), isActive: args.isActive };
     if (args.id) { await ctx.db.patch(args.id, doc); return args.id; }
@@ -330,7 +355,11 @@ export const setAvailability = mutation({
     const staff = await requireStaff(ctx);
     const tour = await ctx.db.get(args.tourId);
     if (!tour) throw new ConvexError({ code: "NOT_FOUND" });
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(args.date)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "date" });
+    if (!isRealIsoDate(args.date)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "date" });
+    if (args.toDate && !isRealIsoDate(args.toDate)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "toDate" });
+    // Capacity is per start time: a row for an unknown time would never apply, and a fraction or negative would corrupt every count
+    if (args.startTime !== undefined && !tour.startTimes.includes(args.startTime)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "startTime" });
+    if (args.capacity !== undefined) assertInt(args.capacity, 0, 10_000, "capacity");
     const last = args.toDate && args.toDate > args.date ? args.toDate : args.date;
     const dates: string[] = [];
     for (let d = new Date(`${args.date}T00:00:00Z`); dates.length < 366; d.setUTCDate(d.getUTCDate() + 1)) {
@@ -339,7 +368,7 @@ export const setAvailability = mutation({
       dates.push(iso);
     }
     for (const date of dates) {
-      const rows = await ctx.db.query("availability").withIndex("by_tour_date", (q) => q.eq("tourId", args.tourId).eq("date", date)).take(20);
+      const rows = await ctx.db.query("availability").withIndex("by_tour_date", (q) => q.eq("tourId", args.tourId).eq("date", date)).collect();
       const existing = rows.find((r) => (r.startTime ?? null) === (args.startTime ?? null));
       const doc = { tourId: args.tourId, date, startTime: args.startTime, capacity: args.capacity ?? tour.defaultCapacityPerSlot, booked: existing?.booked ?? 0, isBlackout: args.isBlackout, note: args.note };
       if (existing) await ctx.db.patch(existing._id, doc);
@@ -357,11 +386,24 @@ export const clearAvailability = mutation({
 });
 
 export const upsertAddOn = mutation({
-  args: { id: v.optional(v.id("addOns")), tourId: v.optional(v.id("tours")), key: v.string(), name: localized, description: localizedOptional, priceOmr: v.number(), priceType: v.union(v.literal("per_booking"), v.literal("per_person")), isActive: v.boolean(), order: v.number() },
+  args: {
+    id: v.optional(v.id("addOns")),
+    tourId: v.optional(v.id("tours")),
+    key: v.string(),
+    name: localized,
+    description: localizedOptional,
+    priceOmr: v.number(),
+    priceType: v.union(v.literal("per_booking"), v.literal("per_person")),
+    isActive: v.boolean(),
+    order: v.number(),
+    /** Product kinds the extra suits (omit or empty = every kind). */
+    appliesToKinds: v.optional(v.array(v.union(v.literal("tour"), v.literal("service")))),
+  },
   returns: v.id("addOns"),
   handler: async (ctx, args) => {
     await requireStaff(ctx);
-    const doc = { tourId: args.tourId, key: args.key, name: args.name, description: args.description, price: Math.round(Math.max(0, args.priceOmr) * 1000), priceType: args.priceType, isActive: args.isActive, order: args.order };
+    const kinds = args.appliesToKinds?.length ? [...new Set(args.appliesToKinds)] : undefined;
+    const doc = { tourId: args.tourId, key: args.key, name: args.name, description: args.description, price: Math.round(Math.max(0, args.priceOmr) * 1000), priceType: args.priceType, isActive: args.isActive, order: args.order, appliesToKinds: kinds };
     if (args.id) { await ctx.db.patch(args.id, doc); return args.id; }
     return await ctx.db.insert("addOns", doc);
   },
@@ -502,10 +544,11 @@ export const importTours = mutation({
           priceChild,
           tieredPricing,
           vehiclePricing,
-          childAgeMax: r.child_age_max ? Number(r.child_age_max) : undefined,
+          childAgeMax: r.child_age_max === undefined || r.child_age_max === null || r.child_age_max === "" ? undefined : int(r.child_age_max, 3, 17, "child_age_max"),
           infantAgeMax: 2,
           priceFrom: priceFromOf({ pricingModel, priceGroup, priceAdult, tieredPricing, vehiclePricing }),
-          depositPercent: Number(r.deposit_percent ?? 100),
+          // A blank deposit means full payment; 0% is refused (see upsert)
+          depositPercent: r.deposit_percent === undefined || r.deposit_percent === null || r.deposit_percent === "" ? 100 : int(r.deposit_percent, 1, 100, "deposit_percent"),
           freeCancellationHours: Number(r.free_cancellation_hours ?? 24),
           allowReserveNowPayLater: true,
           holdHours: 24,

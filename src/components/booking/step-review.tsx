@@ -9,13 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import type { BookingTour, WizardState } from "@/components/booking/types";
-import type { QuoteView } from "@/components/booking/price-summary";
+import { SelectionIssue, type QuoteView } from "@/components/booking/price-summary";
+import { isQuoteBookable } from "@/components/booking/selection";
 
-export function StepReview({ tour, state, update, quote, onBack, onNext }: { tour: BookingTour; state: WizardState; update: (p: Partial<WizardState>) => void; quote: QuoteView; onBack: () => void; onNext: () => void }) {
+export function StepReview({ tour, state, update, quote, onBack, onEdit, onNext }: { tour: BookingTour; state: WizardState; update: (p: Partial<WizardState>) => void; quote: QuoteView; onBack: () => void; onEdit: () => void; onNext: () => void }) {
   const locale = useLocale();
   const t = useTranslations("booking.review");
   const tc = useTranslations("common");
-  const canContinue = state.acceptedPolicies && state.acceptedWaiver && quote?.available !== false;
+  const canContinue = state.acceptedPolicies && state.acceptedWaiver && isQuoteBookable(quote, state.couponCode);
   const policyLinks = tour.requiredPolicies;
 
   return (
@@ -42,7 +43,7 @@ export function StepReview({ tour, state, update, quote, onBack, onNext }: { tou
         <p className="flex items-center gap-2 font-medium"><ShieldCheck className="size-4 text-success" /> {t("policyHeadline")}</p>
         <p className="mt-1 text-ink-500">
           {tour.freeCancellationHours > 0 ? tc("freeCancellation", { window: cancellationWindow(tour.freeCancellationHours, locale) }) : tc("nonRefundable")}
-          {tour.depositPercent < 100 && ` · ${t("deposit", { percent: tour.depositPercent })}`}
+          {tour.depositPercent < 100 && quote?.total !== 0 && ` · ${t("deposit", { percent: tour.depositPercent })}`}
         </p>
       </div>
 
@@ -56,7 +57,7 @@ export function StepReview({ tour, state, update, quote, onBack, onNext }: { tou
                   {policyLinks.filter((p) => p.key !== "waiver").map((p, i, arr) => (
                     <span key={p.key}>
                       <Link href={`/policies/${p.key}`} target="_blank" className="text-gold-700 underline underline-offset-4">{pick(p.title, locale)}</Link>
-                      {i < arr.length - 1 ? ", " : ""}
+                      {i < arr.length - 1 ? (locale === "ar" ? "، " : ", ") : ""}
                     </span>
                   ))}
                 </span>
@@ -72,6 +73,8 @@ export function StepReview({ tour, state, update, quote, onBack, onNext }: { tou
         </div>
         <p className="text-xs text-ink-500">{t("versionNote")}</p>
       </div>
+
+      <SelectionIssue tour={tour} quote={quote} couponCode={state.couponCode} onEdit={onEdit} />
 
       <div className="flex justify-between">
         <Button variant="outline" size="lg" onClick={onBack}>{tc("back")}</Button>

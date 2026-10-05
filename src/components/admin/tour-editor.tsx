@@ -29,6 +29,11 @@ type Faq = { question: LocalizedString; answer: LocalizedString };
 
 const L = (en = "", ar = ""): LocalizedString => ({ en, ar });
 
+/** Weekdays in display order (Sunday first, 0 = Sunday as stored on the tour). */
+const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6];
+/** 2023-01-01 was a Sunday, so day n of that week has weekday n. */
+const weekdayName = (n: number, locale: string) => new Intl.DateTimeFormat(locale === "ar" ? "ar-OM" : "en-GB", { weekday: "short", timeZone: "UTC" }).format(new Date(Date.UTC(2023, 0, 1 + n)));
+
 function initial(t: TourDoc | null) {
   return {
     code: t?.code ?? "",
@@ -49,6 +54,9 @@ function initial(t: TourDoc | null) {
     durationMinutes: t?.durationMinutes ?? 480,
     durationDays: t?.durationDays ?? 1,
     startTimes: (t?.startTimes ?? ["08:00"]).join(", "),
+    operatingWeekdays: (t?.operatingWeekdays ?? []) as number[],
+    fixedDepartureDates: (t?.fixedDepartureDates ?? []).join(", "),
+    departureType: (t?.departureType ?? "private") as "private" | "shared",
     meetingLabel: t?.meetingPoint?.label ?? L(),
     meetingAddress: t?.meetingPoint?.address ?? "",
     meetingLat: t?.meetingPoint?.lat?.toString() ?? "",
@@ -128,6 +136,7 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
           code: f.code.trim(), kind: f.kind, title: f.title, slug: f.slug.en || f.slug.ar ? f.slug : undefined, summary: f.summary, description: f.description, highlights: f.highlights, itinerary: f.itinerary, inclusions: f.inclusions, exclusions: f.exclusions, faqs: f.faqs,
           categoryId: f.categoryId as Id<"categories">, secondaryCategoryIds: f.secondaryCategoryIds as Id<"categories">[], destinationIds: f.destinationIds as Id<"destinations">[],
           durationLabel: f.durationLabel, durationMinutes: f.durationMinutes, durationDays: f.durationDays, startTimes: f.startTimes.split(",").map((s) => s.trim()).filter(Boolean),
+          operatingWeekdays: f.operatingWeekdays, fixedDepartureDates: f.fixedDepartureDates.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean), departureType: f.departureType,
           meetingPoint: f.meetingLabel.en || f.meetingLabel.ar ? { label: f.meetingLabel, address: f.meetingAddress || undefined, lat: num(f.meetingLat), lng: num(f.meetingLng) } : undefined,
           pickupIncluded: f.pickupIncluded, guideLanguages: f.guideLanguages.split(",").map((s) => s.trim()).filter(Boolean), minGroup: f.minGroup, maxGroup: f.maxGroup, defaultCapacityPerSlot: f.defaultCapacityPerSlot, difficulty: f.difficulty,
           pricingModel: f.pricingModel, priceGroupOmr: f.priceGroupOmr || undefined, priceAdultOmr: f.priceAdultOmr || undefined, priceChildOmr: f.priceChildOmr || undefined,
@@ -201,6 +210,7 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-1.5"><Label>{t("code")}</Label><Input value={f.code} onChange={(e) => set("code", e.target.value)} placeholder="OCT-011" /></div>
               <div className="space-y-1.5"><Label>{t("kind")}</Label><Select value={f.kind} onValueChange={(v) => set("kind", v as "tour" | "service")}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="tour">{t("kinds.tour")}</SelectItem><SelectItem value="service">{t("kinds.service")}</SelectItem></SelectContent></Select></div>
+              <div className="space-y-1.5"><Label>{t("departureType")}</Label><Select value={f.departureType} onValueChange={(v) => set("departureType", v as "private" | "shared")}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="private">{t("departureTypes.private")}</SelectItem><SelectItem value="shared">{t("departureTypes.shared")}</SelectItem></SelectContent></Select></div>
               <div className="space-y-1.5"><Label>{t("category")}</Label><Select value={f.categoryId} onValueChange={(v) => set("categoryId", v)}><SelectTrigger className="w-full"><SelectValue placeholder="—" /></SelectTrigger><SelectContent>{categories.map((c) => <SelectItem key={c._id} value={c._id}>{pick(c.name, locale)}</SelectItem>)}</SelectContent></Select></div>
             </div>
             <div className="mt-4 space-y-4">
@@ -262,6 +272,25 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
                 {f.pricingModel !== "per_person" && <p className="text-xs text-muted-foreground">{f.pricingModel === "per_vehicle" ? t("capacityUnitVehicles") : t("capacityUnitDepartures")}</p>}
               </div>
             </div>
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>{t("operatingDays")}</Label>
+                <div className="flex flex-wrap gap-2">
+                  {WEEKDAYS.map((d) => (
+                    <label key={d} className="flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-sm">
+                      <Checkbox checked={f.operatingWeekdays.includes(d)} onCheckedChange={(v) => set("operatingWeekdays", v ? [...f.operatingWeekdays, d].sort((a, b) => a - b) : f.operatingWeekdays.filter((x) => x !== d))} />
+                      {weekdayName(d, locale)}
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">{t("operatingDaysHint")}</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="fixedDepartures">{t("fixedDepartures")}</Label>
+                <Textarea id="fixedDepartures" rows={2} value={f.fixedDepartureDates} onChange={(e) => set("fixedDepartureDates", e.target.value)} placeholder="2026-10-19, 2026-12-28" dir="ltr" />
+                <p className="text-xs text-muted-foreground">{t("fixedDeparturesHint")}</p>
+              </div>
+            </div>
             <div className="mt-4 flex items-center gap-3"><Switch checked={f.pickupIncluded} onCheckedChange={(v) => set("pickupIncluded", v)} id="pickup" /><Label htmlFor="pickup">{t("pickupIncluded")}</Label></div>
           </Panel>
           <Panel title={t("destinations")}>
@@ -302,7 +331,7 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
                 <>
                   <div className="space-y-1.5"><Label>{t("priceAdult")}</Label><Input type="number" step="0.001" value={f.priceAdultOmr} onChange={(e) => set("priceAdultOmr", Number(e.target.value))} /></div>
                   <div className="space-y-1.5"><Label>{t("priceChild")}</Label><Input type="number" step="0.001" value={f.priceChildOmr} onChange={(e) => set("priceChildOmr", Number(e.target.value))} /></div>
-                  <div className="space-y-1.5"><Label>{t("childAgeMax")}</Label><Input type="number" value={f.childAgeMax} onChange={(e) => set("childAgeMax", Number(e.target.value))} /></div>
+                  <div className="space-y-1.5"><Label>{t("childAgeMax")}</Label><Input type="number" min={3} max={17} value={f.childAgeMax} onChange={(e) => e.target.value !== "" && set("childAgeMax", Number(e.target.value))} /></div>
                 </>
               )}
               {f.pricingModel === "tiered" && (
@@ -311,7 +340,7 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
                   <div className="space-y-1.5"><Label>{t("tierFirstTwo")}</Label><Input type="number" step="0.001" value={f.tierFirstTwoOmr} onChange={(e) => set("tierFirstTwoOmr", Number(e.target.value))} /></div>
                   <div className="space-y-1.5"><Label>{t("tierExtraAdult")}</Label><Input type="number" step="0.001" value={f.tierExtraAdultOmr} onChange={(e) => set("tierExtraAdultOmr", Number(e.target.value))} /></div>
                   <div className="space-y-1.5"><Label>{t("tierExtraChild")}</Label><Input type="number" step="0.001" value={f.tierExtraChildOmr} onChange={(e) => set("tierExtraChildOmr", Number(e.target.value))} /></div>
-                  <div className="space-y-1.5"><Label>{t("childAgeMax")}</Label><Input type="number" value={f.childAgeMax} onChange={(e) => set("childAgeMax", Number(e.target.value))} /></div>
+                  <div className="space-y-1.5"><Label>{t("childAgeMax")}</Label><Input type="number" min={3} max={17} value={f.childAgeMax} onChange={(e) => e.target.value !== "" && set("childAgeMax", Number(e.target.value))} /></div>
                 </>
               )}
               {f.pricingModel === "per_vehicle" && (
@@ -336,7 +365,7 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
                   })()}
                 </p>
               )}
-              <div className="space-y-1.5"><Label>{t("deposit")}</Label><Input type="number" min={0} max={100} value={f.depositPercent} onChange={(e) => set("depositPercent", Number(e.target.value))} /></div>
+              <div className="space-y-1.5"><Label>{t("deposit")}</Label><Input type="number" min={1} max={100} value={f.depositPercent} onChange={(e) => e.target.value !== "" && set("depositPercent", Number(e.target.value))} /></div>
               <div className="space-y-1.5"><Label>{t("freeCancellation")}</Label><Input type="number" min={0} value={f.freeCancellationHours} onChange={(e) => set("freeCancellationHours", Number(e.target.value))} /></div>
               <div className="space-y-1.5"><Label>{t("holdHours")}</Label><Input type="number" min={1} value={f.holdHours} onChange={(e) => set("holdHours", Number(e.target.value))} /></div>
             </div>
@@ -364,7 +393,7 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
                 <div className="space-y-1.5"><Label>{t("from")}</Label><Input type="date" value={season.startDate} onChange={(e) => setSeason({ ...season, startDate: e.target.value })} /></div>
                 <div className="space-y-1.5"><Label>{t("to")}</Label><Input type="date" value={season.endDate} onChange={(e) => setSeason({ ...season, endDate: e.target.value })} /></div>
                 <div className="space-y-1.5"><Label>{f.pricingModel === "per_group" ? t("priceGroup") : t("priceAdult")}</Label><Input type="number" step="0.001" value={f.pricingModel === "per_group" ? season.priceGroupOmr : season.priceAdultOmr} onChange={(e) => setSeason(f.pricingModel === "per_group" ? { ...season, priceGroupOmr: e.target.value } : { ...season, priceAdultOmr: e.target.value })} /></div>
-                <div className="flex items-end"><Button size="sm" disabled={!season.startDate || !season.endDate} onClick={async () => { await upsertSeason({ tourId: tour._id, name: season.name, startDate: season.startDate, endDate: season.endDate, priceAdultOmr: season.priceAdultOmr ? Number(season.priceAdultOmr) : undefined, priceGroupOmr: season.priceGroupOmr ? Number(season.priceGroupOmr) : undefined, priceChildOmr: season.priceChildOmr ? Number(season.priceChildOmr) : undefined, isActive: true }); setSeason({ name: L(), startDate: "", endDate: "", priceAdultOmr: "", priceGroupOmr: "", priceChildOmr: "" }); toast.success(t("saved")); }}><Plus className="size-4" /> {t("add")}</Button></div>
+                <div className="flex items-end"><Button size="sm" disabled={!season.startDate || !season.endDate || season.endDate < season.startDate} onClick={async () => { const price = (x: string) => (x.trim() === "" ? undefined : Number(x)); try { await upsertSeason({ tourId: tour._id, name: season.name, startDate: season.startDate, endDate: season.endDate, priceAdultOmr: price(season.priceAdultOmr), priceGroupOmr: price(season.priceGroupOmr), priceChildOmr: price(season.priceChildOmr), isActive: true }); setSeason({ name: L(), startDate: "", endDate: "", priceAdultOmr: "", priceGroupOmr: "", priceChildOmr: "" }); toast.success(t("saved")); } catch { toast.error(t("seasonInvalid")); } }}><Plus className="size-4" /> {t("add")}</Button></div>
               </div>
             </Panel>
           )}

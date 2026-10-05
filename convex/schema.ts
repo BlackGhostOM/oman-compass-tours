@@ -231,6 +231,12 @@ export default defineSchema({
     durationMinutes: v.number(), // for filtering/sorting
     durationDays: v.number(), // 1 for day tours
     startTimes: v.array(v.string()), // ["08:00","14:00"]
+    /** Weekdays the tour runs (0 = Sunday … 6 = Saturday). Unset or empty = every day. */
+    operatingWeekdays: v.optional(v.array(v.number())),
+    /** Departure start dates (YYYY-MM-DD). When set, only these dates can be booked (wins over weekdays). */
+    fixedDepartureDates: v.optional(v.array(v.string())),
+    /** "shared": seats on a departure other guests also book (group trips, tickets). Unset = "private". */
+    departureType: v.optional(v.union(v.literal("private"), v.literal("shared"))),
     meetingPoint: v.optional(
       v.object({
         label: localized,
@@ -332,6 +338,8 @@ export default defineSchema({
     priceType: v.union(v.literal("per_booking"), v.literal("per_person")),
     isActive: v.boolean(),
     order: v.number(),
+    /** Product kinds the extra can be delivered on (e.g. ["tour"] for a guide upgrade). Unset = every kind. */
+    appliesToKinds: v.optional(v.array(v.union(v.literal("tour"), v.literal("service")))),
   })
     .index("by_tour", ["tourId", "order"])
     .index("by_key", ["key"]),
@@ -378,6 +386,11 @@ export default defineSchema({
     status: bookingStatusValidator,
     paymentMethodPreference: v.optional(paymentProviderValidator),
     holdExpiresAt: v.optional(v.number()),
+    /**
+     * Latest instant an opened checkout may keep this hold alive (set on the first extension: the hold it extended
+     * plus one checkout window). Reset whenever staff start a fresh hold.
+     */
+    holdCeilingAt: v.optional(v.number()),
     policyVersionIds: v.array(v.id("policyVersions")),
     source: v.union(
       v.literal("web"),
@@ -402,11 +415,17 @@ export default defineSchema({
     reminderSentAt: v.optional(v.number()),
     reviewRequestedAt: v.optional(v.number()),
     createdByStaffId: v.optional(v.id("users")),
+    /** Money arrived that could not confirm the booking (cancelled, refunded or departed): staff must refund or rebook. */
+    needsAttention: v.optional(v.boolean()),
+    /** Why needsAttention was set, e.g. "payment_on_cancelled", "payment_after_departure", "no_capacity". */
+    attentionReason: v.optional(v.string()),
     updatedAt: v.number(),
   })
     .index("by_reference", ["reference"])
     .index("by_user", ["userId", "date"])
     .index("by_tour_date", ["tourId", "date"])
+    // Capacity reads only the statuses that hold a place, for one date or a range (lib/capacity)
+    .index("by_tour_status_date", ["tourId", "status", "date"])
     .index("by_status", ["status", "date"])
     .index("by_date", ["date"])
     .index("by_holdExpiry", ["status", "holdExpiresAt"])

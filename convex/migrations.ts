@@ -2,7 +2,8 @@ import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { syncCatalogFromSeed } from "./lib/catalogSync";
 import { POLICY_TEXTS } from "./seedData/policyTexts2026";
-import { RETIRED_TOUR_CODES } from "./seedData/tours";
+import { RETIRED_TOUR_CODES, toursSeed } from "./seedData/tours";
+import { addOnsSeed } from "./seedData/misc";
 
 /**
  * One-off data migrations, run with `npx convex run migrations:<name> [--prod]`.
@@ -109,5 +110,35 @@ export const localizeDestinationRegions = internalMutation({
       updated += 1;
     }
     return { updated, total: rows.length };
+  },
+});
+
+/**
+ * Scopes the tour-only global extras (senior guide, restaurant lunch, photo package) to tours, and marks the shared
+ * group trips and tickets as shared departures, from the seed. Only fills fields staff have not set.
+ */
+export const scopeAddOnsAndDepartures = internalMutation({
+  args: {},
+  returns: v.object({ addOns: v.number(), tours: v.number() }),
+  handler: async (ctx) => {
+    let addOns = 0;
+    for (const a of addOnsSeed) {
+      if (!a.appliesToKinds) continue;
+      const row = await ctx.db.query("addOns").withIndex("by_key", (q) => q.eq("key", a.key)).unique();
+      if (row && !row.appliesToKinds?.length) {
+        await ctx.db.patch(row._id, { appliesToKinds: a.appliesToKinds });
+        addOns += 1;
+      }
+    }
+    let tours = 0;
+    for (const t of toursSeed) {
+      if (!t.departureType) continue;
+      const row = await ctx.db.query("tours").withIndex("by_code", (q) => q.eq("code", t.code)).unique();
+      if (row && !row.departureType) {
+        await ctx.db.patch(row._id, { departureType: t.departureType, updatedAt: Date.now() });
+        tours += 1;
+      }
+    }
+    return { addOns, tours };
   },
 });

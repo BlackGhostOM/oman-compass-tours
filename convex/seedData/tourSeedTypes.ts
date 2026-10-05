@@ -24,6 +24,12 @@ export type TourSeed = {
   durationMinutes: number;
   durationDays: number;
   startTimes: string[];
+  /** Weekdays the tour runs (0 = Sunday … 6 = Saturday); omit for every day. */
+  operatingWeekdays?: number[];
+  /** Departure start dates (YYYY-MM-DD); when set, only these dates can be booked. */
+  fixedDepartureDates?: string[];
+  /** "shared" for group trips and tickets; omit for private departures. */
+  departureType?: "private" | "shared";
   pickupIncluded: boolean;
   guideLanguages: string[];
   minGroup: number;

@@ -8,8 +8,10 @@ import { ConvexError } from "convex/values";
 import { AlertTriangle, ArrowRight, CheckCircle2, Clock, LockKeyhole } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
+import { unpayableReason } from "../../../convex/lib/holds";
 import { Link } from "@/i18n/navigation";
-import { formatDate, formatOmr, pick } from "@/lib/content";
+import { formatDate, formatOmanDateTime, formatOmr, pick } from "@/lib/content";
+import { site } from "@/lib/site";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProviderPicker, type Currency, type ProviderId } from "@/components/booking/provider-picker";
@@ -26,6 +28,12 @@ export function CheckoutPanel({ reference, token }: { reference: string; token: 
   const [busy, setBusy] = useState(false);
   const [kind, setKind] = useState<"deposit" | "full">("deposit");
   const autoStarted = useRef(false);
+  // The hold countdown and expiry are time-based, so re-render while the page stays open
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (options && !params.get("provider")) setProvider(options.defaultProvider as ProviderId);
@@ -43,7 +51,8 @@ export function CheckoutPanel({ reference, token }: { reference: string; token: 
       window.location.href = result.checkoutUrl;
     } catch (err) {
       const data = err instanceof ConvexError ? (err.data as { code?: string; message?: string }) : undefined;
-      toast.error(data?.code === "PROVIDER_NOT_CONFIGURED" ? t("errors.notConfigured") : data?.code === "PROVIDER_ERROR" ? `${t("errors.provider")} ${data.message ?? ""}` : t("errors.generic"));
+      setNow(Date.now());
+      toast.error(data?.code === "HOLD_EXPIRED" ? t("errors.holdExpired") : data?.code === "PROVIDER_NOT_CONFIGURED" ? t("errors.notConfigured") : data?.code === "PROVIDER_ERROR" ? `${t("errors.provider")} ${data.message ?? ""}` : t("errors.generic"));
       setBusy(false);
     }
   }
@@ -51,7 +60,7 @@ export function CheckoutPanel({ reference, token }: { reference: string; token: 
   // Auto-start when arriving from the wizard with a chosen provider
   useEffect(() => {
     const p = params.get("provider") as ProviderId | null;
-    if (p && booking && options && !autoStarted.current && options.providers.includes(p) && booking.status !== "confirmed") {
+    if (p && booking && options && !autoStarted.current && options.providers.includes(p) && booking.status !== "confirmed" && !unpayableReason(booking, Date.now())) {
       autoStarted.current = true;
       void pay(p, (params.get("currency") as Currency) || currency);
     }
@@ -78,7 +87,25 @@ export function CheckoutPanel({ reference, token }: { reference: string; token: 
       </div>
     );
   }
-  if (booking.status === "cancelled" || booking.status === "refunded") {
+  const whatsappHref = `https://wa.me/${site.whatsappNumber}?text=${encodeURIComponent(`Booking ${booking.reference}`)}`;
+  // Money arrived after the booking stopped being payable: the team follows up, nothing to pay here
+  if (booking.needsAttention) {
+    return (
+      <div className="rounded-xl border border-warning/40 bg-white p-8 text-center">
+        <AlertTriangle className="mx-auto size-10 text-warning" />
+        <h2 className="mt-3 font-heading text-lg text-navy-950">{t("status.paidUnpayableTitle")}</h2>
+        <p className="mx-auto mt-2 max-w-prose text-sm text-ink-500">{t("status.paidUnpayableBody")}</p>
+        <div className="mt-4 flex flex-wrap justify-center gap-3">
+          <Button asChild variant="outline"><a href={whatsappHref} target="_blank" rel="noopener noreferrer">{t("whatsapp")}</a></Button>
+          <Button asChild variant="outline"><Link href={`/booking/${reference}?t=${token}`}>{t("viewBooking")}</Link></Button>
+        </div>
+      </div>
+    );
+  }
+  // An unpaid hold that ran out (or whose tour already left) cannot be paid: say so instead of offering Pay.
+  // The scheduled expiry usually cancels it right at the deadline, so a cancelled booking whose hold expired says so too.
+  const unpayable = booking.holdExpired ? "hold_expired" : unpayableReason(booking, now);
+  if ((booking.status === "cancelled" && !booking.holdExpired) || booking.status === "refunded") {
     return (
       <div className="rounded-xl border border-sand-200 bg-white p-8 text-center">
         <AlertTriangle className="mx-auto size-10 text-warning" />
@@ -88,7 +115,23 @@ export function CheckoutPanel({ reference, token }: { reference: string; token: 
     );
   }
 
-  const holdLeft = booking.holdExpiresAt ? Math.max(0, booking.holdExpiresAt - Date.now()) : null;
+  if (unpayable === "hold_expired" || unpayable === "departed") {
+    return (
+      <div className="rounded-xl border border-sand-200 bg-white p-8 text-center">
+        <Clock className="mx-auto size-10 text-warning" />
+        <h2 className="mt-3 font-heading text-lg text-navy-950">{t("holdExpiredTitle")}</h2>
+        <p className="mx-auto mt-2 max-w-prose text-sm text-ink-500">{unpayable === "departed" ? t("departedBody") : t("holdExpiredBody")}</p>
+        <div className="mt-4 flex flex-wrap justify-center gap-3">
+          {unpayable === "hold_expired" && <Button asChild><Link href={`/book/${pick(booking.tour?.slug, locale)}`}>{t("rebook")}</Link></Button>}
+          <Button asChild variant="outline"><a href={whatsappHref} target="_blank" rel="noopener noreferrer">{t("whatsapp")}</a></Button>
+        </div>
+      </div>
+    );
+  }
+
+  // No countdown once the deadline has passed (a partly paid hold stays payable until departure)
+  const holdLeft = booking.holdExpiresAt && booking.holdExpiresAt > now ? booking.holdExpiresAt - now : null;
+  const holdUntil = booking.holdExpiresAt ? formatOmanDateTime(booking.holdExpiresAt, locale) : "";
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
@@ -97,7 +140,12 @@ export function CheckoutPanel({ reference, token }: { reference: string; token: 
           <p className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-ink-900">{t("paymentCancelled")}</p>
         )}
         {holdLeft !== null && (
-          <p className="flex items-center gap-2 text-sm text-ink-500"><Clock className="size-4 text-gold-500" /> {t("holdUntil", { hours: Math.max(1, Math.round(holdLeft / 3_600_000)) })}</p>
+          <p className="flex items-center gap-2 text-sm text-ink-500">
+            <Clock className="size-4 shrink-0 text-gold-500" />{" "}
+            {holdLeft < 2 * 3_600_000
+              ? t("holdLeftMinutes", { minutes: Math.max(1, Math.ceil(holdLeft / 60_000)), time: holdUntil })
+              : t("holdLeftHours", { hours: Math.round(holdLeft / 3_600_000), time: holdUntil })}
+          </p>
         )}
 
         {depositRemaining > 0 && depositRemaining < outstanding && (

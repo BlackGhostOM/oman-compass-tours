@@ -8,9 +8,10 @@ import { useQuery } from "convex/react";
 import { track } from "@/lib/analytics";
 import { AlertTriangle, CalendarPlus, CheckCircle2, Clock, CreditCard, Download, MapPin, MessageCircle, UserRound } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
+import { unpayableReason } from "../../../convex/lib/holds";
 import { Link } from "@/i18n/navigation";
 import { countryName } from "@/lib/countries";
-import { formatDate, formatHijri, formatOmr, pick, cancellationWindow } from "@/lib/content";
+import { formatDate, formatHijri, formatOmanDateTime, formatOmr, pick, cancellationWindow } from "@/lib/content";
 import { site } from "@/lib/site";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -31,10 +32,17 @@ export function ConfirmationView({ reference, token }: { reference: string; toke
   const locale = useLocale();
   const t = useTranslations("confirmation");
   const ts = useTranslations("bookingStatus");
+  const tsum = useTranslations("booking.summary");
   const params = useSearchParams();
   const booking = useQuery(api.bookings.byReference, { reference, token });
   const viewer = useQuery(api.users.viewer);
   const [countdown, setCountdown] = useState<string | null>(null);
+  // Re-evaluated every minute so an open page stops offering payment once the hold runs out
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (!booking) return;
@@ -77,7 +85,12 @@ export function ConfirmationView({ reference, token }: { reference: string; toke
 
   const isNew = params.get("new") === "1";
   const confirmed = ["confirmed", "in_progress", "completed"].includes(booking.status);
-  const needsPayment = booking.status === "inquiry" || booking.status === "pending_payment";
+  const unpaidHold = booking.status === "inquiry" || booking.status === "pending_payment";
+  // "hold_expired" | "departed" | null; the scheduled expiry cancels a lapsed hold right at its deadline, so a booking
+  // cancelled for that reason reads the same as one still waiting to be swept
+  const holdOver = booking.holdExpired ? "hold_expired" : unpaidHold ? unpayableReason(booking, now) : null;
+  const attention = booking.needsAttention;
+  const needsPayment = unpaidHold && !holdOver && !attention;
   const voucherUrl = `/api/voucher/${booking.voucherToken}`;
   const icsUrl = `/api/calendar/${booking.voucherToken}`;
   const shareUrl = `${site.url}/${locale}/booking/${booking.reference}?t=${booking.voucherToken}`;
@@ -89,17 +102,32 @@ export function ConfirmationView({ reference, token }: { reference: string; toke
     <div className="grid gap-8 lg:grid-cols-[1fr_20rem]">
       <div className="space-y-6">
         <div className={cn("rounded-xl border p-6 text-center sm:p-8", confirmed ? "border-success/40 bg-success/5" : "border-warning/40 bg-warning/5")}>
-          {confirmed ? <CheckCircle2 className="mx-auto size-12 text-success" /> : <Clock className="mx-auto size-12 text-warning" />}
+          {confirmed ? <CheckCircle2 className="mx-auto size-12 text-success" /> : attention ? <AlertTriangle className="mx-auto size-12 text-warning" /> : <Clock className="mx-auto size-12 text-warning" />}
           <h1 className="heading-brand mt-4 font-heading text-2xl text-navy-950 sm:text-3xl">
-            {confirmed ? (isNew ? t("confirmedTitle") : t("bookingTitle")) : needsPayment ? t("holdTitle") : t("bookingTitle")}
+            {confirmed ? (isNew ? t("confirmedTitle") : t("bookingTitle")) : attention ? t("paidUnpayableTitle") : holdOver ? t("holdExpiredTitle") : needsPayment ? t("holdTitle") : t("bookingTitle")}
           </h1>
           <p className="mt-2 text-ink-500">
-            {confirmed ? t("confirmedBody", { email: booking.traveller.email }) : needsPayment ? t("holdBody", { hours: booking.holdExpiresAt ? Math.max(1, Math.round((booking.holdExpiresAt - Date.now()) / 3_600_000)) : 24 }) : ""}
+            {confirmed
+              ? t("confirmedBody", { email: booking.traveller.email })
+              : attention
+                ? t("paidUnpayableBody")
+                : holdOver
+                  ? holdOver === "departed" ? t("departedBody") : t("holdExpiredBody")
+                  : needsPayment && booking.holdExpiresAt
+                    ? t("holdBodyUntil", { deadline: formatOmanDateTime(booking.holdExpiresAt, locale) })
+                    : ""}
           </p>
           <p className="mt-4 font-heading text-lg tracking-[0.2em] text-navy-950" dir="ltr">{booking.reference}</p>
           <Badge className={cn("mt-2", statusTone[booking.status])}>{ts(booking.status)}</Badge>
           {countdown && confirmed && <p className="mt-3 text-sm text-gold-700">{countdown}</p>}
         </div>
+
+        {holdOver === "hold_expired" && !attention && (
+          <div className="flex flex-wrap justify-center gap-3">
+            {booking.tour && <Button asChild className="bg-gold-gradient font-semibold text-navy-950"><Link href={`/book/${pick(booking.tour.slug, locale)}`}>{t("rebook")}</Link></Button>}
+            <Button asChild variant="outline"><a href={`https://wa.me/${site.whatsappNumber}?text=${encodeURIComponent(`Booking ${booking.reference}`)}`} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-4 text-[#25D366]" /> {t("whatsapp")}</a></Button>
+          </div>
+        )}
 
         {needsPayment && (
           <div className="flex flex-col items-center gap-3 rounded-xl border border-sand-200 bg-white p-6 text-center">
@@ -114,9 +142,11 @@ export function ConfirmationView({ reference, token }: { reference: string; toke
               <Download className="size-5 text-gold-700" /> <span>{t("voucher")}</span>
             </a>
           </Button>
-          <Button asChild variant="outline" className="h-auto flex-col gap-1 py-4">
-            <a href={icsUrl}><CalendarPlus className="size-5 text-gold-700" /> <span>{t("addToCalendar")}</span></a>
-          </Button>
+          {!holdOver && booking.status !== "cancelled" && booking.status !== "refunded" && (
+            <Button asChild variant="outline" className="h-auto flex-col gap-1 py-4">
+              <a href={icsUrl}><CalendarPlus className="size-5 text-gold-700" /> <span>{t("addToCalendar")}</span></a>
+            </Button>
+          )}
           <Button asChild variant="outline" className="h-auto flex-col gap-1 py-4 border-[#25D366]/50">
             <a href={`https://wa.me/?text=${encodeURIComponent(waText)}`} target="_blank" rel="noopener noreferrer"><MessageCircle className="size-5 text-[#25D366]" /> <span>{t("sendWhatsapp")}</span></a>
           </Button>
@@ -141,7 +171,7 @@ export function ConfirmationView({ reference, token }: { reference: string; toke
           <div className="mt-5 border-t border-sand-200 pt-5">
             <ul className="space-y-1.5 text-sm">
               {booking.items.map((it) => (
-                <li key={it._id} className="flex justify-between"><span className="text-ink-500">{pick(it.label, locale)}{it.quantity > 1 && it.kind !== "discount" ? ` × ${it.quantity}` : ""}</span><span dir="ltr" className={it.kind === "discount" ? "text-success" : "text-ink-900"}>{formatOmr(it.total, locale)}</span></li>
+                <li key={it._id} className="flex justify-between"><span className="text-ink-500">{pick(it.label, locale)}{it.quantity > 1 && it.kind !== "discount" ? ` × ${it.quantity}` : ""}</span><span dir="ltr" className={it.kind === "discount" ? "text-success" : "text-ink-900"}>{it.total === 0 && it.kind !== "discount" ? tsum("free") : formatOmr(it.total, locale)}</span></li>
               ))}
             </ul>
             <div className="hairline my-3" />

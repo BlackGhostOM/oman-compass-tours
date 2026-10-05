@@ -186,9 +186,50 @@ export const sendBalanceDue = internalAction({
   },
 });
 
+/** A payment arrived for a booking that could not be confirmed (cancelled, expired, refunded or departed). Replaces the plain receipt. */
+export const sendPaymentOnUnpayable = internalAction({
+  args: { bookingId: v.id("bookings") },
+  returns: v.null(),
+  handler: async (ctx, { bookingId }) => {
+    const b = await loadBooking(ctx, bookingId);
+    if (!b) return null;
+    const locale = b.locale;
+    const l = links(b, locale);
+    const title = locale === "ar" ? `استلمنا دفعتك — ${b.reference}` : `We received your payment — ${b.reference}`;
+    const body = locale === "ar"
+      ? `<p>مرحبًا ${escapeHtml(b.traveller.firstName)}، شكرًا لك. وصلتنا دفعتك بأمان، غير أن حجزك لم يعد قائمًا عند وصولها، إذ انتهت مهلة الحجز المؤقت أو أُلغي الحجز أو فات موعد الانطلاق. لا داعي للقلق؛ سيتواصل معك فريقنا قريبًا لإعادة جدولة رحلتك أو ردّ المبلغ كاملًا، أيهما تفضّل.</p>`
+      : `<p>Hello ${escapeHtml(b.traveller.firstName)}, thank you. Your payment reached us safely, but by the time it arrived your booking was no longer active: the hold had run out, the booking had been cancelled, or the departure had already left. Please do not worry. Our team will contact you shortly to rebook your trip or refund you in full, whichever you prefer.</p>`;
+    const html = layout(locale, title, `${body}${summaryTable(b, locale)}<p><a href="${l.whatsapp}" style="color:#DDB97A">${locale === "ar" ? "راسلنا عبر واتساب" : "Message us on WhatsApp"}</a> · <a href="${l.confirmation}" style="color:#DDB97A">${locale === "ar" ? "عرض الحجز" : "View booking"}</a></p>`);
+    const result = await sendEmail({ to: b.traveller.email, subject: title, html });
+    await logEmail(ctx, "payment_on_unpayable", b.traveller.email, locale, bookingId, result);
+    return null;
+  },
+});
+
 /* ------------------------------------------------------------------ */
 /* Staff notifications                                                 */
 /* ------------------------------------------------------------------ */
+
+const ATTENTION_REASONS: Record<string, string> = {
+  payment_on_cancelled: "the booking was already cancelled",
+  payment_on_refunded: "the booking was already refunded",
+  payment_after_departure: "the departure time had already passed",
+  no_capacity: "the hold had expired and the departure no longer has room for this party",
+};
+
+export const notifyStaffPaymentOnUnpayable = internalAction({
+  args: { bookingId: v.id("bookings"), reason: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { bookingId, reason }) => {
+    const b = await loadBooking(ctx, bookingId);
+    if (!b) return null;
+    const why = ATTENTION_REASONS[reason] ?? reason;
+    const html = layout("en", `Payment received on ${b.status} booking ${b.reference}`, `<p><strong>Action needed:</strong> a payment was taken but the booking could not be confirmed because ${escapeHtml(why)}. The status was left as <strong>${b.status}</strong> and the booking is flagged in the dashboard. Contact the customer to rebook or refund. The customer was told the team will be in touch.</p>${summaryTable(b, "en")}<p>${escapeHtml(b.traveller.firstName)} ${escapeHtml(b.traveller.lastName)} · ${escapeHtml(b.traveller.email)} · <a href="https://wa.me/${b.traveller.phone.replace(/[^0-9]/g, "")}" style="color:#DDB97A">${escapeHtml(b.traveller.phone)}</a></p>${button(`${SITE_URL()}/en/admin/bookings/${b._id}`, "Open in dashboard")}`);
+    const result = await sendEmail({ to: STAFF_EMAIL, subject: `[Action needed] Payment on ${b.status} booking ${b.reference}`, html, replyTo: b.traveller.email });
+    await logEmail(ctx, "staff_payment_on_unpayable", STAFF_EMAIL, "en", bookingId, result);
+    return null;
+  },
+});
 
 export const notifyStaffNewBooking = internalAction({
   args: { bookingId: v.id("bookings") },

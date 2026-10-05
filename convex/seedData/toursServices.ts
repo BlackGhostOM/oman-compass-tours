@@ -245,6 +245,7 @@ export const services: TourSeed[] = [
     code: "OCT-025",
     viatorCode: "425555P34",
     kind: "service",
+    departureType: "shared",
     title: { en: "The National Aquarium Abu Dhabi – Entry Ticket", ar: "الأكواريوم الوطني في أبوظبي: تذكرة دخول" },
     slug: { en: "abu-dhabi-national-aquarium-ticket", ar: "تذكرة-أكواريوم-أبوظبي" },
     summary: {

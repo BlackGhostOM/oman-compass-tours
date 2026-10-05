@@ -3,6 +3,7 @@
 import { useLocale, useTranslations } from "next-intl";
 import { Download, Plus, Trash2 } from "lucide-react";
 import { formatOmr, type LocalizedString } from "@/lib/content";
+import { isRealIsoDate, isoDayToInstant } from "../../../convex/lib/dates";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -107,7 +108,9 @@ export function StatusBadge({ status, label }: { status: string; label?: string 
 
 export function DateTime({ value, withTime = true }: { value: number | string; withTime?: boolean }) {
   const locale = useLocale();
-  const d = typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(value + "T00:00:00") : new Date(value);
+  const dateOnly = typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const d = dateOnly ? (isRealIsoDate(value) ? isoDayToInstant(value) : null) : new Date(value);
+  if (!d || Number.isNaN(d.getTime())) return <span className="whitespace-nowrap tabular-nums">{String(value)}</span>;
   return <span className="whitespace-nowrap tabular-nums">{new Intl.DateTimeFormat(locale === "ar" ? "ar-OM" : "en-GB", { timeZone: "Asia/Muscat", day: "numeric", month: "short", year: "numeric", ...(withTime && typeof value === "number" ? { hour: "2-digit", minute: "2-digit" } : {}) }).format(d)}</span>;
 }
 

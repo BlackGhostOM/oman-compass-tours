@@ -4,7 +4,9 @@ import Image from "next/image";
 import { useLocale, useTranslations } from "next-intl";
 import { CalendarDays, Clock, Users } from "lucide-react";
 import { formatDate, formatOmr, pick, cancellationWindow } from "@/lib/content";
+import { BOOKING_HORIZON_DAYS } from "../../../convex/lib/dates";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { BookingTour } from "@/components/booking/types";
 
@@ -19,8 +21,62 @@ export type QuoteView = {
   couponCode?: string;
   couponError?: string;
   remaining?: number;
+  /** Capacity units this party needs: seats (per_person), one departure (per_group, tiered) or 4WDs (per_vehicle). */
+  needed?: number;
   available?: boolean;
+  /** Set by bookings.quote when available is false; "sold_out" means not enough capacity left. */
+  unavailableReason?: string | null;
 } | null | undefined;
+
+/** Why the current selection cannot be booked (quote.available === false), worded for its reason. Renders nothing otherwise. */
+export function UnavailableNote({ tour, quote, className, id }: { tour: BookingTour; quote: QuoteView; className?: string; id?: string }) {
+  const t = useTranslations("booking.summary");
+  if (!quote || quote.available !== false) return null;
+  const reason = quote.unavailableReason;
+  const remaining = quote.remaining ?? 0;
+  let text: string;
+  if (reason && reason !== "sold_out" && t.has(`unavailableReasons.${reason}`)) {
+    text = t(`unavailableReasons.${reason}`, { days: BOOKING_HORIZON_DAYS, min: tour.minGroup, max: tour.maxGroup, age: tour.infantAgeMax + 1 });
+  } else if (quote.needed === undefined) {
+    text = t("soldOut", { remaining });
+  } else if (tour.pricingModel === "per_vehicle" && tour.vehiclePricing) {
+    // remaining and needed count 4WDs here, not places
+    text = t("soldOutVehicles", { remaining, needed: quote.needed, maxAdults: tour.vehiclePricing.maxAdults, seats: tour.vehiclePricing.seats });
+  } else if (tour.pricingModel === "per_group" || tour.pricingModel === "tiered") {
+    // A private departure: one booking takes the whole slot
+    text = t("slotFull");
+  } else {
+    text = t("soldOutSeats", { remaining, needed: quote.needed });
+  }
+  return (
+    <p id={id} role="alert" className={cn("rounded-lg border border-danger/40 bg-danger/5 p-2 text-xs text-danger", className)}>
+      {text}
+    </p>
+  );
+}
+
+/**
+ * Shown on Review and Payment when the selection can no longer be booked as it stands (availability changed, or the
+ * coupon stopped applying): the reason plus a way back to step 1, where both are fixed.
+ */
+export function SelectionIssue({ tour, quote, couponCode, onEdit }: { tour: BookingTour; quote: QuoteView; couponCode: string; onEdit: () => void }) {
+  const t = useTranslations("booking");
+  if (!quote) return null;
+  const couponInvalid = !!couponCode && !!quote.couponError;
+  if (quote.available !== false && !couponInvalid) return null;
+  return (
+    <div className="space-y-2">
+      <UnavailableNote tour={tour} quote={quote} />
+      {couponInvalid && (
+        <p role="alert" className="rounded-lg border border-danger/40 bg-danger/5 p-2 text-xs text-danger">
+          {t("summary.couponNotApplied", { code: couponCode })}{" "}
+          {t.has(`dates.couponErrors.${quote.couponError}`) && t(`dates.couponErrors.${quote.couponError}`)}
+        </p>
+      )}
+      <Button type="button" variant="outline" size="sm" onClick={onEdit}>{t("editSelection")}</Button>
+    </div>
+  );
+}
 
 export function PriceSummary({
   tour,
@@ -30,6 +86,7 @@ export function PriceSummary({
   kids,
   infants,
   quote,
+  couponCode,
   className,
   compact = false,
 }: {
@@ -40,11 +97,14 @@ export function PriceSummary({
   kids: number;
   infants: number;
   quote: QuoteView;
+  /** The code the customer entered; when the quote reports a couponError, the summary says it is not applied. */
+  couponCode?: string;
   className?: string;
   compact?: boolean;
 }) {
   const locale = useLocale();
   const t = useTranslations("booking.summary");
+  const td = useTranslations("booking.dates");
   const tc = useTranslations("common");
 
   return (
@@ -68,9 +128,7 @@ export function PriceSummary({
         <div className="flex items-center justify-between gap-3">
           <dt className="flex items-center gap-1.5 text-ink-500"><Users className="size-4 text-gold-500" /> {t("guests")}</dt>
           <dd className="text-end font-medium text-ink-900">
-            {tc("adults", { count: adults })}
-            {kids > 0 && `, ${tc("children", { count: kids })}`}
-            {infants > 0 && `, ${t("infants", { count: infants })}`}
+            {[tc("adults", { count: adults }), ...(kids > 0 ? [tc("children", { count: kids })] : []), ...(infants > 0 ? [t("infants", { count: infants })] : [])].join(locale === "ar" ? "، " : ", ")}
           </dd>
         </div>
       </dl>
@@ -88,7 +146,7 @@ export function PriceSummary({
                     {pick(it.label, locale)}
                     {it.quantity > 1 && it.kind !== "discount" ? <span className="text-ink-300"> × {it.quantity}</span> : null}
                   </span>
-                  <span dir="ltr" className="font-medium text-ink-900">{it.kind === "infant" ? t("free") : formatOmr(it.total, locale)}</span>
+                  <span dir="ltr" className="font-medium text-ink-900">{it.total === 0 && it.kind !== "discount" ? t("free") : formatOmr(it.total, locale)}</span>
                 </li>
               ))}
             </ul>
@@ -103,8 +161,12 @@ export function PriceSummary({
                 <div className="mt-1 flex justify-between"><span>{t("balanceLater")}</span><span dir="ltr">{formatOmr(quote.balanceDue, locale)}</span></div>
               </div>
             )}
-            {quote.available === false && (
-              <p className="mt-3 rounded-lg border border-danger/40 bg-danger/5 p-2 text-xs text-danger">{t("soldOut", { remaining: quote.remaining ?? 0 })}</p>
+            <UnavailableNote tour={tour} quote={quote} className="mt-3" />
+            {couponCode && quote.couponError && (
+              <p className="mt-3 rounded-lg border border-warning/40 bg-warning/5 p-2 text-xs text-ink-900">
+                {t("couponNotApplied", { code: couponCode })}{" "}
+                {td.has(`couponErrors.${quote.couponError}`) && td(`couponErrors.${quote.couponError}`)}
+              </p>
             )}
             {tour.freeCancellationHours > 0 && <p className="mt-3 text-xs text-success">{tc("freeCancellation", { window: cancellationWindow(tour.freeCancellationHours, locale) })}</p>}
           </>

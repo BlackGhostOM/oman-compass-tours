@@ -4,7 +4,7 @@ import { use, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
-import { ArrowLeft, Copy, Download, Link2, Mail, MessageCircle, RefreshCw, Send } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Copy, Download, Link2, Mail, MessageCircle, RefreshCw, Send } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../../../../../convex/_generated/api";
 import type { Id } from "../../../../../../convex/_generated/dataModel";
@@ -33,6 +33,7 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ i
   const updateDetails = useMutation(api.admin.bookings.updateDetails);
   const recordPayment = useMutation(api.admin.bookings.recordManualPayment);
   const regenerate = useMutation(api.admin.bookings.regenerateVoucher);
+  const clearAttention = useMutation(api.admin.bookings.clearAttention);
   const issueLink = useMutation(api.admin.bookings.issuePaymentLink);
   const refund = useAction(api.payments.refund);
   const resend = useAction(api.adminActions.resendConfirmation);
@@ -61,6 +62,28 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ i
       toast.success(ok);
     } catch (err) {
       const data = err instanceof ConvexError ? (err.data as { code?: string }) : undefined;
+      toast.error(data?.code && t.has(`errors.${data.code}`) ? t(`errors.${data.code}`) : data?.code ? `${t("error")} (${data.code})` : t("error"));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /** Status change; a booking going back onto a full departure needs an explicit overbooking confirmation. */
+  async function changeStatus(status: (typeof ALL)[number], force: boolean) {
+    if (!b) return;
+    setBusy("status");
+    try {
+      try {
+        await updateStatus({ id: b._id, status, force });
+      } catch (err) {
+        const data = err instanceof ConvexError ? (err.data as { code?: string; remaining?: number; needed?: number }) : undefined;
+        if (data?.code !== "NEEDS_OVERRIDE") throw err;
+        if (!window.confirm(t("needsOverride", { remaining: data.remaining ?? 0, needed: data.needed ?? 0 }))) return;
+        await updateStatus({ id: b._id, status, force, override: true });
+      }
+      toast.success(t("statusUpdated"));
+    } catch (err) {
+      const data = err instanceof ConvexError ? (err.data as { code?: string }) : undefined;
       toast.error(data?.code ? `${t("error")} (${data.code})` : t("error"));
     } finally {
       setBusy(null);
@@ -77,11 +100,27 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ i
           <>
             <Button asChild variant="ghost" size="sm"><Link href="/admin/bookings"><ArrowLeft className="size-4 rtl:-scale-x-100" /> {t("back")}</Link></Button>
             <StatusBadge status={b.status} />
+            {b.needsAttention && <StatusBadge status="cancelled" label={t("attentionTitle")} />}
             <Button asChild variant="outline" size="sm"><a href={`/api/voucher/${b.voucherToken}`} target="_blank" rel="noopener noreferrer"><Download className="size-4" /> {t("voucher")}</a></Button>
             <Button variant="outline" size="sm" disabled={busy === "resend"} onClick={() => run("resend", () => resend({ bookingId: b._id }), t("resent"))}><Mail className="size-4" /> {t("resend")}</Button>
           </>
         }
       />
+
+      {b.needsAttention && (
+        <div role="alert" className="flex flex-col gap-3 rounded-xl border border-danger/40 bg-danger/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex gap-3">
+            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-danger" />
+            <div>
+              <p className="font-medium text-danger">{t("attentionTitle")}</p>
+              <p className="text-sm text-muted-foreground">
+                {t("attentionBody", { reason: t.has(`attentionReasons.${b.attentionReason}`) ? t(`attentionReasons.${b.attentionReason}`) : t("attentionReasons.other") })}
+              </p>
+            </div>
+          </div>
+          <Button size="sm" variant="outline" disabled={busy === "attention"} onClick={() => run("attention", () => clearAttention({ id: b._id }), t("attentionCleared"))}>{t("clearAttention")}</Button>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Status workflow */}
@@ -91,7 +130,7 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ i
               const allowed = b.allowedTransitions.includes(s);
               const current = b.status === s;
               return (
-                <Button key={s} size="sm" variant={current ? "default" : allowed ? "outline" : "ghost"} disabled={current || busy === "status"} className={current ? "bg-navy-950 text-gold-400" : !allowed ? "opacity-40" : ""} onClick={() => run("status", () => updateStatus({ id: b._id, status: s, force: !allowed }), t("statusUpdated"))} title={!allowed ? t("forceHint") : undefined}>
+                <Button key={s} size="sm" variant={current ? "default" : allowed ? "outline" : "ghost"} disabled={current || busy === "status"} className={current ? "bg-navy-950 text-gold-400" : !allowed ? "opacity-40" : ""} onClick={() => changeStatus(s, !allowed)} title={!allowed ? t("forceHint") : undefined}>
                   <StatusBadge status={s} />
                 </Button>
               );

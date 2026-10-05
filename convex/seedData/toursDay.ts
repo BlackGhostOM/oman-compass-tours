@@ -507,6 +507,7 @@ export const dayTours: TourSeed[] = [
     code: "OCT-014",
     viatorCode: "425555P8",
     kind: "tour",
+    departureType: "shared",
     title: {
       en: "Friday Goat Market & Souq in Nizwa with an Omani Guide (Sharing Trip)",
       ar: "سوق الجمعة وسوق الماشية في نزوى مع مرشد عُماني (رحلة مشتركة)",
@@ -553,6 +554,8 @@ export const dayTours: TourSeed[] = [
     durationMinutes: 540,
     durationDays: 1,
     startTimes: ["05:30"],
+    // The livestock auction is held on Friday mornings only (see FAQ)
+    operatingWeekdays: [5],
     pickupIncluded: true,
     guideLanguages: ["en", "ar"],
     minGroup: 1,

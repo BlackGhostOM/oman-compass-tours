@@ -34,10 +34,12 @@ export function LanguageSwitcher({ className, variant = "ghost" }: { className?:
 
   function switchTo(next: Locale) {
     if (next === locale) return;
+    // Keep the query (e.g. the booking wizard's ?date=); read at click time so the header needs no Suspense boundary
+    const query = Object.fromEntries(new URLSearchParams(window.location.search));
     startTransition(() => {
       router.replace(
         // @ts-expect-error -- params are forwarded for dynamic segments
-        { pathname, params },
+        { pathname, params, query },
         { locale: next },
       );
     });
