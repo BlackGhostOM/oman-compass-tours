@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { localeValidator } from "./schema";
-import { addOnAppliesTo } from "./lib/pricing";
+import { addOnAppliesTo, PARTY_MAX } from "./lib/pricing";
 
 /** Card projection used by lists, carousels and related-tour rails. */
 function toCard(t: Doc<"tours">) {
@@ -105,7 +105,7 @@ export const list = query({
       if (args.minPrice !== undefined && t.priceFrom < args.minPrice) return false;
       if (args.maxPrice !== undefined && t.priceFrom > args.maxPrice) return false;
       if (args.guideLanguage && !t.guideLanguages.includes(args.guideLanguage)) return false;
-      if (args.minGroupSize !== undefined && t.maxGroup < args.minGroupSize) return false;
+      if (args.minGroupSize !== undefined && PARTY_MAX < args.minGroupSize) return false;
       return true;
     });
 

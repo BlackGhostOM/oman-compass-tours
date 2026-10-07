@@ -28,7 +28,7 @@ export type VehiclePricing = {
 };
 
 export type PricingTour = {
-  pricingModel: "per_group" | "per_person" | "tiered" | "per_vehicle";
+  pricingModel: "per_group" | "per_person" | "tiered" | "per_vehicle" | "per_vehicle_multiday";
   priceGroup?: number | null;
   priceAdult?: number | null;
   priceChild?: number | null;
@@ -57,18 +57,45 @@ export function vehiclesNeeded(adults: number, children: number, cfg: VehiclePri
 /** Most lap infants one booking may bring (the counter's cap; infants never take a seat). */
 export const INFANT_MAX = 6;
 
+/** Both 4WD models: per_vehicle, and per_vehicle_multiday (trips of 2+ days, at most 4 guests per vehicle). */
+export const isVehicleModel = (model: string | undefined | null): boolean => model === "per_vehicle" || model === "per_vehicle_multiday";
+
+/** Seats in one vehicle on a multi-day 4WD trip: adults and children alike (lap infants excluded). */
+export const MULTIDAY_VEHICLE_SEATS = 4;
+
+/**
+ * Owner rule: no tour caps the group size. 4WD tours add vehicles and private-group tours add groups as the
+ * party grows; per-person and tiered tours simply count everyone. PARTY_MAX only stops absurd or abusive
+ * online requests.
+ */
+/** The largest party (adults + children) one online booking may carry, for every tour. */
+export const PARTY_MAX = 200;
+
+/**
+ * Private groups a per_group party needs: the private price covers up to maxGroup guests (one vehicle), and
+ * each further maxGroup guests start another group at the same price, like extra 4WDs.
+ */
+export function groupsNeeded(adults: number, children: number, maxGroup: number | undefined): number {
+  const n = Math.max(0, Math.floor(adults)) + Math.max(0, Math.floor(children));
+  if (n === 0) return 0;
+  const per = Number.isFinite(maxGroup) && (maxGroup as number) >= 1 ? Math.floor(maxGroup as number) : n;
+  return Math.ceil(n / per);
+}
+
 /**
  * How much of a slot's capacity one party consumes. Private models (per_group,
  * tiered) take one departure whatever the party size; per-person tours take a
  * seat per guest; per-vehicle tours take one unit per 4WD, so capacityPerSlot
  * counts the day's vehicle fleet.
  */
-export function capacityUnits(tour: Pick<PricingTour, "pricingModel" | "vehiclePricing">, adults: number, children: number): number {
+export function capacityUnits(tour: Pick<PricingTour, "pricingModel" | "vehiclePricing"> & { maxGroup?: number }, adults: number, children: number): number {
   switch (tour.pricingModel) {
     case "per_group":
+      return Math.max(1, groupsNeeded(adults, children, tour.maxGroup));
     case "tiered":
       return 1;
     case "per_vehicle":
+    case "per_vehicle_multiday":
       return Math.max(1, vehiclesNeeded(adults, children, tour.vehiclePricing ?? { pricePerVehicle: 0, maxAdults: 4, seats: 6 }));
     default:
       return Math.max(0, Math.floor(adults) + Math.floor(children));
@@ -91,6 +118,7 @@ export function pricingProblem(tour: Pick<PricingTour, "pricingModel" | "priceGr
       return t.firstTwoAdults >= t.firstAdult ? null : "tieredPricing.firstTwoAdults";
     }
     case "per_vehicle":
+    case "per_vehicle_multiday":
       return (tour.vehiclePricing?.pricePerVehicle ?? 0) > 0 ? null : "vehiclePricing";
     default:
       if (!((tour.priceAdult ?? 0) > 0)) return "priceAdult";
@@ -110,6 +138,7 @@ export function priceFromOf(tour: Pick<PricingTour, "pricingModel" | "priceGroup
     case "tiered":
       return tour.tieredPricing?.firstAdult ?? 0;
     case "per_vehicle":
+    case "per_vehicle_multiday":
       return tour.vehiclePricing?.pricePerVehicle ?? 0;
     default:
       return tour.priceAdult ?? 0;
@@ -237,14 +266,16 @@ export function computeQuote(input: QuoteInput): Quote {
 
   let subtotal = 0;
   if (tour.pricingModel === "per_group") {
+    // A larger party takes more private groups (each up to maxGroup guests), never a refusal
+    const groups = Math.max(1, groupsNeeded(adults, children, tour.maxGroup));
     items.push({
       kind: "group",
-      label: seasonal({ en: `Private group (up to ${tour.maxGroup})`, ar: `مجموعة خاصة (حتى ${tour.maxGroup})` }, seasonGroup !== undefined),
-      quantity: 1,
+      label: seasonal({ en: `Private group (up to ${tour.maxGroup} guests each)`, ar: `مجموعة خاصة (حتى ${tour.maxGroup} ضيوف لكل مجموعة)` }, seasonGroup !== undefined),
+      quantity: groups,
       unitPrice: priceGroup,
-      total: priceGroup,
+      total: groups * priceGroup,
     });
-    subtotal = priceGroup;
+    subtotal = groups * priceGroup;
   } else if (tour.pricingModel === "tiered" && tour.tieredPricing) {
     // The first adult pays a starting total, the first two together a combined
     // total, then every further adult and every child adds a flat amount.
@@ -266,7 +297,7 @@ export function computeQuote(input: QuoteInput): Quote {
       items.push({ kind: "child", label: { en: "Child", ar: "طفل" }, quantity: children, unitPrice: t.extraChild, total: children * t.extraChild });
       subtotal += children * t.extraChild;
     }
-  } else if (tour.pricingModel === "per_vehicle" && tour.vehiclePricing) {
+  } else if (isVehicleModel(tour.pricingModel) && tour.vehiclePricing) {
     // Every 4WD costs the same flat price; the party size decides how many are
     // needed. Seasonal overrides do not apply to per-vehicle pricing.
     const cfg = tour.vehiclePricing;

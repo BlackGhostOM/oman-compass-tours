@@ -79,6 +79,10 @@ test.describe("Staff: Wave 2 booking changes", () => {
     const token = await signInStaff(page);
     const tour = await tourBySlug("wadi-shab-bimmah-sinkhole-private");
     const [first, second] = await openSlots(tour, 2, 2);
+    // No departure is capped by default any more; staff limit a day with an availability row, as here (removed below)
+    const dayCapacity = 4;
+    await convexHttp("mutation", "admin/products:setAvailability", { tourId: tour._id, date: first.date, startTime: first.startTime, capacity: dayCapacity, isBlackout: false, note: "QA capacity" }, token);
+    first.remaining = dayCapacity;
 
     const { bookingId } = await convexHttp<{ bookingId: string }>(
       "mutation",
@@ -142,6 +146,10 @@ test.describe("Staff: Wave 2 booking changes", () => {
       expect(b.total).toBe((await quote(tour._id, { date: second.date, startTime: second.startTime, adults: 2 }))!.total);
     } finally {
       await convexHttp("mutation", "admin/bookings:updateStatus", { id: bookingId, status: "cancelled", reason: "QA cleanup" }, token);
+      const full = await convexHttp<{ availability: { _id: string; date: string; startTime?: string; note?: string }[] }>("query", "admin/products:get", { id: tour._id }, token);
+      for (const row of full.availability.filter((a) => a.date === first.date && a.note === "QA capacity")) {
+        await convexHttp("mutation", "admin/products:clearAvailability", { id: row._id }, token);
+      }
     }
   });
 

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Check, Clock, Languages, MapPin, ShieldCheck, Users, X } from "lucide-react";
 import { api } from "../../../../../../convex/_generated/api";
-import { perPersonPrices } from "../../../../../../convex/lib/pricing";
+import { perPersonPrices, isVehicleModel } from "../../../../../../convex/lib/pricing";
 import { Link, redirect } from "@/i18n/navigation";
 import { fetchPublic } from "@/lib/convex-server";
 import { decodeSlug, pick, upToKey } from "@/lib/content";
@@ -240,7 +240,7 @@ export default async function TourPage({ params }: Props) {
                           <PriceRow label={`${t("tierExtraChild")} (${t("ages", { min: (tour.infantAgeMax ?? 2) + 1, max: tour.childAgeMax ?? 11 })})`} baisa={tour.tieredPricing.extraChild} locale={locale} />
                           <tr><td className="px-4 py-3">{t("infants", { max: tour.infantAgeMax ?? 2 })}</td><td className="px-4 py-3 text-success" colSpan={2}>{t("free")}</td></tr>
                         </>
-                      ) : tour.pricingModel === "per_vehicle" && tour.vehiclePricing ? (
+                      ) : isVehicleModel(tour.pricingModel) && tour.vehiclePricing ? (
                         <>
                           <PriceRow label={t("perVehicleRow", { maxAdults: tour.vehiclePricing.maxAdults, seats: tour.vehiclePricing.seats })} baisa={tour.vehiclePricing.pricePerVehicle} locale={locale} />
                           <tr><td className="px-4 py-3">{t("infants", { max: tour.infantAgeMax ?? 2 })}</td><td className="px-4 py-3 text-success" colSpan={2}>{t("free")}</td></tr>

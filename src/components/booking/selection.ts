@@ -5,7 +5,7 @@
  * and capacity uses the same unit rule as the server (convex/lib/pricing capacityUnits).
  */
 import { addDaysIso, isOperatingDate, isRealIsoDate } from "../../../convex/lib/dates";
-import { capacityUnits, INFANT_MAX } from "../../../convex/lib/pricing";
+import { capacityUnits, INFANT_MAX, PARTY_MAX } from "../../../convex/lib/pricing";
 import type { QuoteView } from "@/components/booking/price-summary";
 import type { BookingTour, WizardState } from "@/components/booking/types";
 
@@ -69,7 +69,7 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
  *   not sold out; otherwise the first bookable date.
  * - Start time: kept if the tour still offers it and (when availability is known) it fits the party; otherwise
  *   the first time that fits, else the first start time.
- * - Guests: adults 1..maxGroup, children 0..maxGroup-adults, adults raised to reach minGroup,
+ * - Guests: adults 1..PARTY_MAX, children 0..PARTY_MAX-adults (no tour caps the group), adults raised to reach minGroup,
  *   infants 0..min(adults, INFANT_MAX).
  * - Add-ons: only ids the tour still offers; child seats at most children + infants.
  * - Consent boxes are always cleared, so a returning customer ticks the policy versions in force today.
@@ -100,7 +100,7 @@ export function sanitizeSelection(tour: BookingTour, input: unknown, opts: Selec
   if (d.date !== undefined && d.date !== date) changed = true;
 
   // Guests
-  const maxGroup = Math.max(1, tour.maxGroup);
+  const maxGroup = PARTY_MAX;
   const minGroup = clamp(tour.minGroup, 1, maxGroup);
   const inAdults = asInt(d.adults);
   const inChildren = asInt(d.children);

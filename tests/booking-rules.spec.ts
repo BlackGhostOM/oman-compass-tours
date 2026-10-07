@@ -6,6 +6,7 @@ import { type Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { convexHttp, testSessionKey } from "./helpers";
 import { addDaysIso, bookingWindow, omanTodayIso, weekdayOfIso } from "../convex/lib/dates";
+import { PARTY_MAX } from "../convex/lib/pricing";
 import { sanitizeSelection } from "../src/components/booking/selection";
 import type { BookingTour } from "../src/components/booking/types";
 
@@ -77,11 +78,14 @@ test.describe("guest counters per pricing model", () => {
       await expect(counter(page, "children")).toHaveValue("0");
       await expect(counter(page, "infants")).toHaveValue("0");
 
-      // Adults stop at the group maximum, with the WhatsApp note for larger groups
-      while (await plus(page, "adult").isEnabled()) await plus(page, "adult").click();
-      await expect(counter(page, "adults")).toHaveValue(String(tour.maxGroup));
-      await expect(page.getByText(new RegExp(`^Up to ${tour.maxGroup} guests per online booking`)).first()).toBeVisible();
-      await expect(plus(page, "child")).toBeDisabled(); // children share the same maximum
+      // No tour caps the group: adults go past the old maximum and "+" stays enabled, with no "larger groups" note
+      const beyond = tour.maxGroup + 2;
+      while (Number(await counter(page, "adults").inputValue()) < beyond) await plus(page, "adult").click();
+      await expect(counter(page, "adults")).toHaveValue(String(beyond));
+      await expect(plus(page, "adult")).toBeEnabled();
+      await expect(plus(page, "child")).toBeEnabled();
+      await expect(page.getByText(/guests per online booking/)).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Continue", exact: true })).toBeEnabled();
 
       // Down to one adult: children may now fill the group up to the maximum
       while (await minus(page, "adult").isEnabled()) await minus(page, "adult").click();
@@ -110,11 +114,13 @@ test.describe("guest counters per pricing model", () => {
         await expect(counter(page, "infants")).toHaveValue("1");
       }
 
-      // Children are capped at maximum minus adults
+      // Children are not capped either: they can take the party past the old maximum
       const adults = Number(await counter(page, "adults").inputValue());
-      while (await plus(page, "child").isEnabled()) await plus(page, "child").click();
-      await expect(counter(page, "children")).toHaveValue(String(tour.maxGroup - adults));
-      await expect(plus(page, "adult")).toBeDisabled();
+      const kids = tour.maxGroup - adults + 2;
+      while (Number(await counter(page, "children").inputValue()) < kids) await plus(page, "child").click();
+      await expect(counter(page, "children")).toHaveValue(String(kids));
+      await expect(plus(page, "adult")).toBeEnabled();
+      await expect(plus(page, "child")).toBeEnabled();
     });
   }
 
@@ -207,7 +213,7 @@ test.describe("bookings:quote unavailableReason", () => {
       [{ date: "2099-12-31" }, "too_far"],
       [{ date: addDaysIso(from, 30), startTime: "8:30" }, "invalid_start_time"],
       [{ date: addDaysIso(from, 30), startTime: "23:55" }, "invalid_start_time"],
-      [{ date: addDaysIso(from, 30), startTime: "07:30", adults: tour.maxGroup + 1 }, "above_max_group"],
+      [{ date: addDaysIso(from, 30), startTime: "07:30", adults: PARTY_MAX + 1 }, "above_max_group"], // only absurd requests
       [{ date: addDaysIso(from, 30), startTime: "07:30", adults: 0, children: 0 }, "below_min_group"],
       [{ date: addDaysIso(from, 30), startTime: "07:30", adults: 2, infants: 3 }, "too_many_infants"],
     ];
@@ -221,6 +227,9 @@ test.describe("bookings:quote unavailableReason", () => {
     const { date, startTime } = await openSlot(tour, 2);
     const ok = await quote(tour._id, { date, startTime });
     expect(ok).toMatchObject({ available: true, unavailableReason: null });
+    // A party well past the tour's old maximum is bookable: no tour caps the group
+    const big = await quote(tour._id, { date, startTime, adults: tour.maxGroup + 5 });
+    expect(big).toMatchObject({ available: true, unavailableReason: null });
   });
 
   test("bookings:create refuses past and too-far dates with their own codes", async () => {
@@ -292,7 +301,7 @@ test.describe("draft restore sanitising", () => {
     await expect(page.getByRole("button", { name: "Continue", exact: true })).toBeEnabled();
   });
 
-  test("a draft with too many guests is clamped to the tour's limits", async ({ page }) => {
+  test("a draft with a large group keeps it; infants still clamp to the adults", async ({ page }) => {
     const tour = await tourBySlug("wakan-village-nakhal-fort-4wd"); // OCT-011, per group, up to 4
     const slot = await openSlot(tour, 1);
     const key = testSessionKey();
@@ -302,9 +311,9 @@ test.describe("draft restore sanitising", () => {
     const adults = Number(await counter(page, "adults").inputValue());
     const children = Number(await counter(page, "children").inputValue());
     const infants = Number(await counter(page, "infants").inputValue());
-    expect(adults).toBeGreaterThanOrEqual(1);
-    expect(adults + children).toBeLessThanOrEqual(tour.maxGroup);
-    expect(infants).toBeLessThanOrEqual(adults);
+    expect(adults).toBe(7);
+    expect(children).toBe(2);
+    expect(infants).toBeLessThanOrEqual(Math.min(adults, 6));
   });
 
   test("a valid draft restores on Review with both consent boxes unticked", async ({ page }) => {
@@ -338,7 +347,7 @@ test.describe("draft restore sanitising", () => {
     expect(stale.state.step).toBe(1);
     expect(stale.state.date).toBe(window.from);
     expect(tour.startTimes).toContain(stale.state.startTime);
-    expect(stale.state.adults + stale.state.children).toBeLessThanOrEqual(tour.maxGroup);
+    expect(stale.state.adults + stale.state.children).toBeLessThanOrEqual(PARTY_MAX);
     expect(stale.state.infants).toBeLessThanOrEqual(stale.state.adults);
     expect(stale.state.addOns).toEqual({});
 

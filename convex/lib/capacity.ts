@@ -11,6 +11,12 @@ import { addDaysIso, isOperatingDate, lastTourDay } from "./dates";
 import { capacityUnits } from "./pricing";
 
 /**
+ * Owner rule: no departure is capped by default (vehicles and guides are added as needed). Only an availability
+ * row staff add for a date limits or closes it; defaultCapacityPerSlot is kept as the dashboard's reference number.
+ */
+export const UNLIMITED_CAPACITY = 10_000;
+
+/**
  * Statuses whose bookings occupy a place. An unexpired "inquiry" (reserve now, pay later) holds its place
  * exactly like an unpaid pay-now checkout; expireHold cancels either at holdExpiresAt.
  */
@@ -24,7 +30,7 @@ export function countsForCapacity(status: Doc<"bookings">["status"]): status is 
 /** Unpaid holds created on the website, capped per departure (siteSettings booking.maxUnpaidHoldsPerSlot). */
 export const DEFAULT_MAX_UNPAID_HOLDS_PER_SLOT = 2;
 
-type CapacityTour = Pick<Doc<"tours">, "_id" | "startTimes" | "defaultCapacityPerSlot" | "pricingModel" | "vehiclePricing" | "minGroup" | "durationDays"> & {
+type CapacityTour = Pick<Doc<"tours">, "_id" | "startTimes" | "defaultCapacityPerSlot" | "pricingModel" | "vehiclePricing" | "minGroup" | "maxGroup" | "durationDays"> & {
   operatingWeekdays?: number[];
   fixedDepartureDates?: string[];
   concurrentCapacity?: number;
@@ -40,11 +46,11 @@ export const slotOf = (tour: Pick<Doc<"tours">, "startTimes">, b: Pick<Doc<"book
  * - Otherwise a row for this time wins, then an "All slots" row (its capacity applies to each start time),
  *   then the tour default.
  */
-export function slotCapacity(tour: Pick<Doc<"tours">, "defaultCapacityPerSlot">, overrides: readonly Override[], time: string): number {
+export function slotCapacity(tour: Pick<Doc<"tours">, "defaultCapacityPerSlot">, overrides: readonly Override[], time: string, fallback = UNLIMITED_CAPACITY): number {
   if (overrides.some((o) => o.isBlackout && (!o.startTime || o.startTime === time))) return 0;
   const slotRow = overrides.find((o) => o.startTime === time && !o.isBlackout);
   const dayRow = overrides.find((o) => !o.startTime && !o.isBlackout);
-  const capacity = slotRow?.capacity ?? dayRow?.capacity ?? tour.defaultCapacityPerSlot;
+  const capacity = slotRow?.capacity ?? dayRow?.capacity ?? fallback;
   return Number.isFinite(capacity) ? Math.max(0, Math.floor(capacity)) : 0;
 }
 

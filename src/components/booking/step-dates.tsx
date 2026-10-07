@@ -7,7 +7,7 @@ import { Minus, Plus, Tag } from "lucide-react";
 import { formatOmr, pick } from "@/lib/content";
 import { whatsappLink } from "@/lib/site";
 import { BOOKING_HORIZON_DAYS, bookingWindow, isoDayFromLocalDate, isRealIsoDate } from "../../../convex/lib/dates";
-import { INFANT_MAX } from "../../../convex/lib/pricing";
+import { INFANT_MAX, PARTY_MAX, isVehicleModel } from "../../../convex/lib/pricing";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -146,7 +146,8 @@ export function StepDates({
     if (childSeat && (state.addOns[childSeat._id] ?? 0) > children + infants) patch.addOns = { ...state.addOns, [childSeat._id]: children + infants };
     update(patch);
   };
-  const largeGroupLink = whatsappLink(t("largeGroupMessage", { tour: pick(tour.title, locale), max: tour.maxGroup }));
+  // No tour caps the group (vehicles and private groups are added); this only stops absurd online requests
+  const maxGroup = PARTY_MAX;
   const waLink = (href: string) => function WhatsAppLink(chunks: ReactNode) {
     return <a href={href} target="_blank" rel="noopener noreferrer" className="font-medium text-navy-950 underline underline-offset-4">{chunks}</a>;
   };
@@ -158,7 +159,7 @@ export function StepDates({
     tour.startTimes.includes(state.startTime) &&
     selectedFits &&
     groupSize >= tour.minGroup &&
-    groupSize <= tour.maxGroup &&
+    groupSize <= maxGroup &&
     // quote.available carries the server's date, start-time, group and capacity reasons; an entered code must apply
     isQuoteBookable(quote, state.couponCode);
 
@@ -237,16 +238,15 @@ export function StepDates({
 
           <div className="space-y-3">
             <Label className="block">{t("guests")}</Label>
-            <Counter id="adults" label={t("adults")} hint={t("adultsHint", { min: (tour.childAgeMax ?? 11) + 1 })} value={state.adults} min={1} max={Math.max(1, tour.maxGroup - state.children)} onChange={(v) => setParty({ adults: v })} increaseLabel={t("counter.adults.increase")} decreaseLabel={t("counter.adults.decrease")} />
-            <Counter id="children" label={t("children")} hint={t("childrenHint", { min: tour.infantAgeMax + 1, max: tour.childAgeMax ?? 11 })} value={state.children} min={0} max={Math.max(0, tour.maxGroup - state.adults)} onChange={(v) => setParty({ children: v })} increaseLabel={t("counter.children.increase")} decreaseLabel={t("counter.children.decrease")} />
+            <Counter id="adults" label={t("adults")} hint={t("adultsHint", { min: (tour.childAgeMax ?? 11) + 1 })} value={state.adults} min={1} max={Math.max(1, maxGroup - state.children)} onChange={(v) => setParty({ adults: v })} increaseLabel={t("counter.adults.increase")} decreaseLabel={t("counter.adults.decrease")} />
+            <Counter id="children" label={t("children")} hint={t("childrenHint", { min: tour.infantAgeMax + 1, max: tour.childAgeMax ?? 11 })} value={state.children} min={0} max={Math.max(0, maxGroup - state.adults)} onChange={(v) => setParty({ children: v })} increaseLabel={t("counter.children.increase")} decreaseLabel={t("counter.children.decrease")} />
             <Counter id="infants" label={t("infants")} hint={t("infantsHint", { max: tour.infantAgeMax })} value={state.infants} min={0} max={infantMax} onChange={(v) => setParty({ infants: v })} increaseLabel={t("counter.infants.increase")} decreaseLabel={t("counter.infants.decrease")} />
             {tour.pricingModel === "per_group" && <p className="text-xs text-ink-500">{t("perGroupNote", { max: tour.maxGroup })}</p>}
-            {tour.pricingModel === "per_vehicle" && tour.vehiclePricing && (
-              <p className="text-xs text-ink-500">{t("perVehicleNote", { maxAdults: tour.vehiclePricing.maxAdults, seats: tour.vehiclePricing.seats, max: tour.maxGroup })}</p>
+            {isVehicleModel(tour.pricingModel) && tour.vehiclePricing && (
+              <p className="text-xs text-ink-500">{t("perVehicleNote", { maxAdults: tour.vehiclePricing.maxAdults, seats: tour.vehiclePricing.seats })}</p>
             )}
             {groupSize < tour.minGroup && <p className="text-xs text-danger">{t("minGroup", { min: tour.minGroup, age: tour.infantAgeMax + 1 })}</p>}
             {/* Why "+" stops at the limit, with a way to book a larger group */}
-            {groupSize >= tour.maxGroup && <p className={cn("text-xs", groupSize > tour.maxGroup ? "text-danger" : "text-ink-500")}>{t.rich("maxGroup", { max: tour.maxGroup, link: waLink(largeGroupLink) })}</p>}
             {state.infants > 0 && state.infants >= infantMax && <p className="text-xs text-ink-500">{t.rich("infantsLimit", { link: waLink(whatsappLink(pick(tour.title, locale))) })}</p>}
           </div>
         </div>

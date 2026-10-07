@@ -5,7 +5,7 @@ import { useQuery } from "convex/react";
 import { AlertTriangle } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { capacityUnits } from "../../../convex/lib/pricing";
+import { capacityUnits, PARTY_MAX } from "../../../convex/lib/pricing";
 import { isRealIsoDate } from "../../../convex/lib/dates";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,7 @@ export type SlotTour = {
   startTimes: string[];
   minGroup: number;
   maxGroup: number;
-  pricingModel: "per_group" | "per_person" | "tiered" | "per_vehicle";
+  pricingModel: "per_group" | "per_person" | "tiered" | "per_vehicle" | "per_vehicle_multiday";
   vehiclePricing?: { pricePerVehicle: number; maxAdults: number; seats: number } | null;
 };
 export type SlotValue = { date: string; startTime: string; adults: number; children: number; infants: number };
@@ -47,7 +47,7 @@ export function BookingSlotFields({ tour, value, onChange, idPrefix, own }: { to
     else if (day.isBlackout) warnings.push(ts("blackout"));
     else if (remaining !== undefined && remaining < needed) warnings.push(ts("noCapacity", { remaining, needed }));
   }
-  if (tour && (group < tour.minGroup || group > tour.maxGroup)) warnings.push(ts("groupSize", { min: tour.minGroup, max: tour.maxGroup }));
+  if (tour && (group < tour.minGroup || group > PARTY_MAX)) warnings.push(ts("groupSize", { min: tour.minGroup, max: PARTY_MAX }));
   if (value.infants > value.adults) warnings.push(ts("tooManyInfants"));
 
   const num = (x: string) => (x.trim() === "" ? 0 : Math.max(0, Math.floor(Number(x)) || 0));

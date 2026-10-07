@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { CalendarDays, Clock, Users } from "lucide-react";
 import { formatDate, formatOmr, pick, cancellationWindow } from "@/lib/content";
 import { BOOKING_HORIZON_DAYS } from "../../../convex/lib/dates";
+import { PARTY_MAX, isVehicleModel } from "../../../convex/lib/pricing";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,10 +37,10 @@ export function UnavailableNote({ tour, quote, className, id }: { tour: BookingT
   const remaining = quote.remaining ?? 0;
   let text: string;
   if (reason && reason !== "sold_out" && t.has(`unavailableReasons.${reason}`)) {
-    text = t(`unavailableReasons.${reason}`, { days: BOOKING_HORIZON_DAYS, min: tour.minGroup, max: tour.maxGroup, age: tour.infantAgeMax + 1 });
+    text = t(`unavailableReasons.${reason}`, { days: BOOKING_HORIZON_DAYS, min: tour.minGroup, max: PARTY_MAX, age: tour.infantAgeMax + 1 });
   } else if (quote.needed === undefined) {
     text = t("soldOut", { remaining });
-  } else if (tour.pricingModel === "per_vehicle" && tour.vehiclePricing) {
+  } else if (isVehicleModel(tour.pricingModel) && tour.vehiclePricing) {
     // remaining and needed count 4WDs here, not places
     text = t("soldOutVehicles", { remaining, needed: quote.needed, maxAdults: tour.vehiclePricing.maxAdults, seats: tour.vehiclePricing.seats });
   } else if (tour.pricingModel === "per_group" || tour.pricingModel === "tiered") {

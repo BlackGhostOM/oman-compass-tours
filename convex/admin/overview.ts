@@ -68,7 +68,7 @@ export const stats = query({
     const capacityToday = tours.reduce((a, t) => {
       if (!isOperatingDate(t, today)) return a;
       const rows = overridesToday.filter((o) => o.tourId === t._id);
-      return a + t.startTimes.reduce((sum, time) => sum + slotCapacity(t, rows, time), 0);
+      return a + t.startTimes.reduce((sum, time) => sum + slotCapacity(t, rows, time, t.defaultCapacityPerSlot), 0);
     }, 0);
     // Same units as the capacity it is compared with: seats, private departures or 4WDs depending on the model
     const tourById = new Map(tours.map((t) => [String(t._id), t]));

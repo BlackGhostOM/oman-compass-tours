@@ -7,7 +7,7 @@ import { ConvexError } from "convex/values";
 import { ArrowLeft, ArrowUp, ArrowDown, ImagePlus, Plus, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
-import { vehiclesNeeded } from "../../../convex/lib/pricing";
+import { isVehicleModel, MULTIDAY_VEHICLE_SEATS, vehiclesNeeded } from "../../../convex/lib/pricing";
 import { normalizeStartTimes } from "../../../convex/lib/dates";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { useSearchParams } from "next/navigation";
@@ -73,7 +73,7 @@ function initial(t: TourDoc | null) {
     // Text, so "not set" (each departure counted on its own) stays apart from a number
     concurrentCapacity: t?.concurrentCapacity != null ? String(t.concurrentCapacity) : "",
     difficulty: (t?.difficulty ?? "easy") as "easy" | "moderate" | "challenging",
-    pricingModel: (t?.pricingModel ?? "per_person") as "per_group" | "per_person" | "tiered" | "per_vehicle",
+    pricingModel: (t?.pricingModel ?? "per_person") as "per_group" | "per_person" | "tiered" | "per_vehicle" | "per_vehicle_multiday",
     priceGroupOmr: t?.priceGroup ? t.priceGroup / 1000 : 0,
     priceAdultOmr: t?.priceAdult ? t.priceAdult / 1000 : 0,
     // Text, so a deliberate 0 (children free) stays apart from "not set"
@@ -164,7 +164,7 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
           pickupIncluded: f.pickupIncluded, guideLanguages: f.guideLanguages.split(",").map((s) => s.trim()).filter(Boolean), minGroup: f.minGroup, maxGroup: f.maxGroup, defaultCapacityPerSlot: f.defaultCapacityPerSlot, concurrentCapacity: f.concurrentCapacity.trim() === "" ? null : Number(f.concurrentCapacity), difficulty: f.difficulty,
           pricingModel: f.pricingModel, priceGroupOmr: f.priceGroupOmr || undefined, priceAdultOmr: f.priceAdultOmr || undefined, priceChildOmr: f.pricingModel === "per_person" ? num(f.priceChildOmr) : undefined,
           tieredOmr: f.pricingModel === "tiered" ? { firstAdult: f.tierFirstAdultOmr || 0, firstTwoAdults: f.tierFirstTwoOmr || 0, extraAdult: f.tierExtraAdultOmr || 0, extraChild: f.tierExtraChildOmr || 0 } : undefined,
-          vehicleOmr: f.pricingModel === "per_vehicle" ? { pricePerVehicle: f.vehiclePriceOmr || 0, maxAdults: f.vehicleMaxAdults || 4, seats: f.vehicleSeats || 6 } : undefined,
+          vehicleOmr: isVehicleModel(f.pricingModel) ? { pricePerVehicle: f.vehiclePriceOmr || 0, maxAdults: f.pricingModel === "per_vehicle_multiday" ? MULTIDAY_VEHICLE_SEATS : f.vehicleMaxAdults || 4, seats: f.pricingModel === "per_vehicle_multiday" ? MULTIDAY_VEHICLE_SEATS : f.vehicleSeats || 6 } : undefined,
           childAgeMax: f.childAgeMax, infantAgeMax: 2, compareAtPriceFromOmr: f.compareAtPriceFromOmr || undefined,
           depositPercent: f.depositPercent, freeCancellationHours: f.freeCancellationHours, allowReserveNowPayLater: f.allowReserveNowPayLater, holdHours: f.holdHours,
           coverImage: f.coverUrl ? { kind: "image", url: f.coverUrl, alt: f.title } : undefined, video: f.videoUrl ? { kind: "video", url: f.videoUrl, alt: f.title } : undefined,
@@ -315,11 +315,11 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
               <div className="space-y-1.5"><Label>{t("guideLanguages")}</Label><Input value={f.guideLanguages} onChange={(e) => set("guideLanguages", e.target.value)} placeholder="en, ar" dir="ltr" /></div>
               <div className="space-y-1.5"><Label>{t("difficulty")}</Label><Select value={f.difficulty} onValueChange={(v) => set("difficulty", v as typeof f.difficulty)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="easy">{t("difficulties.easy")}</SelectItem><SelectItem value="moderate">{t("difficulties.moderate")}</SelectItem><SelectItem value="challenging">{t("difficulties.challenging")}</SelectItem></SelectContent></Select></div>
               <div className="space-y-1.5"><Label>{t("minGroup")}</Label><Input type="number" min={1} value={f.minGroup} onChange={(e) => set("minGroup", Number(e.target.value))} /></div>
-              <div className="space-y-1.5"><Label>{t("maxGroup")}</Label><Input type="number" min={1} value={f.maxGroup} onChange={(e) => set("maxGroup", Number(e.target.value))} /></div>
+              {f.pricingModel === "per_group" && <div className="space-y-1.5"><Label>{t("guestsPerGroup")}</Label><Input type="number" min={1} value={f.maxGroup} onChange={(e) => set("maxGroup", Number(e.target.value))} /></div>}
               <div className="space-y-1.5">
                 <Label>{t("capacity")}</Label>
                 <Input type="number" min={1} value={f.defaultCapacityPerSlot} onChange={(e) => set("defaultCapacityPerSlot", Number(e.target.value))} />
-                {f.pricingModel !== "per_person" && <p className="text-xs text-muted-foreground">{f.pricingModel === "per_vehicle" ? t("capacityUnitVehicles") : t("capacityUnitDepartures")}</p>}
+                <p className="text-xs text-muted-foreground">{t("capacityUnlimited")}</p>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="te-concurrent">{t("concurrentCapacity")}</Label>
@@ -401,7 +401,7 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
         <TabsContent value="pricing" className="space-y-5 pt-4">
           <Panel>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="space-y-1.5"><Label>{t("pricingModel")}</Label><Select value={f.pricingModel} onValueChange={(v) => set("pricingModel", v as typeof f.pricingModel)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="per_person">{t("perPerson")}</SelectItem><SelectItem value="per_group">{t("perGroup")}</SelectItem><SelectItem value="tiered">{t("tiered")}</SelectItem><SelectItem value="per_vehicle">{t("perVehicle")}</SelectItem></SelectContent></Select></div>
+              <div className="space-y-1.5"><Label>{t("pricingModel")}</Label><Select value={f.pricingModel} onValueChange={(v) => set("pricingModel", v as typeof f.pricingModel)}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="per_person">{t("perPerson")}</SelectItem><SelectItem value="per_group">{t("perGroup")}</SelectItem><SelectItem value="tiered">{t("tiered")}</SelectItem><SelectItem value="per_vehicle">{t("perVehicle")}</SelectItem><SelectItem value="per_vehicle_multiday" disabled={f.durationDays < 2}>{t("perVehicleMultiday")}</SelectItem></SelectContent></Select></div>
               {f.pricingModel === "per_group" && (
                 <div className="space-y-1.5"><Label>{t("priceGroup")}</Label><Input type="number" step="0.001" value={f.priceGroupOmr} onChange={(e) => set("priceGroupOmr", Number(e.target.value))} /></div>
               )}
@@ -421,11 +421,13 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
                   <div className="space-y-1.5"><Label>{t("childAgeMax")}</Label><Input type="number" min={3} max={17} value={f.childAgeMax} onChange={(e) => e.target.value !== "" && set("childAgeMax", Number(e.target.value))} /></div>
                 </>
               )}
-              {f.pricingModel === "per_vehicle" && (
+              {isVehicleModel(f.pricingModel) && (
                 <>
                   <div className="space-y-1.5"><Label>{t("vehiclePrice")}</Label><Input type="number" step="0.001" value={f.vehiclePriceOmr} onChange={(e) => set("vehiclePriceOmr", Number(e.target.value))} /></div>
+                  {f.pricingModel === "per_vehicle" && <>
                   <div className="space-y-1.5"><Label>{t("vehicleMaxAdults")}</Label><Input type="number" min={1} max={10} value={f.vehicleMaxAdults} onChange={(e) => set("vehicleMaxAdults", Number(e.target.value))} /></div>
                   <div className="space-y-1.5"><Label>{t("vehicleSeats")}</Label><Input type="number" min={1} max={16} value={f.vehicleSeats} onChange={(e) => set("vehicleSeats", Number(e.target.value))} /></div>
+                  </>}
                 </>
               )}
               <div className="space-y-1.5"><Label>{t("compareAt")}</Label><Input type="number" step="0.001" value={f.compareAtPriceFromOmr} onChange={(e) => set("compareAtPriceFromOmr", Number(e.target.value))} /></div>
@@ -434,12 +436,16 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
                   {t("tieredHint", { one: f.tierFirstAdultOmr, two: f.tierFirstTwoOmr, three: Math.round((f.tierFirstTwoOmr + f.tierExtraAdultOmr) * 1000) / 1000, childx: f.tierExtraChildOmr })}
                 </p>
               )}
-              {f.pricingModel === "per_vehicle" && (
+              {isVehicleModel(f.pricingModel) && (
                 <p className="text-xs text-muted-foreground sm:col-span-2 lg:col-span-4">
                   {(() => {
                     // The example is priced by the same rule the booking page uses, for whatever capacity is set
-                    const n = vehiclesNeeded(5, 2, { pricePerVehicle: 0, maxAdults: f.vehicleMaxAdults || 4, seats: f.vehicleSeats || 6 });
-                    return t("vehicleHint", { maxAdults: f.vehicleMaxAdults, seats: f.vehicleSeats, vehicles: n, example: Math.round(n * (f.vehiclePriceOmr || 0) * 1000) / 1000 });
+                    const multiday = f.pricingModel === "per_vehicle_multiday";
+                    const maxAdults = multiday ? MULTIDAY_VEHICLE_SEATS : f.vehicleMaxAdults || 4;
+                    const seats = multiday ? MULTIDAY_VEHICLE_SEATS : f.vehicleSeats || 6;
+                    const n = vehiclesNeeded(5, 2, { pricePerVehicle: 0, maxAdults, seats });
+                    const example = Math.round(n * (f.vehiclePriceOmr || 0) * 1000) / 1000;
+                    return multiday ? t("vehicleMultidayHint", { seats, vehicles: n, example }) : t("vehicleHint", { maxAdults, seats, vehicles: n, example });
                   })()}
                 </p>
               )}
@@ -454,7 +460,7 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
           </Panel>
           {tour && (
             <Panel title={t("seasons")}>
-              {(f.pricingModel === "tiered" || f.pricingModel === "per_vehicle") && (
+              {(f.pricingModel === "tiered" || isVehicleModel(f.pricingModel)) && (
                 <p className="mb-3 text-xs text-muted-foreground">{t("seasonsSimpleOnly")}</p>
               )}
               <ul className="mb-4 divide-y divide-border text-sm">
@@ -474,7 +480,7 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
                 {f.pricingModel === "per_person" && (
                   <div className="space-y-1.5"><Label>{t("priceChild")}</Label><Input type="number" step="0.001" min={0.001} placeholder={t("seasonChildAuto")} value={season.priceChildOmr} onChange={(e) => setSeason({ ...season, priceChildOmr: e.target.value })} /></div>
                 )}
-                <div className="flex items-end"><Button size="sm" disabled={!season.startDate || !season.endDate || season.endDate < season.startDate || f.pricingModel === "tiered" || f.pricingModel === "per_vehicle"} onClick={async () => { const price = (x: string) => (x.trim() === "" ? undefined : Number(x)); try { await upsertSeason({ tourId: tour._id, name: season.name, startDate: season.startDate, endDate: season.endDate, priceAdultOmr: f.pricingModel === "per_person" ? price(season.priceAdultOmr) : undefined, priceGroupOmr: f.pricingModel === "per_group" ? price(season.priceGroupOmr) : undefined, priceChildOmr: f.pricingModel === "per_person" ? price(season.priceChildOmr) : undefined, isActive: true }); setSeason({ name: L(), startDate: "", endDate: "", priceAdultOmr: "", priceGroupOmr: "", priceChildOmr: "" }); toast.success(t("saved")); } catch { toast.error(t("seasonInvalid")); } }}><Plus className="size-4" /> {t("add")}</Button></div>
+                <div className="flex items-end"><Button size="sm" disabled={!season.startDate || !season.endDate || season.endDate < season.startDate || f.pricingModel === "tiered" || isVehicleModel(f.pricingModel)} onClick={async () => { const price = (x: string) => (x.trim() === "" ? undefined : Number(x)); try { await upsertSeason({ tourId: tour._id, name: season.name, startDate: season.startDate, endDate: season.endDate, priceAdultOmr: f.pricingModel === "per_person" ? price(season.priceAdultOmr) : undefined, priceGroupOmr: f.pricingModel === "per_group" ? price(season.priceGroupOmr) : undefined, priceChildOmr: f.pricingModel === "per_person" ? price(season.priceChildOmr) : undefined, isActive: true }); setSeason({ name: L(), startDate: "", endDate: "", priceAdultOmr: "", priceGroupOmr: "", priceChildOmr: "" }); toast.success(t("saved")); } catch { toast.error(t("seasonInvalid")); } }}><Plus className="size-4" /> {t("add")}</Button></div>
               </div>
               {f.pricingModel === "per_person" && <p className="mt-2 text-xs text-muted-foreground">{t("seasonChildHint")}</p>}
             </Panel>
@@ -514,7 +520,7 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
           {tour && (
             <Panel title={t("availabilityTitle")}>
               <p className="mb-1 text-xs text-muted-foreground">{t("availabilityHint", { capacity: tour.defaultCapacityPerSlot })}</p>
-              {f.pricingModel !== "per_person" && <p className="mb-1 text-xs text-muted-foreground">{f.pricingModel === "per_vehicle" ? t("capacityUnitVehicles") : t("capacityUnitDepartures")}</p>}
+              <p className="mb-1 text-xs text-muted-foreground">{t("capacityUnlimited")}</p>
               <p className="mb-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground">{t("blackoutNote")}</p>
               <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-7">
                 <div className="space-y-1.5"><Label>{t("date")}</Label><Input type="date" value={avail.date} onChange={(e) => setAvail({ ...avail, date: e.target.value, toDate: avail.toDate && avail.toDate < e.target.value ? "" : avail.toDate })} /></div>

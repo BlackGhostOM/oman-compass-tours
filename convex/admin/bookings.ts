@@ -12,7 +12,7 @@ import { releaseCouponUse, retakeCouponUse } from "../lib/coupons";
 import { buildQuote } from "../bookings";
 import { fallbackHoldExpiry, holdExpiryFor, isLapsedHold, loadHoldSettings } from "../lib/holds";
 import { confirmPaidBooking } from "../payments";
-import { capacityUnits } from "../lib/pricing";
+import { capacityUnits, PARTY_MAX, isVehicleModel } from "../lib/pricing";
 
 type Status = Doc<"bookings">["status"];
 
@@ -171,7 +171,7 @@ async function manualBookingProblems(
   const needed = capacityUnits(tour, adults, children);
   if (!blackout && operating && remaining < needed) problems.push("no_capacity");
   const group = adults + children;
-  if (group < tour.minGroup || group > tour.maxGroup) problems.push("group_size");
+  if (group < tour.minGroup || group > PARTY_MAX) problems.push("group_size");
   if (infants > adults) problems.push("too_many_infants");
   return { problems, remaining, needed };
 }
@@ -275,11 +275,11 @@ export const updateDetails = mutation({
 /** Staff type one agreed total, so every model but per-person prints it as a single line on the voucher. */
 function staffPriceItem(tour: Doc<"tours">, adults: number, children: number, total: number) {
   const heads = adults + children;
-  const vehicles = tour.pricingModel === "per_vehicle" ? capacityUnits(tour, adults, children) : 0;
+  const vehicles = isVehicleModel(tour.pricingModel) ? capacityUnits(tour, adults, children) : 0;
   const item =
     tour.pricingModel === "per_person"
       ? { kind: "adult" as const, label: { en: "Guests", ar: "الضيوف" }, quantity: heads, unitPrice: Math.round(total / Math.max(1, heads)) }
-      : tour.pricingModel === "per_vehicle"
+      : isVehicleModel(tour.pricingModel)
         ? { kind: "group" as const, label: { en: "4WD vehicle", ar: "سيارة دفع رباعي" }, quantity: vehicles, unitPrice: Math.round(total / Math.max(1, vehicles)) }
         : tour.pricingModel === "tiered"
           ? { kind: "group" as const, label: { en: `Private tour (${adults} adults${children ? `, ${children} children` : ""})`, ar: `جولة خاصة (${adults} بالغين${children ? ` و${children} أطفال` : ""})` }, quantity: 1, unitPrice: total }
@@ -322,8 +322,8 @@ async function planAmendment(ctx: QueryCtx | MutationCtx, b: Doc<"bookings">, to
   if (!isRealIsoDate(date)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "date" });
   if (date !== b.date && date < omanTodayIso()) throw new ConvexError({ code: "DATE_IN_PAST" });
   if (!tour.startTimes.includes(startTime)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "startTime" });
-  assertInt(adults, 1, 100, "adults");
-  assertInt(children, 0, 100, "children");
+  assertInt(adults, 1, 500, "adults");
+  assertInt(children, 0, 500, "children");
   assertInt(infants, 0, 50, "infants");
   const slotChanged = date !== b.date || startTime !== slotOf(tour, b);
   const partyChanged = adults !== b.adults || children !== b.children || infants !== b.infants;
@@ -515,8 +515,8 @@ export const createManual = mutation({
     const tour = await ctx.db.get(args.tourId);
     if (!tour) throw new ConvexError({ code: "TOUR_NOT_FOUND" });
     if (!isRealIsoDate(args.date)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "date" });
-    assertInt(args.adults, 1, 100, "adults");
-    assertInt(args.children, 0, 100, "children");
+    assertInt(args.adults, 1, 500, "adults");
+    assertInt(args.children, 0, 500, "children");
     assertInt(args.infants, 0, 50, "infants");
     const total = Math.round(Math.max(0, args.totalOmr) * 1000);
     const paid = Math.round(Math.max(0, Math.min(args.amountPaidOmr ?? 0, args.totalOmr)) * 1000);

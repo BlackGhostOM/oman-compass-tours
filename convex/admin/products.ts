@@ -6,9 +6,9 @@ import { mutation, query, type MutationCtx } from "../_generated/server";
 import { assertInt, audit, requireStaff } from "../lib/access";
 import { faqValidator, itineraryDayValidator, localized, localizedOptional, mediaValidator, pricingModelValidator, seoValidator } from "../schema";
 import { releaseStorageRefs } from "../lib/mediaRefs";
-import { priceFromOf, pricingProblem } from "../lib/pricing";
+import { isVehicleModel, MULTIDAY_VEHICLE_SEATS, priceFromOf, pricingProblem } from "../lib/pricing";
 import { isRealIsoDate, normalizeStartTimes, omanTodayIso } from "../lib/dates";
-import { activeBookingsBetween, activeBookingsOn, bookedUnits, overridesOn, refreshBookingEndDates, slotCapacity, startTimeChangeImpact } from "../lib/capacity";
+import { activeBookingsBetween, activeBookingsOn, bookedUnits, overridesOn, refreshBookingEndDates, slotCapacity, startTimeChangeImpact, UNLIMITED_CAPACITY } from "../lib/capacity";
 
 const slugify = (s: string) =>
   s
@@ -270,6 +270,10 @@ export const upsert = mutation({
           extraChild: omr(data.tieredOmr.extraChild, "tieredOmr")!,
         }
       : undefined;
+    if (data.pricingModel === "per_vehicle_multiday") {
+      if (data.durationDays < 2) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "durationDays" });
+      if (data.vehicleOmr) data.vehicleOmr = { ...data.vehicleOmr, maxAdults: MULTIDAY_VEHICLE_SEATS, seats: MULTIDAY_VEHICLE_SEATS };
+    }
     if (data.vehicleOmr) {
       assertInt(data.vehicleOmr.maxAdults, 1, 10, "vehicleMaxAdults");
       assertInt(data.vehicleOmr.seats, data.vehicleOmr.maxAdults, 16, "vehicleSeats");
@@ -459,7 +463,7 @@ export const upsertSeason = mutation({
     // Tiered and per-vehicle prices ignore seasons, so a season there would say "Saved" and never apply
     const tour = await ctx.db.get(args.tourId);
     if (!tour) throw new ConvexError({ code: "NOT_FOUND" });
-    if (tour.pricingModel === "tiered" || tour.pricingModel === "per_vehicle") throw new ConvexError({ code: "INVALID_ARGUMENT", field: "pricingModel" });
+    if (tour.pricingModel === "tiered" || isVehicleModel(tour.pricingModel)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "pricingModel" });
     if (args.id) {
       const current = await ctx.db.get(args.id);
       if (!current || current.tourId !== args.tourId) throw new ConvexError({ code: "NOT_FOUND" });
@@ -508,7 +512,7 @@ export const setAvailability = mutation({
     for (const date of dates) {
       const rows = await ctx.db.query("availability").withIndex("by_tour_date", (q) => q.eq("tourId", args.tourId).eq("date", date)).collect();
       const existing = rows.find((r) => (r.startTime ?? null) === (args.startTime ?? null));
-      const doc = { tourId: args.tourId, date, startTime: args.startTime, capacity: args.capacity ?? tour.defaultCapacityPerSlot, booked: existing?.booked ?? 0, isBlackout: args.isBlackout, note: args.note };
+      const doc = { tourId: args.tourId, date, startTime: args.startTime, capacity: args.capacity ?? UNLIMITED_CAPACITY, booked: existing?.booked ?? 0, isBlackout: args.isBlackout, note: args.note };
       if (existing) await ctx.db.patch(existing._id, doc);
       else await ctx.db.insert("availability", doc);
     }
@@ -591,7 +595,7 @@ export const upsertDestination = mutation({
 /* Bulk import (JSON template)                                         */
 /* ------------------------------------------------------------------ */
 
-const PRICING_MODELS = ["per_group", "per_person", "tiered", "per_vehicle"] as const;
+const PRICING_MODELS = ["per_group", "per_person", "tiered", "per_vehicle", "per_vehicle_multiday"] as const;
 const PRICING_KEYS = ["pricing_model", "price_group_omr", "price_adult_omr", "price_child_omr", "tier_first_adult_omr", "tier_first_two_adults_omr", "tier_extra_adult_omr", "tier_extra_child_omr", "vehicle_price_omr", "vehicle_max_adults", "vehicle_seats"];
 /** The template's sample row uses this prefix so trying the template can never overwrite a real product. */
 const SAMPLE_CODE_RE = /^SAMPLE-/i;
@@ -779,10 +783,11 @@ export const importTours = mutation({
                 }
               : undefined;
           const vehicle = existing?.vehiclePricing;
-          const vehicleMaxAdults = pricingModel === "per_vehicle" ? (int("vehicle_max_adults", 1, 10) ?? vehicle?.maxAdults ?? 4) : 0;
+          const multiday = pricingModel === "per_vehicle_multiday";
+          const vehicleMaxAdults = multiday ? MULTIDAY_VEHICLE_SEATS : isVehicleModel(pricingModel) ? (int("vehicle_max_adults", 1, 10) ?? vehicle?.maxAdults ?? 4) : 0;
           const vehiclePricing =
-            pricingModel === "per_vehicle"
-              ? { pricePerVehicle: omr("vehicle_price_omr") ?? vehicle?.pricePerVehicle ?? 0, maxAdults: vehicleMaxAdults, seats: int("vehicle_seats", vehicleMaxAdults, 16) ?? Math.max(vehicleMaxAdults, vehicle?.seats ?? 6) }
+            isVehicleModel(pricingModel)
+              ? { pricePerVehicle: omr("vehicle_price_omr") ?? vehicle?.pricePerVehicle ?? 0, maxAdults: vehicleMaxAdults, seats: multiday ? MULTIDAY_VEHICLE_SEATS : (int("vehicle_seats", vehicleMaxAdults, 16) ?? Math.max(vehicleMaxAdults, vehicle?.seats ?? 6)) }
               : undefined;
           Object.assign(patch, { pricingModel, priceGroup, priceAdult, priceChild, tieredPricing, vehiclePricing, priceFrom: priceFromOf({ pricingModel, priceGroup, priceAdult, tieredPricing, vehiclePricing }) });
         }

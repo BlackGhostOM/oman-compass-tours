@@ -19,7 +19,7 @@ export type BookingTour = {
   operatingWeekdays?: number[] | null;
   /** Departure start dates (YYYY-MM-DD); null = any date. */
   fixedDepartureDates?: string[] | null;
-  pricingModel: "per_group" | "per_person" | "tiered" | "per_vehicle";
+  pricingModel: "per_group" | "per_person" | "tiered" | "per_vehicle" | "per_vehicle_multiday";
   priceGroup: number | null;
   priceAdult: number | null;
   priceChild: number | null;

@@ -9,7 +9,7 @@ import { addDaysIso, BOOKING_HORIZON_DAYS, dateProblem, isOperatingDate, lastTou
 import { maxUnpaidHoldsPerSlot, remainingCapacity, unpaidWebHoldsOn } from "./lib/capacity";
 import { releaseCouponUse } from "./lib/coupons";
 import { CHECKOUT_SESSION_COVER_MS, fallbackHoldExpiry, holdCeiling, holdExpiryFor, loadHoldSettings } from "./lib/holds";
-import { addOnAppliesTo, capacityUnits, computeQuote, INFANT_MAX, isFreeCancellation, type PricingCoupon } from "./lib/pricing";
+import { addOnAppliesTo, capacityUnits, computeQuote, INFANT_MAX, isFreeCancellation, PARTY_MAX, type PricingCoupon } from "./lib/pricing";
 import { localeValidator, paymentProviderValidator, travellerValidator } from "./schema";
 
 const TIME_RE = /^\d{2}:\d{2}$/;
@@ -92,14 +92,14 @@ function assertBookingArgs(tour: Doc<"tours">, args: { date: string; startTime: 
   if (problem === "too_far") throw new ConvexError({ code: "DATE_OUT_OF_RANGE", maxDays: BOOKING_HORIZON_DAYS });
   if (!isOperatingDate(tour, args.date)) throw new ConvexError({ code: "DATE_NOT_OPERATING" });
   if (!TIME_RE.test(args.startTime) || !tour.startTimes.includes(args.startTime)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "startTime" });
-  assertInt(args.adults, 1, 60, "adults");
-  assertInt(args.children, 0, 60, "children");
+  assertInt(args.adults, 1, PARTY_MAX, "adults");
+  assertInt(args.children, 0, PARTY_MAX, "children");
   assertInt(args.infants, 0, INFANT_MAX, "infants");
   // Infants travel on an adult's lap (child policy), so one per adult; larger families are arranged by staff
   if (args.infants > args.adults) throw new ConvexError({ code: "TOO_MANY_INFANTS", max: args.adults });
   const groupSize = args.adults + args.children;
   if (groupSize < tour.minGroup) throw new ConvexError({ code: "BELOW_MIN_GROUP", min: tour.minGroup });
-  if (groupSize > tour.maxGroup) throw new ConvexError({ code: "ABOVE_MAX_GROUP", max: tour.maxGroup });
+  if (groupSize > PARTY_MAX) throw new ConvexError({ code: "ABOVE_MAX_GROUP", max: PARTY_MAX });
 }
 
 const publicBooking = (b: Doc<"bookings">) => ({
@@ -172,7 +172,7 @@ export const quote = query({
       : !isOperatingDate(tour, args.date) ? "not_operating"
       : !startTime || !TIME_RE.test(startTime) || !tour.startTimes.includes(startTime) ? "invalid_start_time"
       : groupSize < tour.minGroup ? "below_min_group"
-      : groupSize > tour.maxGroup ? "above_max_group"
+      : groupSize > PARTY_MAX ? "above_max_group"
       : args.infants > args.adults || args.infants > INFANT_MAX ? "too_many_infants"
       : null;
     // Capacity units this party needs (seats, a private departure or 4WDs), so the sold-out message can name them

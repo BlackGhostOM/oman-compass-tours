@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { DateTime, EmptyState, Money, PageHeader, StatusBadge } from "@/components/admin/ui";
+import { isVehicleModel } from "../../../../../convex/lib/pricing";
 
 type Status = "draft" | "published" | "archived";
 
@@ -159,7 +160,7 @@ export default function AdminProductsPage() {
                     <div className="text-xs text-muted-foreground">{tr.kind} {tr.isFeatured ? `· ${t("featured")}` : ""} {tr.tags.includes("price-placeholder") ? `· ${t("pricePlaceholder")}` : ""}</div>
                   </TableCell>
                   <TableCell>{tr.category ? pick(tr.category, locale) : "—"}</TableCell>
-                  <TableCell className="text-end"><Money baisa={tr.priceFrom} /> <span className="text-xs text-muted-foreground">{tr.pricingModel === "per_group" ? t("perGroup") : tr.pricingModel === "per_vehicle" ? t("perVehicle") : tr.pricingModel === "tiered" ? t("forFirstAdult") : t("perAdult")}</span></TableCell>
+                  <TableCell className="text-end"><Money baisa={tr.priceFrom} /> <span className="text-xs text-muted-foreground">{tr.pricingModel === "per_group" ? t("perGroup") : isVehicleModel(tr.pricingModel) ? t("perVehicle") : tr.pricingModel === "tiered" ? t("forFirstAdult") : t("perAdult")}</span></TableCell>
                   <TableCell>
                     <Select value={tr.status} onValueChange={(v) => setTourStatus({ id: tr._id, status: v as Status }).then(() => toast.success(t("statusUpdated"))).catch((err) => toast.error(err instanceof ConvexError && (err.data as { code?: string })?.code === "PRICE_MISSING" ? t("priceMissing") : String((err as Error).message)))}>
                       <SelectTrigger className="h-7 w-32"><SelectValue /></SelectTrigger>

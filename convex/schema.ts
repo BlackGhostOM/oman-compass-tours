@@ -43,6 +43,8 @@ export const pricingModelValidator = v.union(
   v.literal("per_person"),
   v.literal("tiered"),
   v.literal("per_vehicle"),
+  // 4WD trips of 2+ days: flat price per vehicle, at most 4 guests (adults or children) per vehicle
+  v.literal("per_vehicle_multiday"),
 );
 
 /**

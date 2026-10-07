@@ -18,7 +18,7 @@ export function BookPanel({
     title: LocalizedString;
     slug: LocalizedString;
     priceFrom: number;
-    pricingModel: "per_group" | "per_person" | "tiered" | "per_vehicle";
+    pricingModel: "per_group" | "per_person" | "tiered" | "per_vehicle" | "per_vehicle_multiday";
     compareAtPriceFrom?: number | null;
     priceAdult?: number | null;
     priceChild?: number | null;
@@ -124,7 +124,7 @@ export function BookPanel({
 }
 
 /** Mobile sticky bar shown below the fold. */
-export function MobileBookBar({ tour }: { tour: { slug: LocalizedString; priceFrom: number; pricingModel: "per_group" | "per_person" | "tiered" | "per_vehicle" } }) {
+export function MobileBookBar({ tour }: { tour: { slug: LocalizedString; priceFrom: number; pricingModel: "per_group" | "per_person" | "tiered" | "per_vehicle" | "per_vehicle_multiday" } }) {
   const locale = useLocale();
   const t = useTranslations("tour");
   const ref = useRef<HTMLDivElement>(null);
