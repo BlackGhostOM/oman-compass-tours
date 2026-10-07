@@ -7,7 +7,7 @@ import { ConvexError } from "convex/values";
 import { ArrowLeft, ArrowUp, ArrowDown, ImagePlus, Plus, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
-import { isVehicleModel, MULTIDAY_VEHICLE_SEATS, vehiclesNeeded } from "../../../convex/lib/pricing";
+import { isVehicleModel, MULTIDAY_VEHICLE_SEATS, multidayVehiclePrice, vehiclesNeeded } from "../../../convex/lib/pricing";
 import { normalizeStartTimes } from "../../../convex/lib/dates";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { useSearchParams } from "next/navigation";
@@ -85,6 +85,7 @@ function initial(t: TourDoc | null) {
     vehiclePriceOmr: t?.vehiclePricing ? t.vehiclePricing.pricePerVehicle / 1000 : 0,
     vehicleMaxAdults: t?.vehiclePricing?.maxAdults ?? 4,
     vehicleSeats: t?.vehiclePricing?.seats ?? 6,
+    vehicleExtraGuestOmr: t?.vehiclePricing?.extraGuestPrice != null ? t.vehiclePricing.extraGuestPrice / 1000 : 0,
     childAgeMax: t?.childAgeMax ?? 11,
     compareAtPriceFromOmr: t?.compareAtPriceFrom ? t.compareAtPriceFrom / 1000 : 0,
     depositPercent: t?.depositPercent ?? 100,
@@ -164,7 +165,7 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
           pickupIncluded: f.pickupIncluded, guideLanguages: f.guideLanguages.split(",").map((s) => s.trim()).filter(Boolean), minGroup: f.minGroup, maxGroup: f.maxGroup, defaultCapacityPerSlot: f.defaultCapacityPerSlot, concurrentCapacity: f.concurrentCapacity.trim() === "" ? null : Number(f.concurrentCapacity), difficulty: f.difficulty,
           pricingModel: f.pricingModel, priceGroupOmr: f.priceGroupOmr || undefined, priceAdultOmr: f.priceAdultOmr || undefined, priceChildOmr: f.pricingModel === "per_person" ? num(f.priceChildOmr) : undefined,
           tieredOmr: f.pricingModel === "tiered" ? { firstAdult: f.tierFirstAdultOmr || 0, firstTwoAdults: f.tierFirstTwoOmr || 0, extraAdult: f.tierExtraAdultOmr || 0, extraChild: f.tierExtraChildOmr || 0 } : undefined,
-          vehicleOmr: isVehicleModel(f.pricingModel) ? { pricePerVehicle: f.vehiclePriceOmr || 0, maxAdults: f.pricingModel === "per_vehicle_multiday" ? MULTIDAY_VEHICLE_SEATS : f.vehicleMaxAdults || 4, seats: f.pricingModel === "per_vehicle_multiday" ? MULTIDAY_VEHICLE_SEATS : f.vehicleSeats || 6 } : undefined,
+          vehicleOmr: isVehicleModel(f.pricingModel) ? { pricePerVehicle: f.vehiclePriceOmr || 0, maxAdults: f.pricingModel === "per_vehicle_multiday" ? MULTIDAY_VEHICLE_SEATS : f.vehicleMaxAdults || 4, seats: f.pricingModel === "per_vehicle_multiday" ? MULTIDAY_VEHICLE_SEATS : f.vehicleSeats || 6, ...(f.pricingModel === "per_vehicle_multiday" ? { extraGuest: f.vehicleExtraGuestOmr || 0 } : {}) } : undefined,
           childAgeMax: f.childAgeMax, infantAgeMax: 2, compareAtPriceFromOmr: f.compareAtPriceFromOmr || undefined,
           depositPercent: f.depositPercent, freeCancellationHours: f.freeCancellationHours, allowReserveNowPayLater: f.allowReserveNowPayLater, holdHours: f.holdHours,
           coverImage: f.coverUrl ? { kind: "image", url: f.coverUrl, alt: f.title } : undefined, video: f.videoUrl ? { kind: "video", url: f.videoUrl, alt: f.title } : undefined,
@@ -423,7 +424,8 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
               )}
               {isVehicleModel(f.pricingModel) && (
                 <>
-                  <div className="space-y-1.5"><Label>{t("vehiclePrice")}</Label><Input type="number" step="0.001" value={f.vehiclePriceOmr} onChange={(e) => set("vehiclePriceOmr", Number(e.target.value))} /></div>
+                  <div className="space-y-1.5"><Label>{t(f.pricingModel === "per_vehicle_multiday" ? "vehicleFirstTwoPrice" : "vehiclePrice")}</Label><Input type="number" step="0.001" value={f.vehiclePriceOmr} onChange={(e) => set("vehiclePriceOmr", Number(e.target.value))} /></div>
+                  {f.pricingModel === "per_vehicle_multiday" && <div className="space-y-1.5"><Label>{t("vehicleExtraGuestPrice")}</Label><Input type="number" step="0.001" min={0} value={f.vehicleExtraGuestOmr} onChange={(e) => set("vehicleExtraGuestOmr", Number(e.target.value))} /></div>}
                   {f.pricingModel === "per_vehicle" && <>
                   <div className="space-y-1.5"><Label>{t("vehicleMaxAdults")}</Label><Input type="number" min={1} max={10} value={f.vehicleMaxAdults} onChange={(e) => set("vehicleMaxAdults", Number(e.target.value))} /></div>
                   <div className="space-y-1.5"><Label>{t("vehicleSeats")}</Label><Input type="number" min={1} max={16} value={f.vehicleSeats} onChange={(e) => set("vehicleSeats", Number(e.target.value))} /></div>
@@ -443,9 +445,14 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
                     const multiday = f.pricingModel === "per_vehicle_multiday";
                     const maxAdults = multiday ? MULTIDAY_VEHICLE_SEATS : f.vehicleMaxAdults || 4;
                     const seats = multiday ? MULTIDAY_VEHICLE_SEATS : f.vehicleSeats || 6;
+                    if (multiday) {
+                      // 5 guests: a full vehicle (two + 3rd + 4th) and a second vehicle with one guest
+                      const p = multidayVehiclePrice(5, { pricePerVehicle: f.vehiclePriceOmr || 0, extraGuestPrice: f.vehicleExtraGuestOmr || 0 });
+                      return t("vehicleMultidayHint", { two: f.vehiclePriceOmr || 0, extra: f.vehicleExtraGuestOmr || 0, full: Math.round(((f.vehiclePriceOmr || 0) + 2 * (f.vehicleExtraGuestOmr || 0)) * 1000) / 1000, example: Math.round(p.total * 1000) / 1000 });
+                    }
                     const n = vehiclesNeeded(5, 2, { pricePerVehicle: 0, maxAdults, seats });
                     const example = Math.round(n * (f.vehiclePriceOmr || 0) * 1000) / 1000;
-                    return multiday ? t("vehicleMultidayHint", { seats, vehicles: n, example }) : t("vehicleHint", { maxAdults, seats, vehicles: n, example });
+                    return t("vehicleHint", { maxAdults, seats, vehicles: n, example });
                   })()}
                 </p>
               )}

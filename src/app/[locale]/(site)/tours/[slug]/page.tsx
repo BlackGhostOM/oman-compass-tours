@@ -240,6 +240,12 @@ export default async function TourPage({ params }: Props) {
                           <PriceRow label={`${t("tierExtraChild")} (${t("ages", { min: (tour.infantAgeMax ?? 2) + 1, max: tour.childAgeMax ?? 11 })})`} baisa={tour.tieredPricing.extraChild} locale={locale} />
                           <tr><td className="px-4 py-3">{t("infants", { max: tour.infantAgeMax ?? 2 })}</td><td className="px-4 py-3 text-success" colSpan={2}>{t("free")}</td></tr>
                         </>
+                      ) : tour.pricingModel === "per_vehicle_multiday" && tour.vehiclePricing ? (
+                        <>
+                          <PriceRow label={t("multidayFirstTwoRow")} baisa={tour.vehiclePricing.pricePerVehicle} locale={locale} />
+                          <PriceRow label={t("multidayExtraGuestRow")} baisa={tour.vehiclePricing.extraGuestPrice ?? 0} locale={locale} />
+                          <tr><td className="px-4 py-3">{t("infants", { max: tour.infantAgeMax ?? 2 })}</td><td className="px-4 py-3 text-success" colSpan={2}>{t("free")}</td></tr>
+                        </>
                       ) : isVehicleModel(tour.pricingModel) && tour.vehiclePricing ? (
                         <>
                           <PriceRow label={t("perVehicleRow", { maxAdults: tour.vehiclePricing.maxAdults, seats: tour.vehiclePricing.seats })} baisa={tour.vehiclePricing.pricePerVehicle} locale={locale} />

@@ -7,7 +7,7 @@ import { Minus, Plus, Tag } from "lucide-react";
 import { formatOmr, pick } from "@/lib/content";
 import { whatsappLink } from "@/lib/site";
 import { BOOKING_HORIZON_DAYS, bookingWindow, isoDayFromLocalDate, isRealIsoDate } from "../../../convex/lib/dates";
-import { INFANT_MAX, PARTY_MAX, isVehicleModel } from "../../../convex/lib/pricing";
+import { INFANT_MAX, PARTY_MAX } from "../../../convex/lib/pricing";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -242,7 +242,8 @@ export function StepDates({
             <Counter id="children" label={t("children")} hint={t("childrenHint", { min: tour.infantAgeMax + 1, max: tour.childAgeMax ?? 11 })} value={state.children} min={0} max={Math.max(0, maxGroup - state.adults)} onChange={(v) => setParty({ children: v })} increaseLabel={t("counter.children.increase")} decreaseLabel={t("counter.children.decrease")} />
             <Counter id="infants" label={t("infants")} hint={t("infantsHint", { max: tour.infantAgeMax })} value={state.infants} min={0} max={infantMax} onChange={(v) => setParty({ infants: v })} increaseLabel={t("counter.infants.increase")} decreaseLabel={t("counter.infants.decrease")} />
             {tour.pricingModel === "per_group" && <p className="text-xs text-ink-500">{t("perGroupNote", { max: tour.maxGroup })}</p>}
-            {isVehicleModel(tour.pricingModel) && tour.vehiclePricing && (
+            {tour.pricingModel === "per_vehicle_multiday" && <p className="text-xs text-ink-500">{t("perVehicleMultidayNote")}</p>}
+            {tour.pricingModel === "per_vehicle" && tour.vehiclePricing && (
               <p className="text-xs text-ink-500">{t("perVehicleNote", { maxAdults: tour.vehiclePricing.maxAdults, seats: tour.vehiclePricing.seats })}</p>
             )}
             {groupSize < tour.minGroup && <p className="text-xs text-danger">{t("minGroup", { min: tour.minGroup, age: tour.infantAgeMax + 1 })}</p>}

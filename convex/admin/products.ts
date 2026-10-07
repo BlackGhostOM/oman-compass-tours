@@ -109,7 +109,7 @@ const tourInput = {
   /** Tiered pricing in OMR: totals for the first adult and the first two adults, then flat add-ons. */
   tieredOmr: v.optional(v.object({ firstAdult: v.number(), firstTwoAdults: v.number(), extraAdult: v.number(), extraChild: v.number() })),
   /** Per-vehicle pricing in OMR: a flat price per 4WD, with the vehicle's capacity. */
-  vehicleOmr: v.optional(v.object({ pricePerVehicle: v.number(), maxAdults: v.number(), seats: v.number() })),
+  vehicleOmr: v.optional(v.object({ pricePerVehicle: v.number(), maxAdults: v.number(), seats: v.number(), extraGuest: v.optional(v.number()) })),
   childAgeMax: v.optional(v.number()),
   infantAgeMax: v.optional(v.number()),
   compareAtPriceFromOmr: v.optional(v.number()),
@@ -279,7 +279,12 @@ export const upsert = mutation({
       assertInt(data.vehicleOmr.seats, data.vehicleOmr.maxAdults, 16, "vehicleSeats");
     }
     const vehiclePricing = data.vehicleOmr
-      ? { pricePerVehicle: omr(data.vehicleOmr.pricePerVehicle, "vehicleOmr")!, maxAdults: data.vehicleOmr.maxAdults, seats: data.vehicleOmr.seats }
+      ? {
+          pricePerVehicle: omr(data.vehicleOmr.pricePerVehicle, "vehicleOmr")!,
+          maxAdults: data.vehicleOmr.maxAdults,
+          seats: data.vehicleOmr.seats,
+          ...(data.pricingModel === "per_vehicle_multiday" && data.vehicleOmr.extraGuest !== undefined ? { extraGuestPrice: omr(data.vehicleOmr.extraGuest, "vehicleOmr")! } : {}),
+        }
       : undefined;
     // Drafts may be saved before pricing is decided; a complete price is required only to publish.
     if (data.status === "published") {
@@ -596,7 +601,7 @@ export const upsertDestination = mutation({
 /* ------------------------------------------------------------------ */
 
 const PRICING_MODELS = ["per_group", "per_person", "tiered", "per_vehicle", "per_vehicle_multiday"] as const;
-const PRICING_KEYS = ["pricing_model", "price_group_omr", "price_adult_omr", "price_child_omr", "tier_first_adult_omr", "tier_first_two_adults_omr", "tier_extra_adult_omr", "tier_extra_child_omr", "vehicle_price_omr", "vehicle_max_adults", "vehicle_seats"];
+const PRICING_KEYS = ["pricing_model", "price_group_omr", "price_adult_omr", "price_child_omr", "tier_first_adult_omr", "tier_first_two_adults_omr", "tier_extra_adult_omr", "tier_extra_child_omr", "vehicle_price_omr", "vehicle_max_adults", "vehicle_seats", "vehicle_extra_guest_omr"];
 /** The template's sample row uses this prefix so trying the template can never overwrite a real product. */
 const SAMPLE_CODE_RE = /^SAMPLE-/i;
 
@@ -787,7 +792,7 @@ export const importTours = mutation({
           const vehicleMaxAdults = multiday ? MULTIDAY_VEHICLE_SEATS : isVehicleModel(pricingModel) ? (int("vehicle_max_adults", 1, 10) ?? vehicle?.maxAdults ?? 4) : 0;
           const vehiclePricing =
             isVehicleModel(pricingModel)
-              ? { pricePerVehicle: omr("vehicle_price_omr") ?? vehicle?.pricePerVehicle ?? 0, maxAdults: vehicleMaxAdults, seats: multiday ? MULTIDAY_VEHICLE_SEATS : (int("vehicle_seats", vehicleMaxAdults, 16) ?? Math.max(vehicleMaxAdults, vehicle?.seats ?? 6)) }
+              ? { pricePerVehicle: omr("vehicle_price_omr") ?? vehicle?.pricePerVehicle ?? 0, maxAdults: vehicleMaxAdults, seats: multiday ? MULTIDAY_VEHICLE_SEATS : (int("vehicle_seats", vehicleMaxAdults, 16) ?? Math.max(vehicleMaxAdults, vehicle?.seats ?? 6)), ...(multiday ? { extraGuestPrice: omr("vehicle_extra_guest_omr") ?? vehicle?.extraGuestPrice ?? undefined } : {}) }
               : undefined;
           Object.assign(patch, { pricingModel, priceGroup, priceAdult, priceChild, tieredPricing, vehiclePricing, priceFrom: priceFromOf({ pricingModel, priceGroup, priceAdult, tieredPricing, vehiclePricing }) });
         }

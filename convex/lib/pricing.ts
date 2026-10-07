@@ -25,6 +25,11 @@ export type VehiclePricing = {
   maxAdults: number;
   /** Total guests one vehicle carries, children included (6 in the standard setup). */
   seats: number;
+  /**
+   * per_vehicle_multiday only: each guest after the first two in a vehicle (the 3rd and 4th) adds this;
+   * pricePerVehicle is then the price of the first two guests together.
+   */
+  extraGuestPrice?: number | null;
 };
 
 export type PricingTour = {
@@ -62,6 +67,20 @@ export const isVehicleModel = (model: string | undefined | null): boolean => mod
 
 /** Seats in one vehicle on a multi-day 4WD trip: adults and children alike (lap infants excluded). */
 export const MULTIDAY_VEHICLE_SEATS = 4;
+
+/**
+ * Multi-day 4WD price (owner rule): each vehicle takes up to 4 guests, adults or children alike. In every vehicle
+ * the first two guests cost pricePerVehicle together and the 3rd and 4th cost extraGuestPrice each. Vehicles are
+ * filled in order (4, 4, ..., the rest), so 5 guests = one full vehicle + one vehicle with 1 guest.
+ */
+export function multidayVehiclePrice(guests: number, cfg: Pick<VehiclePricing, "pricePerVehicle" | "extraGuestPrice">): { vehicles: number; extraGuests: number; total: number } {
+  const n = Math.max(0, Math.floor(guests));
+  const vehicles = Math.ceil(n / MULTIDAY_VEHICLE_SEATS);
+  let extraGuests = 0;
+  for (let left = n; left > 0; left -= MULTIDAY_VEHICLE_SEATS) extraGuests += Math.max(0, Math.min(left, MULTIDAY_VEHICLE_SEATS) - 2);
+  const extra = Math.max(0, cfg.extraGuestPrice ?? 0);
+  return { vehicles, extraGuests, total: vehicles * cfg.pricePerVehicle + extraGuests * extra };
+}
 
 /**
  * Owner rule: no tour caps the group size. 4WD tours add vehicles and private-group tours add groups as the
@@ -118,8 +137,11 @@ export function pricingProblem(tour: Pick<PricingTour, "pricingModel" | "priceGr
       return t.firstTwoAdults >= t.firstAdult ? null : "tieredPricing.firstTwoAdults";
     }
     case "per_vehicle":
-    case "per_vehicle_multiday":
       return (tour.vehiclePricing?.pricePerVehicle ?? 0) > 0 ? null : "vehiclePricing";
+    case "per_vehicle_multiday":
+      if (!((tour.vehiclePricing?.pricePerVehicle ?? 0) > 0)) return "vehiclePricing";
+      // The 3rd/4th guest price must be set on purpose (0 = they ride free)
+      return tour.vehiclePricing?.extraGuestPrice != null && tour.vehiclePricing.extraGuestPrice >= 0 ? null : "vehiclePricing.extraGuestPrice";
     default:
       if (!((tour.priceAdult ?? 0) > 0)) return "priceAdult";
       // A child price must be set on purpose (0 = children go free); a missing one would silently charge half the adult price
@@ -297,6 +319,28 @@ export function computeQuote(input: QuoteInput): Quote {
       items.push({ kind: "child", label: { en: "Child", ar: "طفل" }, quantity: children, unitPrice: t.extraChild, total: children * t.extraChild });
       subtotal += children * t.extraChild;
     }
+  } else if (tour.pricingModel === "per_vehicle_multiday" && tour.vehiclePricing) {
+    // Up to 4 guests per 4WD: the first two together, then the 3rd and 4th each; more guests start another vehicle
+    const cfg = tour.vehiclePricing;
+    const p = multidayVehiclePrice(groupSize, cfg);
+    items.push({
+      kind: "group",
+      label: { en: "4WD vehicle · first two guests", ar: "سيارة دفع رباعي · أول شخصين" },
+      quantity: p.vehicles,
+      unitPrice: cfg.pricePerVehicle,
+      total: p.vehicles * cfg.pricePerVehicle,
+    });
+    if (p.extraGuests > 0) {
+      const extra = Math.max(0, cfg.extraGuestPrice ?? 0);
+      items.push({
+        kind: "adult",
+        label: { en: "3rd or 4th guest in a 4WD", ar: "الشخص الثالث أو الرابع في السيارة" },
+        quantity: p.extraGuests,
+        unitPrice: extra,
+        total: p.extraGuests * extra,
+      });
+    }
+    subtotal = p.total;
   } else if (isVehicleModel(tour.pricingModel) && tour.vehiclePricing) {
     // Every 4WD costs the same flat price; the party size decides how many are
     // needed. Seasonal overrides do not apply to per-vehicle pricing.

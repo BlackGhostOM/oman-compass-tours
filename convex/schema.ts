@@ -69,6 +69,8 @@ export const vehiclePricingValidator = v.object({
   pricePerVehicle: v.number(),
   maxAdults: v.number(),
   seats: v.number(),
+  /** per_vehicle_multiday only: price of each guest after the first two in a vehicle (the 3rd and 4th); pricePerVehicle then covers the first two. */
+  extraGuestPrice: v.optional(v.number()),
 });
 
 export const bookingStatusValidator = v.union(
