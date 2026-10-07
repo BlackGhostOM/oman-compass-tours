@@ -47,7 +47,7 @@ function Counter({
       </div>
       <div className="flex items-center gap-2" dir="ltr">
         <Button type="button" variant="outline" size="icon-sm" onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} aria-label={decreaseLabel}><Minus className="size-3.5" /></Button>
-        <input id={id} type="number" readOnly value={value} className="w-8 bg-transparent text-center font-heading text-lg text-navy-950" aria-live="polite" />
+        <input id={id} type="number" readOnly value={value} className="w-12 min-w-0 bg-transparent text-center font-heading text-lg tabular-nums text-navy-950 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" aria-live="polite" />
         <Button type="button" variant="outline" size="icon-sm" onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} aria-label={increaseLabel}><Plus className="size-3.5" /></Button>
       </div>
     </div>
