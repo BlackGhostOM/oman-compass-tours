@@ -23,7 +23,7 @@ import type { BookingTour, WizardState } from "@/components/booking/types";
 
 /** Errors the customer fixes on step 1 (date, time, guests, coupon); INVALID_ARGUMENT is routed by its field. */
 const STEP1_CODES = new Set(["SOLD_OUT", "DATE_IN_PAST", "DATE_OUT_OF_RANGE", "DATE_NOT_OPERATING", "BELOW_MIN_GROUP", "ABOVE_MAX_GROUP", "TOO_MANY_INFANTS", "COUPON_INVALID", "PRICE_UNAVAILABLE"]);
-const STEP1_FIELDS = new Set(["date", "startTime", "adults", "children", "infants"]);
+const STEP1_FIELDS = new Set(["date", "startTime", "adults", "children", "infants", "singleRooms"]);
 
 /** Whole numbers from ?adults=&children=&infants= ("Book again" links); anything else is left out. */
 const intParam = (v: string | null) => (v !== null && /^\d{1,2}$/.test(v) ? Number(v) : undefined);
@@ -186,6 +186,7 @@ export function BookingWizard({ tour }: { tour: BookingTour }) {
     adults: state.adults,
     children: state.children,
     infants: state.infants,
+    singleRooms: tour.pricingModel === "per_vehicle_multiday" ? state.singleRooms : undefined,
     addOns: addOnSelection,
     couponCode: state.couponCode || undefined,
   });
@@ -225,6 +226,7 @@ export function BookingWizard({ tour }: { tour: BookingTour }) {
         adults: state.adults,
         children: state.children,
         infants: state.infants,
+        singleRooms: tour.pricingModel === "per_vehicle_multiday" ? state.singleRooms : undefined,
         addOns: addOnSelection,
         couponCode: state.couponCode || undefined,
         traveller: {

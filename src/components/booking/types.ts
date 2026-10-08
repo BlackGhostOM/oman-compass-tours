@@ -45,6 +45,8 @@ export type WizardState = {
   adults: number;
   children: number;
   infants: number;
+  /** per_vehicle_multiday: guests asking for a single room (0 for other tours). */
+  singleRooms: number;
   addOns: Record<string, number>; // addOnId → quantity
   couponCode: string;
   traveller: {

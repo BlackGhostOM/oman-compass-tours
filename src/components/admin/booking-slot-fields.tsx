@@ -5,7 +5,7 @@ import { useQuery } from "convex/react";
 import { AlertTriangle } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { capacityUnits, PARTY_MAX } from "../../../convex/lib/pricing";
+import { capacityUnits, PARTY_MAX, roomsNeeded } from "../../../convex/lib/pricing";
 import { isRealIsoDate } from "../../../convex/lib/dates";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +19,7 @@ export type SlotTour = {
   pricingModel: "per_group" | "per_person" | "tiered" | "per_vehicle" | "per_vehicle_multiday";
   vehiclePricing?: { pricePerVehicle: number; maxAdults: number; seats: number } | null;
 };
-export type SlotValue = { date: string; startTime: string; adults: number; children: number; infants: number };
+export type SlotValue = { date: string; startTime: string; adults: number; children: number; infants: number; /** per_vehicle_multiday only */ singleRooms?: number };
 
 /**
  * Date, start time and party controls shared by the staff "Create manual booking" and "Change booking" dialogs.
@@ -77,6 +77,16 @@ export function BookingSlotFields({ tour, value, onChange, idPrefix, own }: { to
         <div className="space-y-1.5"><Label htmlFor={`${idPrefix}-children`}>{t("children")}</Label><Input id={`${idPrefix}-children`} type="number" min={0} value={value.children} onChange={(e) => onChange({ children: num(e.target.value) })} /></div>
         <div className="space-y-1.5"><Label htmlFor={`${idPrefix}-infants`}>{t("infants")}</Label><Input id={`${idPrefix}-infants`} type="number" min={0} value={value.infants} onChange={(e) => onChange({ infants: num(e.target.value) })} /></div>
       </div>
+      {tour?.pricingModel === "per_vehicle_multiday" && (() => {
+        const rooms = roomsNeeded(group, value.singleRooms);
+        return (
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor={`${idPrefix}-single`}>{t("singleRooms")}</Label>
+            <Input id={`${idPrefix}-single`} type="number" min={0} max={group} value={value.singleRooms ?? 0} onChange={(e) => onChange({ singleRooms: Math.min(group, num(e.target.value)) })} />
+            <p className="text-xs text-muted-foreground">{t("roomsSummary", { shared: rooms.shared, single: rooms.single })}</p>
+          </div>
+        );
+      })()}
       {warnings.length > 0 && (
         <ul role="status" className="space-y-1 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground sm:col-span-2">
           {warnings.map((w) => <li key={w} className="flex items-start gap-2"><AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warning" /> {w}</li>)}

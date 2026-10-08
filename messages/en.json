@@ -270,8 +270,10 @@
     "tierExtraAdult": "Each additional adult",
     "tierExtraChild": "Each child",
     "perVehicleRow": "Per 4WD vehicle (up to {maxAdults} adults, {seats} guests)",
-    "multidayFirstTwoRow": "First two guests in each 4WD",
-    "multidayExtraGuestRow": "3rd and 4th guest in a 4WD (each)",
+    "multidaySeatRow": "Guest {n} in each 4WD",
+    "sharedRoomRow": "Shared room (2 guests)",
+    "singleRoomRow": "Single room",
+    "multidayRoomsNote": "Whole-trip prices. Each 4WD carries up to 4 guests (adults or children) and each seat has its own price; a 5th guest starts another 4WD. Rooms: two guests share a room unless they ask for a single room, and a guest left without a partner gets a single room. Infants stay with their parents.",
     "ages": "ages {min}–{max}",
     "infants": "Infants (0–{max})",
     "free": "Free",
@@ -700,7 +702,7 @@
       "infantsHint": "0–{max} years · free",
       "perGroupNote": "Private-group price covers up to {max, plural, one {# guest} other {# guests}} in one vehicle; larger parties get another group at the same price automatically.",
       "perVehicleNote": "Each 4WD carries up to {maxAdults} adults ({seats} guests in total). Extra vehicles are added automatically, with no limit on group size.",
-      "perVehicleMultidayNote": "Each 4WD carries up to 4 guests, adults or children. The first two share one price, the 3rd and 4th are priced each, and a 5th guest starts another 4WD priced the same way.",
+      "perVehicleMultidayNote": "Each 4WD carries up to 4 guests, adults or children, and the 1st, 2nd, 3rd and 4th guest each have their own price; a 5th guest starts another 4WD priced the same way.",
       "minGroup": "This tour requires at least {min, plural, one {# guest} other {# guests}} aged {age}+ (infants are not counted).",
       "maxGroup": "Up to {max} guests per online booking. For a larger group, <link>message us on WhatsApp</link> and we will gladly arrange it.",
       "largeGroupMessage": "Hello Oman Compass Tours, I would like to book {tour} for a group of more than {max} guests.",
@@ -722,6 +724,10 @@
         "childSeats": {
           "increase": "Add one child seat",
           "decrease": "Remove one child seat"
+        },
+        "singleRooms": {
+          "increase": "Add a single room",
+          "decrease": "Remove a single room"
         }
       },
       "addOns": "Add-ons",
@@ -746,7 +752,11 @@
       "laterDepartures": "Later departures open for online booking {days} days ahead; to reserve one now, message us on WhatsApp.",
       "onlyLaterDepartures": "The next departures open for online booking {days} days ahead. To reserve one now, please message us on WhatsApp.",
       "subtitleShared": "You join a shared group on the departure you choose, so other guests may travel with you.",
-      "subtitleTicket": "Choose your visit date and the number of tickets."
+      "subtitleTicket": "Choose your visit date and the number of tickets.",
+      "singleRooms": "Single rooms",
+      "singleRoomsHint": "Guests who want a room to themselves",
+      "roomsSummary": "Rooms: {shared, plural, =0 {} one {1 shared room} other {# shared rooms}}{shared, plural, =0 {} other {{single, plural, =0 {} other {, }}}}{single, plural, =0 {} one {1 single room} other {# single rooms}}",
+      "roomsOddNote": "A shared room sleeps two, so the guest left without a partner gets a single room too."
     },
     "traveller": {
       "title": "Lead traveller",
@@ -1350,7 +1360,9 @@
           "off_schedule": "The start time is not on the tour's schedule"
         },
         "holdUntil": "Hold the place until (optional)",
-        "holdUntilHint": "Unpaid bookings are released automatically. Default: 7 days, always ending before the departure. Payment links you issue extend the hold to match."
+        "holdUntilHint": "Unpaid bookings are released automatically. Default: 7 days, always ending before the departure. Payment links you issue extend the hold to match.",
+        "singleRooms": "Guests asking for a single room",
+        "roomsSummary": "Rooms: {shared} shared · {single} single"
       },
       "searchPlaceholder": "Search reference, name, email, phone…",
       "allStatuses": "All statuses",
@@ -1625,15 +1637,16 @@
         "priceChildRequired": "Enter a child price before publishing (0 means children travel free).",
         "tiered": "Tiered (first adult, then the pair, then flat add-ons)",
         "perVehicle": "Per 4WD vehicle",
-        "perVehicleMultiday": "Multi-day 4WD (max 4 guests per vehicle, trips of 2+ days)",
-        "vehicleMultidayHint": "Each 4WD carries up to 4 guests, adults or children. First two together {two} OMR, then {extra} OMR each for the 3rd and 4th, so a full 4WD is {full} OMR. Example: 5 guests = one full 4WD + a second 4WD with one guest = {example} OMR.",
+        "perVehicleMultiday": "Multi-day 4WD with rooms (max 4 guests per vehicle, trips of 2+ days)",
+        "vehicleMultidayHint": "Whole-trip prices. A full 4WD (4 guests) is {full} OMR plus rooms. Example: 5 guests with one single-room request = a full 4WD + a second 4WD with one guest, {shared} shared rooms and {single} single rooms = {example} OMR.",
+        "multidaySeatPrice": "Guest {n} in a 4WD (OMR)",
+        "sharedRoomPrice": "Shared room, 2 guests (OMR per room)",
+        "singleRoomPrice": "Single room (OMR per room)",
         "tierFirstAdult": "First adult — total (OMR)",
         "tierFirstTwo": "First two adults — combined total (OMR)",
         "tierExtraAdult": "Each additional adult (OMR)",
         "tierExtraChild": "Each child (OMR)",
         "vehiclePrice": "Price per 4WD (OMR)",
-        "vehicleFirstTwoPrice": "Price of the first two guests in a 4WD (OMR, together)",
-        "vehicleExtraGuestPrice": "Price of the 3rd and of the 4th guest (OMR, each)",
         "vehicleMaxAdults": "Max adults per 4WD",
         "vehicleSeats": "Seats per 4WD (children included)",
         "tieredHint": "Totals: 1 adult = {one} OMR · 2 adults = {two} OMR · 3 adults = {three} OMR · each child +{childx} OMR. Infants travel free.",

@@ -109,7 +109,11 @@ export function sanitizeSelection(tour: BookingTour, input: unknown, opts: Selec
   const children = clamp(inChildren ?? 0, 0, maxGroup - adults);
   if (adults + children < minGroup) adults = minGroup - children;
   const infants = clamp(inInfants ?? 0, 0, Math.min(adults, INFANT_MAX));
+  // Single rooms: only multi-day 4WD trips offer them, at most one per guest
+  const inSingle = asInt(d.singleRooms);
+  const singleRooms = tour.pricingModel === "per_vehicle_multiday" ? clamp(inSingle ?? 0, 0, adults + children) : 0;
   if ((d.adults !== undefined && d.adults !== adults) || (d.children !== undefined && d.children !== children) || (d.infants !== undefined && d.infants !== infants)) changed = true;
+  if (d.singleRooms !== undefined && d.singleRooms !== singleRooms) changed = true;
 
   // Start time
   const needed = partyUnits(tour, adults, children);
@@ -160,6 +164,7 @@ export function sanitizeSelection(tour: BookingTour, input: unknown, opts: Selec
       adults,
       children,
       infants,
+      singleRooms,
       addOns,
       couponCode: typeof d.couponCode === "string" ? d.couponCode : "",
       traveller,

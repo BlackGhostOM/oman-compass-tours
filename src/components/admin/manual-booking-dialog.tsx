@@ -25,7 +25,7 @@ export function ManualBookingDialog({ open, onOpenChange }: { open: boolean; onO
   const router = useRouter();
   const tours = useQuery(api.admin.bookings.toursForSelect);
   const create = useMutation(api.admin.bookings.createManual);
-  const [form, setForm] = useState({ tourId: "", date: addDaysIso(todayIso(), 1), startTime: "", adults: 2, children: 0, infants: 0, firstName: "", lastName: "", nationality: "OM", phone: "", email: "", hotel: "", requests: "", locale: "en" as "en" | "ar", source: "whatsapp" as "whatsapp" | "phone" | "email" | "office" | "viator" | "tripadvisor" | "staff", totalOmr: 0, status: "confirmed" as "inquiry" | "pending_payment" | "confirmed", paidOmr: 0, notes: "", holdUntil: "" });
+  const [form, setForm] = useState({ tourId: "", date: addDaysIso(todayIso(), 1), startTime: "", adults: 2, children: 0, infants: 0, singleRooms: 0, firstName: "", lastName: "", nationality: "OM", phone: "", email: "", hotel: "", requests: "", locale: "en" as "en" | "ar", source: "whatsapp" as "whatsapp" | "phone" | "email" | "office" | "viator" | "tripadvisor" | "staff", totalOmr: 0, status: "confirmed" as "inquiry" | "pending_payment" | "confirmed", paidOmr: 0, notes: "", holdUntil: "" });
   const [busy, setBusy] = useState(false);
   // Once staff type their own total (an agreed discount, say), guest changes stop overwriting it
   const [totalEdited, setTotalEdited] = useState(false);
@@ -34,7 +34,7 @@ export function ManualBookingDialog({ open, onOpenChange }: { open: boolean; onO
   // can overwrite; it follows the tour, date and party until staff type their own total
   const suggestion = useQuery(
     api.admin.bookings.suggestedTotal,
-    form.tourId ? { tourId: form.tourId as Id<"tours">, date: form.date, adults: form.adults, children: form.children, infants: form.infants } : "skip",
+    form.tourId ? { tourId: form.tourId as Id<"tours">, date: form.date, adults: form.adults, children: form.children, infants: form.infants, singleRooms: tour?.pricingModel === "per_vehicle_multiday" ? form.singleRooms : undefined } : "skip",
   );
   const totalOmr: number | undefined = totalEdited ? form.totalOmr : suggestion ? suggestion.total / 1000 : undefined;
 
@@ -44,7 +44,7 @@ export function ManualBookingDialog({ open, onOpenChange }: { open: boolean; onO
     setForm((f) => ({ ...f, tourId: id, startTime: tr?.startTimes[0] ?? "" }));
   }
 
-  function setParty(patch: Partial<Pick<typeof form, "adults" | "children" | "infants">>) {
+  function setParty(patch: Partial<Pick<typeof form, "adults" | "children" | "infants" | "singleRooms">>) {
     setForm((f) => ({ ...f, ...patch }));
   }
 
@@ -53,7 +53,7 @@ export function ManualBookingDialog({ open, onOpenChange }: { open: boolean; onO
     if (!form.tourId || totalOmr === undefined) return;
     setBusy(true);
     try {
-      const args = { tourId: form.tourId as Id<"tours">, date: form.date, startTime: form.startTime, adults: form.adults, children: form.children, infants: form.infants, traveller: { firstName: form.firstName, lastName: form.lastName, nationality: form.nationality, phone: form.phone, email: form.email, hotel: form.hotel || undefined, specialRequests: form.requests || undefined, preferredLanguage: form.locale }, locale: form.locale, source: form.source, totalOmr, status: form.status, amountPaidOmr: form.paidOmr || undefined, internalNotes: form.notes || undefined, holdUntil: form.status !== "confirmed" && form.holdUntil ? form.holdUntil : undefined };
+      const args = { tourId: form.tourId as Id<"tours">, date: form.date, startTime: form.startTime, adults: form.adults, children: form.children, infants: form.infants, singleRooms: tour?.pricingModel === "per_vehicle_multiday" ? form.singleRooms : undefined, traveller: { firstName: form.firstName, lastName: form.lastName, nationality: form.nationality, phone: form.phone, email: form.email, hotel: form.hotel || undefined, specialRequests: form.requests || undefined, preferredLanguage: form.locale }, locale: form.locale, source: form.source, totalOmr, status: form.status, amountPaidOmr: form.paidOmr || undefined, internalNotes: form.notes || undefined, holdUntil: form.status !== "confirmed" && form.holdUntil ? form.holdUntil : undefined };
       let r: { bookingId: Id<"bookings">; reference: string };
       try {
         r = await create(args);
@@ -92,7 +92,7 @@ export function ManualBookingDialog({ open, onOpenChange }: { open: boolean; onO
           <BookingSlotFields
             idPrefix="mb"
             tour={tour}
-            value={{ date: form.date, startTime: form.startTime, adults: form.adults, children: form.children, infants: form.infants }}
+            value={{ date: form.date, startTime: form.startTime, adults: form.adults, children: form.children, infants: form.infants, singleRooms: form.singleRooms }}
             onChange={({ date, startTime, ...party }) => {
               if (date !== undefined) setForm((f) => ({ ...f, date }));
               if (startTime !== undefined) setForm((f) => ({ ...f, startTime }));

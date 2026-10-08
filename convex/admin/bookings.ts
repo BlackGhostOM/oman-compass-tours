@@ -12,7 +12,7 @@ import { releaseCouponUse, retakeCouponUse } from "../lib/coupons";
 import { buildQuote } from "../bookings";
 import { fallbackHoldExpiry, holdExpiryFor, isLapsedHold, loadHoldSettings } from "../lib/holds";
 import { confirmPaidBooking } from "../payments";
-import { capacityUnits, PARTY_MAX, isVehicleModel } from "../lib/pricing";
+import { capacityUnits, PARTY_MAX, isVehicleModel, roomsNeeded } from "../lib/pricing";
 
 type Status = Doc<"bookings">["status"];
 
@@ -298,10 +298,12 @@ const amendArgs = {
   adults: v.optional(v.number()),
   children: v.optional(v.number()),
   infants: v.optional(v.number()),
+  /** per_vehicle_multiday: guests asking for a single room. */
+  singleRooms: v.optional(v.number()),
   /** An agreed total in OMR instead of the website price (one line on the voucher, as for manual bookings). */
   totalOmrOverride: v.optional(v.number()),
 };
-type AmendInput = { date?: string; startTime?: string; adults?: number; children?: number; infants?: number; totalOmrOverride?: number };
+type AmendInput = { date?: string; startTime?: string; adults?: number; children?: number; infants?: number; singleRooms?: number; totalOmrOverride?: number };
 type AmendItem = { kind: Doc<"bookingItems">["kind"]; label: { en: string; ar: string }; quantity: number; unitPrice: number; total: number; addOnId?: Id<"addOns"> };
 
 /**
@@ -319,14 +321,17 @@ async function planAmendment(ctx: QueryCtx | MutationCtx, b: Doc<"bookings">, to
   const adults = input.adults ?? b.adults;
   const children = input.children ?? b.children;
   const infants = input.infants ?? b.infants;
+  const singleRooms = input.singleRooms ?? b.rooms?.singleRequested ?? 0;
   if (!isRealIsoDate(date)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "date" });
   if (date !== b.date && date < omanTodayIso()) throw new ConvexError({ code: "DATE_IN_PAST" });
   if (!tour.startTimes.includes(startTime)) throw new ConvexError({ code: "INVALID_ARGUMENT", field: "startTime" });
   assertInt(adults, 1, 500, "adults");
   assertInt(children, 0, 500, "children");
   assertInt(infants, 0, 50, "infants");
+  assertInt(singleRooms, 0, 500, "singleRooms");
+  const rooms = tour.pricingModel === "per_vehicle_multiday" ? roomsNeeded(adults + children, singleRooms) : undefined;
   const slotChanged = date !== b.date || startTime !== slotOf(tour, b);
-  const partyChanged = adults !== b.adults || children !== b.children || infants !== b.infants;
+  const partyChanged = adults !== b.adults || children !== b.children || infants !== b.infants || singleRooms !== (b.rooms?.singleRequested ?? 0);
 
   let items: AmendItem[];
   let subtotal: number, addOnsTotal: number, discountTotal: number, total: number, depositDue: number;
@@ -348,7 +353,7 @@ async function planAmendment(ctx: QueryCtx | MutationCtx, b: Doc<"bookings">, to
       const a = await ctx.db.get(item.addOnId);
       addOns.push({ addOnId: item.addOnId, quantity: a?.priceType === "per_person" ? Math.max(1, Math.round(item.quantity / Math.max(1, b.groupSize))) : item.quantity });
     }
-    const { quote } = await buildQuote(ctx, tour, { date, adults, children, infants, addOns, couponCode: b.couponCode }, { honourCoupon: true });
+    const { quote } = await buildQuote(ctx, tour, { date, adults, children, infants, singleRooms, addOns, couponCode: b.couponCode }, { honourCoupon: true });
     if (b.couponCode && quote.couponError) couponDropped = quote.couponError;
     const free = quote.total === 0 && !!quote.couponCode && quote.discountTotal > 0;
     if (quote.total <= 0 && !free) throw new ConvexError({ code: "PRICE_UNAVAILABLE" });
@@ -362,6 +367,7 @@ async function planAmendment(ctx: QueryCtx | MutationCtx, b: Doc<"bookings">, to
     adults,
     children,
     infants,
+    rooms,
     groupSize: adults + children,
     slotChanged,
     partyChanged,
@@ -443,6 +449,7 @@ export const amend = mutation({
       adults: plan.adults,
       children: plan.children,
       infants: plan.infants,
+      rooms: plan.rooms,
       groupSize: plan.groupSize,
       subtotal: plan.subtotal,
       addOnsTotal: plan.addOnsTotal,
@@ -497,6 +504,8 @@ export const createManual = mutation({
     adults: v.number(),
     children: v.number(),
     infants: v.number(),
+    /** per_vehicle_multiday: guests asking for a single room. */
+    singleRooms: v.optional(v.number()),
     traveller: travellerValidator,
     locale: v.union(v.literal("en"), v.literal("ar")),
     source: v.union(v.literal("whatsapp"), v.literal("phone"), v.literal("email"), v.literal("office"), v.literal("viator"), v.literal("tripadvisor"), v.literal("staff")),
@@ -542,6 +551,7 @@ export const createManual = mutation({
       adults: args.adults,
       children: args.children,
       infants: args.infants,
+      rooms: tour.pricingModel === "per_vehicle_multiday" ? roomsNeeded(args.adults + args.children, args.singleRooms) : undefined,
       groupSize: args.adults + args.children,
       pricingModel: tour.pricingModel,
       currency: "OMR",
@@ -722,14 +732,14 @@ export const issuePaymentLink = mutation({
  * suggestion matches the online price. Null for an unknown tour or a date that is not a real day.
  */
 export const suggestedTotal = query({
-  args: { tourId: v.id("tours"), date: v.string(), adults: v.number(), children: v.number(), infants: v.number() },
+  args: { tourId: v.id("tours"), date: v.string(), adults: v.number(), children: v.number(), infants: v.number(), singleRooms: v.optional(v.number()) },
   returns: v.union(v.null(), v.object({ total: v.number(), seasonal: v.boolean() })),
   handler: async (ctx, args) => {
     await requireStaff(ctx);
     const tour = await ctx.db.get(args.tourId);
     if (!tour || !isRealIsoDate(args.date)) return null;
     const party = (x: number) => (Number.isFinite(x) ? Math.min(500, Math.max(0, Math.floor(x))) : 0);
-    const { quote } = await buildQuote(ctx, tour, { date: args.date, adults: party(args.adults), children: party(args.children), infants: party(args.infants), addOns: [] });
+    const { quote } = await buildQuote(ctx, tour, { date: args.date, adults: party(args.adults), children: party(args.children), infants: party(args.infants), singleRooms: args.singleRooms === undefined ? undefined : party(args.singleRooms), addOns: [] });
     return { total: quote.total, seasonal: quote.seasonal ?? false };
   },
 });

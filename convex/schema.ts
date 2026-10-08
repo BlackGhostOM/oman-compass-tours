@@ -69,8 +69,13 @@ export const vehiclePricingValidator = v.object({
   pricePerVehicle: v.number(),
   maxAdults: v.number(),
   seats: v.number(),
-  /** per_vehicle_multiday only: price of each guest after the first two in a vehicle (the 3rd and 4th); pricePerVehicle then covers the first two. */
+  /** Legacy (first multi-day rule): the 3rd/4th guest price, read only when seatPrices is missing. */
   extraGuestPrice: v.optional(v.number()),
+  /** per_vehicle_multiday: price of the 1st, 2nd, 3rd and 4th guest in each 4WD (whole trip); pricePerVehicle mirrors the 1st. */
+  seatPrices: v.optional(v.array(v.number())),
+  /** per_vehicle_multiday: one shared room for two guests, and one single room (whole trip). */
+  sharedRoomPrice: v.optional(v.number()),
+  singleRoomPrice: v.optional(v.number()),
 });
 
 export const bookingStatusValidator = v.union(
@@ -383,6 +388,8 @@ export default defineSchema({
     adults: v.number(),
     children: v.number(),
     infants: v.number(),
+    /** per_vehicle_multiday: the rooms booked (singleRequested = guests who asked for a single room). */
+    rooms: v.optional(v.object({ shared: v.number(), single: v.number(), singleRequested: v.number() })),
     groupSize: v.number(),
     pricingModel: pricingModelValidator,
     currency: v.literal("OMR"),

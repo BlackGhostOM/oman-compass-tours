@@ -25,6 +25,7 @@ type ChangeBooking = {
   adults: number;
   children: number;
   infants: number;
+  rooms?: { singleRequested: number } | null;
   total: number;
   amountPaid: number;
   tour: SlotTour | null;
@@ -42,7 +43,7 @@ export function ChangeBookingDialog({ booking, open, onOpenChange }: { booking: 
   const tour = booking.tour ?? undefined;
   // A start time the tour no longer runs cannot be kept: staff pick a listed one
   const initialTime = booking.startTime && tour?.startTimes.includes(booking.startTime) ? booking.startTime : booking.startTime ? "" : (tour?.startTimes[0] ?? "");
-  const [value, setValue] = useState<SlotValue>({ date: booking.date, startTime: initialTime, adults: booking.adults, children: booking.children, infants: booking.infants });
+  const [value, setValue] = useState<SlotValue>({ date: booking.date, startTime: initialTime, adults: booking.adults, children: booking.children, infants: booking.infants, ...(tour?.pricingModel === "per_vehicle_multiday" ? { singleRooms: booking.rooms?.singleRequested ?? 0 } : {}) });
   const [agreedTotal, setAgreedTotal] = useState("");
   const [reason, setReason] = useState("");
   const [notify, setNotify] = useState(true);

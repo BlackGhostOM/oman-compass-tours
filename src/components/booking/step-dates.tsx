@@ -7,7 +7,7 @@ import { Minus, Plus, Tag } from "lucide-react";
 import { formatOmr, pick } from "@/lib/content";
 import { whatsappLink } from "@/lib/site";
 import { BOOKING_HORIZON_DAYS, bookingWindow, isoDayFromLocalDate, isRealIsoDate } from "../../../convex/lib/dates";
-import { INFANT_MAX, PARTY_MAX } from "../../../convex/lib/pricing";
+import { INFANT_MAX, PARTY_MAX, roomsNeeded } from "../../../convex/lib/pricing";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -138,11 +138,13 @@ export function StepDates({
   const smallTravellers = state.children + state.infants;
   const visibleAddOns = tour.addOns.filter((a) => a.key !== "child_seat" || smallTravellers > 0);
   /** Changes the party, keeping infants within the adults and child seats within children + infants. */
-  const setParty = (p: { adults?: number; children?: number; infants?: number }) => {
+  const setParty = (p: { adults?: number; children?: number; infants?: number; singleRooms?: number }) => {
     const adults = p.adults ?? state.adults;
     const children = p.children ?? state.children;
     const infants = Math.min(p.infants ?? state.infants, adults, INFANT_MAX);
-    const patch: Partial<WizardState> = { adults, children, infants };
+    // Single-room requests never exceed the guests (adults and children)
+    const singleRooms = Math.min(p.singleRooms ?? state.singleRooms ?? 0, adults + children);
+    const patch: Partial<WizardState> = { adults, children, infants, singleRooms };
     if (childSeat && (state.addOns[childSeat._id] ?? 0) > children + infants) patch.addOns = { ...state.addOns, [childSeat._id]: children + infants };
     update(patch);
   };
@@ -242,7 +244,17 @@ export function StepDates({
             <Counter id="children" label={t("children")} hint={t("childrenHint", { min: tour.infantAgeMax + 1, max: tour.childAgeMax ?? 11 })} value={state.children} min={0} max={Math.max(0, maxGroup - state.adults)} onChange={(v) => setParty({ children: v })} increaseLabel={t("counter.children.increase")} decreaseLabel={t("counter.children.decrease")} />
             <Counter id="infants" label={t("infants")} hint={t("infantsHint", { max: tour.infantAgeMax })} value={state.infants} min={0} max={infantMax} onChange={(v) => setParty({ infants: v })} increaseLabel={t("counter.infants.increase")} decreaseLabel={t("counter.infants.decrease")} />
             {tour.pricingModel === "per_group" && <p className="text-xs text-ink-500">{t("perGroupNote", { max: tour.maxGroup })}</p>}
-            {tour.pricingModel === "per_vehicle_multiday" && <p className="text-xs text-ink-500">{t("perVehicleMultidayNote")}</p>}
+            {tour.pricingModel === "per_vehicle_multiday" && (() => {
+              const rooms = roomsNeeded(groupSize, state.singleRooms);
+              return (
+                <>
+                  <Counter id="singleRooms" label={t("singleRooms")} hint={t("singleRoomsHint")} value={state.singleRooms ?? 0} min={0} max={groupSize} onChange={(v) => setParty({ singleRooms: v })} increaseLabel={t("counter.singleRooms.increase")} decreaseLabel={t("counter.singleRooms.decrease")} />
+                  <p className="text-xs font-medium text-navy-950" aria-live="polite">{t("roomsSummary", { shared: rooms.shared, single: rooms.single })}</p>
+                  {rooms.single > rooms.singleRequested && <p className="text-xs text-ink-500">{t("roomsOddNote")}</p>}
+                  <p className="text-xs text-ink-500">{t("perVehicleMultidayNote")}</p>
+                </>
+              );
+            })()}
             {tour.pricingModel === "per_vehicle" && tour.vehiclePricing && (
               <p className="text-xs text-ink-500">{t("perVehicleNote", { maxAdults: tour.vehiclePricing.maxAdults, seats: tour.vehiclePricing.seats })}</p>
             )}

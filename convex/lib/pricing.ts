@@ -25,11 +25,14 @@ export type VehiclePricing = {
   maxAdults: number;
   /** Total guests one vehicle carries, children included (6 in the standard setup). */
   seats: number;
-  /**
-   * per_vehicle_multiday only: each guest after the first two in a vehicle (the 3rd and 4th) adds this;
-   * pricePerVehicle is then the price of the first two guests together.
-   */
+  /** Legacy (first multi-day rule, never used live): the 3rd/4th guest price. Read only as a fallback for seatPrices. */
   extraGuestPrice?: number | null;
+  /** per_vehicle_multiday: the price of the 1st, 2nd, 3rd and 4th guest in each 4WD (baisa, whole trip). */
+  seatPrices?: number[] | null;
+  /** per_vehicle_multiday: one shared room for two guests (baisa, whole trip). */
+  sharedRoomPrice?: number | null;
+  /** per_vehicle_multiday: one single room (baisa, whole trip). */
+  singleRoomPrice?: number | null;
 };
 
 export type PricingTour = {
@@ -68,18 +71,42 @@ export const isVehicleModel = (model: string | undefined | null): boolean => mod
 /** Seats in one vehicle on a multi-day 4WD trip: adults and children alike (lap infants excluded). */
 export const MULTIDAY_VEHICLE_SEATS = 4;
 
+/** Guests one shared room sleeps on a multi-day trip. */
+export const SHARED_ROOM_GUESTS = 2;
+
+/** The 4 seat prices of a multi-day 4WD (1st..4th guest), padded with 0; older rows fall back to pricePerVehicle. */
+export function multidaySeatPrices(cfg: Pick<VehiclePricing, "pricePerVehicle" | "extraGuestPrice" | "seatPrices">): number[] {
+  const s = cfg.seatPrices;
+  if (s && s.length > 0) return Array.from({ length: MULTIDAY_VEHICLE_SEATS }, (_, i) => Math.max(0, s[i] ?? 0));
+  const extra = Math.max(0, cfg.extraGuestPrice ?? 0);
+  return [cfg.pricePerVehicle, 0, extra, extra];
+}
+
 /**
- * Multi-day 4WD price (owner rule): each vehicle takes up to 4 guests, adults or children alike. In every vehicle
- * the first two guests cost pricePerVehicle together and the 3rd and 4th cost extraGuestPrice each. Vehicles are
- * filled in order (4, 4, ..., the rest), so 5 guests = one full vehicle + one vehicle with 1 guest.
+ * Multi-day 4WD transport (owner rule, 2026-10-08): each vehicle takes up to 4 guests, adults or children alike,
+ * and in every vehicle the 1st, 2nd, 3rd and 4th guest each have their own price. Vehicles are filled in order
+ * (4, 4, ..., the rest), so 5 guests = one full vehicle + a vehicle whose only guest pays the 1st-guest price.
+ * seatCounts[i] = how many guests sit in position i+1 across all vehicles.
  */
-export function multidayVehiclePrice(guests: number, cfg: Pick<VehiclePricing, "pricePerVehicle" | "extraGuestPrice">): { vehicles: number; extraGuests: number; total: number } {
+export function multidayVehiclePrice(guests: number, cfg: Pick<VehiclePricing, "pricePerVehicle" | "extraGuestPrice" | "seatPrices">): { vehicles: number; seatCounts: number[]; total: number } {
   const n = Math.max(0, Math.floor(guests));
   const vehicles = Math.ceil(n / MULTIDAY_VEHICLE_SEATS);
-  let extraGuests = 0;
-  for (let left = n; left > 0; left -= MULTIDAY_VEHICLE_SEATS) extraGuests += Math.max(0, Math.min(left, MULTIDAY_VEHICLE_SEATS) - 2);
-  const extra = Math.max(0, cfg.extraGuestPrice ?? 0);
-  return { vehicles, extraGuests, total: vehicles * cfg.pricePerVehicle + extraGuests * extra };
+  const seatCounts = Array.from({ length: MULTIDAY_VEHICLE_SEATS }, () => 0);
+  for (let left = n; left > 0; left -= MULTIDAY_VEHICLE_SEATS) for (let i = 0; i < Math.min(left, MULTIDAY_VEHICLE_SEATS); i++) seatCounts[i]++;
+  const prices = multidaySeatPrices(cfg);
+  return { vehicles, seatCounts, total: seatCounts.reduce((sum, c, i) => sum + c * prices[i], 0) };
+}
+
+/**
+ * Rooms for a multi-day party (owner rule, 2026-10-08): a shared room sleeps two; guests who ask for a single room get
+ * one, and the rest pair up. When the rest is an odd number, the guest left without a partner gets a single room too:
+ * 4 guests with 1 single request = 2 single rooms + 1 shared room. Lap infants stay with their parents.
+ */
+export function roomsNeeded(guests: number, singleRequests: number | undefined | null): { shared: number; single: number; singleRequested: number } {
+  const n = Math.max(0, Math.floor(guests));
+  const asked = Math.min(n, Math.max(0, Math.floor(Number.isFinite(singleRequests) ? (singleRequests as number) : 0)));
+  const rest = n - asked;
+  return { shared: Math.floor(rest / SHARED_ROOM_GUESTS), single: asked + (rest % SHARED_ROOM_GUESTS), singleRequested: asked };
 }
 
 /**
@@ -138,10 +165,14 @@ export function pricingProblem(tour: Pick<PricingTour, "pricingModel" | "priceGr
     }
     case "per_vehicle":
       return (tour.vehiclePricing?.pricePerVehicle ?? 0) > 0 ? null : "vehiclePricing";
-    case "per_vehicle_multiday":
-      if (!((tour.vehiclePricing?.pricePerVehicle ?? 0) > 0)) return "vehiclePricing";
-      // The 3rd/4th guest price must be set on purpose (0 = they ride free)
-      return tour.vehiclePricing?.extraGuestPrice != null && tour.vehiclePricing.extraGuestPrice >= 0 ? null : "vehiclePricing.extraGuestPrice";
+    case "per_vehicle_multiday": {
+      // Four seat prices (the 1st above 0; a later one may be 0 on purpose) and both room prices set on purpose (0 = included)
+      const vp = tour.vehiclePricing;
+      const seats = vp?.seatPrices;
+      if (!vp || !seats || seats.length !== MULTIDAY_VEHICLE_SEATS || !(seats[0] > 0) || seats.some((p) => !(Number.isFinite(p) && p >= 0))) return "vehiclePricing.seatPrices";
+      const room = (p: number | null | undefined) => p != null && Number.isFinite(p) && p >= 0;
+      return room(vp.sharedRoomPrice) && room(vp.singleRoomPrice) ? null : "vehiclePricing.rooms";
+    }
     default:
       if (!((tour.priceAdult ?? 0) > 0)) return "priceAdult";
       // A child price must be set on purpose (0 = children go free); a missing one would silently charge half the adult price
@@ -160,8 +191,10 @@ export function priceFromOf(tour: Pick<PricingTour, "pricingModel" | "priceGroup
     case "tiered":
       return tour.tieredPricing?.firstAdult ?? 0;
     case "per_vehicle":
-    case "per_vehicle_multiday":
       return tour.vehiclePricing?.pricePerVehicle ?? 0;
+    case "per_vehicle_multiday":
+      // One traveller: the 1st seat in a 4WD and a single room
+      return tour.vehiclePricing ? multidaySeatPrices(tour.vehiclePricing)[0] + Math.max(0, tour.vehiclePricing.singleRoomPrice ?? 0) : 0;
     default:
       return tour.priceAdult ?? 0;
   }
@@ -226,6 +259,8 @@ export type QuoteInput = {
   adults: number;
   children: number;
   infants: number;
+  /** per_vehicle_multiday: guests who asked for a single room (roomsNeeded adds one for a guest left without a partner). */
+  singleRooms?: number;
   addOns: { addOn: PricingAddOn; quantity: number }[];
   coupon?: PricingCoupon | null;
   date: string; // YYYY-MM-DD
@@ -254,7 +289,17 @@ export type Quote = {
   couponError?: CouponError;
   /** True when a pricing season changed the price of this quote. */
   seasonal?: boolean;
+  /** per_vehicle_multiday: the rooms this party takes. */
+  rooms?: { shared: number; single: number; singleRequested: number };
 };
+
+/** Quote lines of the four seat positions in a multi-day 4WD. */
+const MULTIDAY_SEAT_LABELS: L[] = [
+  { en: "1st guest in a 4WD", ar: "الشخص الأول في السيارة" },
+  { en: "2nd guest in a 4WD", ar: "الشخص الثاني في السيارة" },
+  { en: "3rd guest in a 4WD", ar: "الشخص الثالث في السيارة" },
+  { en: "4th guest in a 4WD", ar: "الشخص الرابع في السيارة" },
+];
 
 export type CouponError =
   | "not_found"
@@ -287,6 +332,7 @@ export function computeQuote(input: QuoteInput): Quote {
       : label;
 
   let subtotal = 0;
+  let rooms: Quote["rooms"];
   if (tour.pricingModel === "per_group") {
     // A larger party takes more private groups (each up to maxGroup guests), never a refusal
     const groups = Math.max(1, groupsNeeded(adults, children, tour.maxGroup));
@@ -320,27 +366,19 @@ export function computeQuote(input: QuoteInput): Quote {
       subtotal += children * t.extraChild;
     }
   } else if (tour.pricingModel === "per_vehicle_multiday" && tour.vehiclePricing) {
-    // Up to 4 guests per 4WD: the first two together, then the 3rd and 4th each; more guests start another vehicle
+    // Up to 4 guests per 4WD, each seat position with its own price; more guests start another vehicle. Then the rooms.
     const cfg = tour.vehiclePricing;
     const p = multidayVehiclePrice(groupSize, cfg);
-    items.push({
-      kind: "group",
-      label: { en: "4WD vehicle · first two guests", ar: "سيارة دفع رباعي · أول شخصين" },
-      quantity: p.vehicles,
-      unitPrice: cfg.pricePerVehicle,
-      total: p.vehicles * cfg.pricePerVehicle,
+    const prices = multidaySeatPrices(cfg);
+    p.seatCounts.forEach((count, i) => {
+      if (count > 0) items.push({ kind: "adult", label: MULTIDAY_SEAT_LABELS[i], quantity: count, unitPrice: prices[i], total: count * prices[i] });
     });
-    if (p.extraGuests > 0) {
-      const extra = Math.max(0, cfg.extraGuestPrice ?? 0);
-      items.push({
-        kind: "adult",
-        label: { en: "3rd or 4th guest in a 4WD", ar: "الشخص الثالث أو الرابع في السيارة" },
-        quantity: p.extraGuests,
-        unitPrice: extra,
-        total: p.extraGuests * extra,
-      });
-    }
-    subtotal = p.total;
+    rooms = roomsNeeded(groupSize, input.singleRooms);
+    const sharedPrice = Math.max(0, cfg.sharedRoomPrice ?? 0);
+    const singlePrice = Math.max(0, cfg.singleRoomPrice ?? 0);
+    if (rooms.shared > 0) items.push({ kind: "group", label: { en: "Shared room (2 guests)", ar: "غرفة مشتركة (لشخصين)" }, quantity: rooms.shared, unitPrice: sharedPrice, total: rooms.shared * sharedPrice });
+    if (rooms.single > 0) items.push({ kind: "group", label: { en: "Single room", ar: "غرفة فردية" }, quantity: rooms.single, unitPrice: singlePrice, total: rooms.single * singlePrice });
+    subtotal = p.total + rooms.shared * sharedPrice + rooms.single * singlePrice;
   } else if (isVehicleModel(tour.pricingModel) && tour.vehiclePricing) {
     // Every 4WD costs the same flat price; the party size decides how many are
     // needed. Seasonal overrides do not apply to per-vehicle pricing.
@@ -407,7 +445,7 @@ export function computeQuote(input: QuoteInput): Quote {
   const depositDue = depositPercent >= 100 ? total : Math.round((total * depositPercent) / 100);
 
   const seasonApplied = tour.pricingModel === "per_group" ? seasonGroup !== undefined : tour.pricingModel === "per_person" ? pp.seasonal : false;
-  return { items, subtotal, addOnsTotal, discountTotal, total, depositDue, balanceDue: total - depositDue, groupSize, couponCode, couponError, seasonal: seasonApplied || undefined };
+  return { items, subtotal, addOnsTotal, discountTotal, total, depositDue, balanceDue: total - depositDue, groupSize, couponCode, couponError, seasonal: seasonApplied || undefined, ...(rooms ? { rooms } : {}) };
 }
 
 export function validateCoupon(

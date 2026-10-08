@@ -52,7 +52,7 @@ async function loadSeason(ctx: QueryCtx | MutationCtx, tourId: Id<"tours">, date
 export async function buildQuote(
   ctx: QueryCtx | MutationCtx,
   tour: Doc<"tours">,
-  args: { date: string; adults: number; children: number; infants: number; addOns: { addOnId: Id<"addOns">; quantity: number }[]; couponCode?: string },
+  args: { date: string; adults: number; children: number; infants: number; singleRooms?: number; addOns: { addOnId: Id<"addOns">; quantity: number }[]; couponCode?: string },
   opts: { honourCoupon?: boolean } = {},
 ) {
   const season = await loadSeason(ctx, tour._id, args.date);
@@ -75,6 +75,7 @@ export async function buildQuote(
     adults: args.adults,
     children: args.children,
     infants: args.infants,
+    singleRooms: args.singleRooms,
     addOns,
     coupon: coupon ?? null,
     date: args.date,
@@ -84,7 +85,7 @@ export async function buildQuote(
 }
 
 /** Customer booking rules (public create only; staff manual bookings and amendments only require a real date). */
-function assertBookingArgs(tour: Doc<"tours">, args: { date: string; startTime: string; adults: number; children: number; infants: number }) {
+function assertBookingArgs(tour: Doc<"tours">, args: { date: string; startTime: string; adults: number; children: number; infants: number; singleRooms?: number }) {
   // Dates follow the Oman calendar: bookable from Oman's tomorrow through the shared horizon (see lib/dates).
   const problem = dateProblem(args.date);
   if (problem === "invalid") throw new ConvexError({ code: "INVALID_ARGUMENT", field: "date" });
@@ -95,6 +96,7 @@ function assertBookingArgs(tour: Doc<"tours">, args: { date: string; startTime: 
   assertInt(args.adults, 1, PARTY_MAX, "adults");
   assertInt(args.children, 0, PARTY_MAX, "children");
   assertInt(args.infants, 0, INFANT_MAX, "infants");
+  if (args.singleRooms !== undefined) assertInt(args.singleRooms, 0, PARTY_MAX, "singleRooms");
   // Infants travel on an adult's lap (child policy), so one per adult; larger families are arranged by staff
   if (args.infants > args.adults) throw new ConvexError({ code: "TOO_MANY_INFANTS", max: args.adults });
   const groupSize = args.adults + args.children;
@@ -112,6 +114,7 @@ const publicBooking = (b: Doc<"bookings">) => ({
   adults: b.adults,
   children: b.children,
   infants: b.infants,
+  rooms: b.rooms ?? null,
   groupSize: b.groupSize,
   pricingModel: b.pricingModel,
   subtotal: b.subtotal,
@@ -153,6 +156,8 @@ export const quote = query({
     adults: v.number(),
     children: v.number(),
     infants: v.number(),
+    /** per_vehicle_multiday: guests asking for a single room. */
+    singleRooms: v.optional(v.number()),
     addOns: addOnSelectionValidator,
     couponCode: v.optional(v.string()),
   },
@@ -282,6 +287,8 @@ export const create = mutation({
     adults: v.number(),
     children: v.number(),
     infants: v.number(),
+    /** per_vehicle_multiday: guests asking for a single room. */
+    singleRooms: v.optional(v.number()),
     addOns: addOnSelectionValidator,
     couponCode: v.optional(v.string()),
     traveller: travellerValidator,
@@ -391,6 +398,7 @@ export const create = mutation({
       adults: args.adults,
       children: args.children,
       infants: args.infants,
+      rooms: quote.rooms,
       groupSize: quote.groupSize,
       pricingModel: tour.pricingModel,
       currency: "OMR",

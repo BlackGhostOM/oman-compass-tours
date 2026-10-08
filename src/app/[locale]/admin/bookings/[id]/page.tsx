@@ -7,6 +7,7 @@ import { ConvexError } from "convex/values";
 import { AlertTriangle, ArrowLeft, CalendarClock, Copy, Download, Link2, Mail, MessageCircle, RefreshCw, Send } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../../../../../convex/_generated/api";
+import { roomsLine } from "../../../../../../convex/lib/guests";
 import type { Id } from "../../../../../../convex/_generated/dataModel";
 import { Link } from "@/i18n/navigation";
 import { countryName } from "@/lib/countries";
@@ -125,7 +126,7 @@ export default function AdminBookingDetailPage({ params }: { params: Promise<{ i
       <PageHeader
         eyebrow={<span dir="ltr">{b.reference}</span>}
         title={pick(b.tourTitle, locale)}
-        description={`${formatDate(b.date, locale)} · ${b.startTime ?? ""} · ${tb("party", { adults: b.adults, children: b.children, infants: b.infants })} · ${t("source")}: ${b.source}`}
+        description={`${formatDate(b.date, locale)} · ${b.startTime ?? ""} · ${tb("party", { adults: b.adults, children: b.children, infants: b.infants })}${b.rooms ? ` · ${roomsLine(b.rooms, locale)}` : ""} · ${t("source")}: ${b.source}`}
         actions={
           <>
             <Button asChild variant="ghost" size="sm"><Link href="/admin/bookings"><ArrowLeft className="size-4 rtl:-scale-x-100" /> {t("back")}</Link></Button>

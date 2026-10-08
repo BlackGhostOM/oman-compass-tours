@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Check, Clock, Languages, MapPin, ShieldCheck, Users, X } from "lucide-react";
 import { api } from "../../../../../../convex/_generated/api";
-import { perPersonPrices, isVehicleModel } from "../../../../../../convex/lib/pricing";
+import { perPersonPrices, isVehicleModel, multidaySeatPrices } from "../../../../../../convex/lib/pricing";
 import { Link, redirect } from "@/i18n/navigation";
 import { fetchPublic } from "@/lib/convex-server";
 import { decodeSlug, pick, upToKey } from "@/lib/content";
@@ -242,8 +242,10 @@ export default async function TourPage({ params }: Props) {
                         </>
                       ) : tour.pricingModel === "per_vehicle_multiday" && tour.vehiclePricing ? (
                         <>
-                          <PriceRow label={t("multidayFirstTwoRow")} baisa={tour.vehiclePricing.pricePerVehicle} locale={locale} />
-                          <PriceRow label={t("multidayExtraGuestRow")} baisa={tour.vehiclePricing.extraGuestPrice ?? 0} locale={locale} />
+                          {multidaySeatPrices(tour.vehiclePricing).map((p, i) => <PriceRow key={i} label={t("multidaySeatRow", { n: i + 1 })} baisa={p} locale={locale} />)}
+                          <PriceRow label={t("sharedRoomRow")} baisa={tour.vehiclePricing.sharedRoomPrice ?? 0} locale={locale} />
+                          <PriceRow label={t("singleRoomRow")} baisa={tour.vehiclePricing.singleRoomPrice ?? 0} locale={locale} />
+                          <tr><td className="px-4 py-3 text-xs text-ink-500" colSpan={3}>{t("multidayRoomsNote")}</td></tr>
                           <tr><td className="px-4 py-3">{t("infants", { max: tour.infantAgeMax ?? 2 })}</td><td className="px-4 py-3 text-success" colSpan={2}>{t("free")}</td></tr>
                         </>
                       ) : isVehicleModel(tour.pricingModel) && tour.vehiclePricing ? (
