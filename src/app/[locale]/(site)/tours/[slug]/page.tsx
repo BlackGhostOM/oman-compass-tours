@@ -243,7 +243,6 @@ export default async function TourPage({ params }: Props) {
                       ) : tour.pricingModel === "per_vehicle_multiday" && tour.vehiclePricing ? (
                         <>
                           {multidaySeatPrices(tour.vehiclePricing).map((p, i) => <PriceRow key={i} label={t("multidaySeatRow", { n: i + 1 })} baisa={p} locale={locale} />)}
-                          <PriceRow label={t("sharedRoomRow")} baisa={tour.vehiclePricing.sharedRoomPrice ?? 0} locale={locale} />
                           <PriceRow label={t("singleRoomRow")} baisa={tour.vehiclePricing.singleRoomPrice ?? 0} locale={locale} />
                           <tr><td className="px-4 py-3 text-xs text-ink-500" colSpan={3}>{t("multidayRoomsNote")}</td></tr>
                           <tr><td className="px-4 py-3">{t("infants", { max: tour.infantAgeMax ?? 2 })}</td><td className="px-4 py-3 text-success" colSpan={2}>{t("free")}</td></tr>

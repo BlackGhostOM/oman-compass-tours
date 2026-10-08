@@ -7,7 +7,7 @@ import { ConvexError } from "convex/values";
 import { ArrowLeft, ArrowUp, ArrowDown, ImagePlus, Plus, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
-import { isVehicleModel, MULTIDAY_VEHICLE_SEATS, multidaySeatPrices, multidayVehiclePrice, roomsNeeded, vehiclesNeeded } from "../../../convex/lib/pricing";
+import { isVehicleModel, MULTIDAY_VEHICLE_SEATS, multidaySeatPrices, multidayVehiclePrice, roomsNeeded, singleRoomSupplements, vehiclesNeeded } from "../../../convex/lib/pricing";
 import { normalizeStartTimes } from "../../../convex/lib/dates";
 import type { Doc, Id } from "../../../convex/_generated/dataModel";
 import { useSearchParams } from "next/navigation";
@@ -87,7 +87,6 @@ function initial(t: TourDoc | null) {
     vehicleSeats: t?.vehiclePricing?.seats ?? 6,
     // Multi-day 4WD: text, so a deliberate 0 stays apart from "not set" (publishing needs all six)
     multidaySeatOmr: t?.pricingModel === "per_vehicle_multiday" && t.vehiclePricing ? multidaySeatPrices(t.vehiclePricing).map((p) => String(p / 1000)) : ["", "", "", ""],
-    sharedRoomOmr: t?.vehiclePricing?.sharedRoomPrice != null ? String(t.vehiclePricing.sharedRoomPrice / 1000) : "",
     singleRoomOmr: t?.vehiclePricing?.singleRoomPrice != null ? String(t.vehiclePricing.singleRoomPrice / 1000) : "",
     childAgeMax: t?.childAgeMax ?? 11,
     compareAtPriceFromOmr: t?.compareAtPriceFrom ? t.compareAtPriceFrom / 1000 : 0,
@@ -110,12 +109,11 @@ function initial(t: TourDoc | null) {
 }
 
 /** The editor's multi-day 4WD prices for admin/products:upsert; a blank seat leaves seats4 unset, so publishing asks for it. */
-function multidayOmr(f: { multidaySeatOmr: string[]; sharedRoomOmr: string; singleRoomOmr: string }) {
+function multidayOmr(f: { multidaySeatOmr: string[]; singleRoomOmr: string }) {
   const n = (x: string) => (x.trim() === "" || !Number.isFinite(Number(x)) ? undefined : Number(x));
   const seats = f.multidaySeatOmr.map(n);
   return {
     ...(seats.every((x) => x !== undefined) ? { seats4: seats as number[] } : {}),
-    ...(n(f.sharedRoomOmr) !== undefined ? { sharedRoom: n(f.sharedRoomOmr) } : {}),
     ...(n(f.singleRoomOmr) !== undefined ? { singleRoom: n(f.singleRoomOmr) } : {}),
   };
 }
@@ -443,7 +441,6 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
                     {f.multidaySeatOmr.map((v, i) => (
                       <div key={i} className="space-y-1.5"><Label htmlFor={`seat-${i}`}>{t("multidaySeatPrice", { n: i + 1 })}</Label><Input id={`seat-${i}`} type="number" step="0.001" min={0} value={v} onChange={(e) => set("multidaySeatOmr", f.multidaySeatOmr.map((x, j) => (j === i ? e.target.value : x)))} /></div>
                     ))}
-                    <div className="space-y-1.5"><Label htmlFor="shared-room">{t("sharedRoomPrice")}</Label><Input id="shared-room" type="number" step="0.001" min={0} value={f.sharedRoomOmr} onChange={(e) => set("sharedRoomOmr", e.target.value)} /></div>
                     <div className="space-y-1.5"><Label htmlFor="single-room">{t("singleRoomPrice")}</Label><Input id="single-room" type="number" step="0.001" min={0} value={f.singleRoomOmr} onChange={(e) => set("singleRoomOmr", e.target.value)} /></div>
                   </>}
                   {f.pricingModel === "per_vehicle" && <>
@@ -466,12 +463,12 @@ export function TourEditor({ tour, categories, destinations }: { tour: TourDoc |
                     const maxAdults = multiday ? MULTIDAY_VEHICLE_SEATS : f.vehicleMaxAdults || 4;
                     const seats = multiday ? MULTIDAY_VEHICLE_SEATS : f.vehicleSeats || 6;
                     if (multiday) {
-                      // 5 guests, one asking for a single room: a full 4WD + a 4WD with one guest; 2 shared rooms + 1 single
+                      // 4 guests, one asking for a single room: one full 4WD; 1 shared room + 2 single rooms with the supplement
                       const seatPrices = f.multidaySeatOmr.map((x) => Number(x) || 0);
-                      const p = multidayVehiclePrice(5, { pricePerVehicle: seatPrices[0], seatPrices });
-                      const r = roomsNeeded(5, 1);
-                      const example = p.total + r.shared * (Number(f.sharedRoomOmr) || 0) + r.single * (Number(f.singleRoomOmr) || 0);
-                      return t("vehicleMultidayHint", { full: Math.round(seatPrices.reduce((a, b) => a + b, 0) * 1000) / 1000, shared: r.shared, single: r.single, example: Math.round(example * 1000) / 1000 });
+                      const p = multidayVehiclePrice(4, { pricePerVehicle: seatPrices[0], seatPrices });
+                      const supplements = singleRoomSupplements(4, roomsNeeded(4, 1));
+                      const example = p.total + supplements * (Number(f.singleRoomOmr) || 0);
+                      return t("vehicleMultidayHint", { full: Math.round(p.total * 1000) / 1000, single: Number(f.singleRoomOmr) || 0, supplements, example: Math.round(example * 1000) / 1000 });
                     }
                     const n = vehiclesNeeded(5, 2, { pricePerVehicle: 0, maxAdults, seats });
                     const example = Math.round(n * (f.vehiclePriceOmr || 0) * 1000) / 1000;

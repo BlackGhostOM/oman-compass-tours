@@ -29,9 +29,9 @@ export type VehiclePricing = {
   extraGuestPrice?: number | null;
   /** per_vehicle_multiday: the price of the 1st, 2nd, 3rd and 4th guest in each 4WD (baisa, whole trip). */
   seatPrices?: number[] | null;
-  /** per_vehicle_multiday: one shared room for two guests (baisa, whole trip). */
+  /** Legacy (never charged): rooms are included in the seat prices; only single-room supplements cost extra. */
   sharedRoomPrice?: number | null;
-  /** per_vehicle_multiday: one single room (baisa, whole trip). */
+  /** per_vehicle_multiday: the supplement for each single room that replaces a shared place (baisa, whole trip). */
   singleRoomPrice?: number | null;
 };
 
@@ -98,15 +98,25 @@ export function multidayVehiclePrice(guests: number, cfg: Pick<VehiclePricing, "
 }
 
 /**
- * Rooms for a multi-day party (owner rule, 2026-10-08): a shared room sleeps two; guests who ask for a single room get
- * one, and the rest pair up. When the rest is an odd number, the guest left without a partner gets a single room too:
- * 4 guests with 1 single request = 2 single rooms + 1 shared room. Lap infants stay with their parents.
+ * Rooms for a multi-day party (owner rules, 2026-10-08): by default guests pair up in shared rooms and an odd last
+ * guest has a room alone. Guests who ask for a single room get one and the rest pair up; when the rest is odd, the
+ * guest left without a partner gets a single room too: 4 guests with 1 single request = 2 single rooms + 1 shared.
+ * Lap infants stay with their parents. Rooms are included in the seat prices; see singleRoomSupplements for extras.
  */
 export function roomsNeeded(guests: number, singleRequests: number | undefined | null): { shared: number; single: number; singleRequested: number } {
   const n = Math.max(0, Math.floor(guests));
   const asked = Math.min(n, Math.max(0, Math.floor(Number.isFinite(singleRequests) ? (singleRequests as number) : 0)));
   const rest = n - asked;
   return { shared: Math.floor(rest / SHARED_ROOM_GUESTS), single: asked + (rest % SHARED_ROOM_GUESTS), singleRequested: asked };
+}
+
+/**
+ * Single rooms that cost the supplement (owner rule, 2026-10-08): the single-room price applies only where a shared
+ * room was turned into single rooms, so the odd last guest's room alone (which the party gets anyway) is free.
+ * 4 guests, 1 request = 2 supplements; 3 guests, 1 request = 0 (the requester takes the odd room); 5 guests, 2 = 2.
+ */
+export function singleRoomSupplements(guests: number, rooms: { single: number }): number {
+  return Math.max(0, rooms.single - (Math.max(0, Math.floor(guests)) % SHARED_ROOM_GUESTS));
 }
 
 /**
@@ -166,12 +176,11 @@ export function pricingProblem(tour: Pick<PricingTour, "pricingModel" | "priceGr
     case "per_vehicle":
       return (tour.vehiclePricing?.pricePerVehicle ?? 0) > 0 ? null : "vehiclePricing";
     case "per_vehicle_multiday": {
-      // Four seat prices (the 1st above 0; a later one may be 0 on purpose) and both room prices set on purpose (0 = included)
+      // Four seat prices (the 1st above 0; a later one may be 0 on purpose) and the single-room supplement (0 = free)
       const vp = tour.vehiclePricing;
       const seats = vp?.seatPrices;
       if (!vp || !seats || seats.length !== MULTIDAY_VEHICLE_SEATS || !(seats[0] > 0) || seats.some((p) => !(Number.isFinite(p) && p >= 0))) return "vehiclePricing.seatPrices";
-      const room = (p: number | null | undefined) => p != null && Number.isFinite(p) && p >= 0;
-      return room(vp.sharedRoomPrice) && room(vp.singleRoomPrice) ? null : "vehiclePricing.rooms";
+      return vp.singleRoomPrice != null && Number.isFinite(vp.singleRoomPrice) && vp.singleRoomPrice >= 0 ? null : "vehiclePricing.singleRoomPrice";
     }
     default:
       if (!((tour.priceAdult ?? 0) > 0)) return "priceAdult";
@@ -193,8 +202,8 @@ export function priceFromOf(tour: Pick<PricingTour, "pricingModel" | "priceGroup
     case "per_vehicle":
       return tour.vehiclePricing?.pricePerVehicle ?? 0;
     case "per_vehicle_multiday":
-      // One traveller: the 1st seat in a 4WD and a single room
-      return tour.vehiclePricing ? multidaySeatPrices(tour.vehiclePricing)[0] + Math.max(0, tour.vehiclePricing.singleRoomPrice ?? 0) : 0;
+      // One traveller: the 1st seat in a 4WD (a lone guest's room alone is included)
+      return tour.vehiclePricing ? multidaySeatPrices(tour.vehiclePricing)[0] : 0;
     default:
       return tour.priceAdult ?? 0;
   }
@@ -366,7 +375,8 @@ export function computeQuote(input: QuoteInput): Quote {
       subtotal += children * t.extraChild;
     }
   } else if (tour.pricingModel === "per_vehicle_multiday" && tour.vehiclePricing) {
-    // Up to 4 guests per 4WD, each seat position with its own price; more guests start another vehicle. Then the rooms.
+    // Up to 4 guests per 4WD, each seat position with its own price; more guests start another vehicle. Rooms are
+    // included; only single rooms that replace a shared place add the supplement.
     const cfg = tour.vehiclePricing;
     const p = multidayVehiclePrice(groupSize, cfg);
     const prices = multidaySeatPrices(cfg);
@@ -374,11 +384,10 @@ export function computeQuote(input: QuoteInput): Quote {
       if (count > 0) items.push({ kind: "adult", label: MULTIDAY_SEAT_LABELS[i], quantity: count, unitPrice: prices[i], total: count * prices[i] });
     });
     rooms = roomsNeeded(groupSize, input.singleRooms);
-    const sharedPrice = Math.max(0, cfg.sharedRoomPrice ?? 0);
     const singlePrice = Math.max(0, cfg.singleRoomPrice ?? 0);
-    if (rooms.shared > 0) items.push({ kind: "group", label: { en: "Shared room (2 guests)", ar: "غرفة مشتركة (لشخصين)" }, quantity: rooms.shared, unitPrice: sharedPrice, total: rooms.shared * sharedPrice });
-    if (rooms.single > 0) items.push({ kind: "group", label: { en: "Single room", ar: "غرفة فردية" }, quantity: rooms.single, unitPrice: singlePrice, total: rooms.single * singlePrice });
-    subtotal = p.total + rooms.shared * sharedPrice + rooms.single * singlePrice;
+    const supplements = singleRoomSupplements(groupSize, rooms);
+    if (supplements > 0) items.push({ kind: "group", label: { en: "Single room supplement (instead of a shared room)", ar: "فرق الغرفة الفردية (بدل الغرفة المشتركة)" }, quantity: supplements, unitPrice: singlePrice, total: supplements * singlePrice });
+    subtotal = p.total + supplements * singlePrice;
   } else if (isVehicleModel(tour.pricingModel) && tour.vehiclePricing) {
     // Every 4WD costs the same flat price; the party size decides how many are
     // needed. Seasonal overrides do not apply to per-vehicle pricing.

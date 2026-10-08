@@ -290,7 +290,6 @@ export const upsert = mutation({
           ...(multiday
             ? {
                 ...(seatPrices ? { seatPrices } : {}),
-                ...(data.vehicleOmr.sharedRoom !== undefined ? { sharedRoomPrice: omr(data.vehicleOmr.sharedRoom, "vehicleOmr")! } : {}),
                 ...(data.vehicleOmr.singleRoom !== undefined ? { singleRoomPrice: omr(data.vehicleOmr.singleRoom, "vehicleOmr")! } : {}),
               }
             : {}),
@@ -611,7 +610,7 @@ export const upsertDestination = mutation({
 /* ------------------------------------------------------------------ */
 
 const PRICING_MODELS = ["per_group", "per_person", "tiered", "per_vehicle", "per_vehicle_multiday"] as const;
-const PRICING_KEYS = ["pricing_model", "price_group_omr", "price_adult_omr", "price_child_omr", "tier_first_adult_omr", "tier_first_two_adults_omr", "tier_extra_adult_omr", "tier_extra_child_omr", "vehicle_price_omr", "vehicle_max_adults", "vehicle_seats", "seat1_omr", "seat2_omr", "seat3_omr", "seat4_omr", "shared_room_omr", "single_room_omr"];
+const PRICING_KEYS = ["pricing_model", "price_group_omr", "price_adult_omr", "price_child_omr", "tier_first_adult_omr", "tier_first_two_adults_omr", "tier_extra_adult_omr", "tier_extra_child_omr", "vehicle_price_omr", "vehicle_max_adults", "vehicle_seats", "seat1_omr", "seat2_omr", "seat3_omr", "seat4_omr", "single_room_omr"];
 /** The template's sample row uses this prefix so trying the template can never overwrite a real product. */
 const SAMPLE_CODE_RE = /^SAMPLE-/i;
 
@@ -805,7 +804,7 @@ export const importTours = mutation({
               ? multiday
                 ? (() => {
                     const seatPrices = [1, 2, 3, 4].map((n, i) => omr(`seat${n}_omr`) ?? vehicle?.seatPrices?.[i] ?? 0);
-                    return { pricePerVehicle: seatPrices[0], maxAdults: MULTIDAY_VEHICLE_SEATS, seats: MULTIDAY_VEHICLE_SEATS, seatPrices, sharedRoomPrice: omr("shared_room_omr") ?? vehicle?.sharedRoomPrice ?? undefined, singleRoomPrice: omr("single_room_omr") ?? vehicle?.singleRoomPrice ?? undefined };
+                    return { pricePerVehicle: seatPrices[0], maxAdults: MULTIDAY_VEHICLE_SEATS, seats: MULTIDAY_VEHICLE_SEATS, seatPrices, singleRoomPrice: omr("single_room_omr") ?? vehicle?.singleRoomPrice ?? undefined };
                   })()
                 : { pricePerVehicle: omr("vehicle_price_omr") ?? vehicle?.pricePerVehicle ?? 0, maxAdults: vehicleMaxAdults, seats: int("vehicle_seats", vehicleMaxAdults, 16) ?? Math.max(vehicleMaxAdults, vehicle?.seats ?? 6) }
               : undefined;

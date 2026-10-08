@@ -24,7 +24,7 @@ export type BookingTour = {
   priceAdult: number | null;
   priceChild: number | null;
   tieredPricing?: { firstAdult: number; firstTwoAdults: number; extraAdult: number; extraChild: number } | null;
-  vehiclePricing?: { pricePerVehicle: number; maxAdults: number; seats: number } | null;
+  vehiclePricing?: { pricePerVehicle: number; maxAdults: number; seats: number; seatPrices?: number[]; singleRoomPrice?: number } | null;
   childAgeMax: number | null;
   infantAgeMax: number;
   minGroup: number;

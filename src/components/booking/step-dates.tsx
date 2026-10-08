@@ -7,7 +7,7 @@ import { Minus, Plus, Tag } from "lucide-react";
 import { formatOmr, pick } from "@/lib/content";
 import { whatsappLink } from "@/lib/site";
 import { BOOKING_HORIZON_DAYS, bookingWindow, isoDayFromLocalDate, isRealIsoDate } from "../../../convex/lib/dates";
-import { INFANT_MAX, PARTY_MAX, roomsNeeded } from "../../../convex/lib/pricing";
+import { INFANT_MAX, PARTY_MAX, roomsNeeded, singleRoomSupplements } from "../../../convex/lib/pricing";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -250,7 +250,8 @@ export function StepDates({
                 <>
                   <Counter id="singleRooms" label={t("singleRooms")} hint={t("singleRoomsHint")} value={state.singleRooms ?? 0} min={0} max={groupSize} onChange={(v) => setParty({ singleRooms: v })} increaseLabel={t("counter.singleRooms.increase")} decreaseLabel={t("counter.singleRooms.decrease")} />
                   <p className="text-xs font-medium text-navy-950" aria-live="polite">{t("roomsSummary", { shared: rooms.shared, single: rooms.single })}</p>
-                  {rooms.single > rooms.singleRequested && <p className="text-xs text-ink-500">{t("roomsOddNote")}</p>}
+                  {rooms.single > rooms.singleRequested && <p className="text-xs text-ink-500">{t(rooms.singleRequested > 0 ? "roomsPartnerNote" : "roomsOddNote")}</p>}
+                  {singleRoomSupplements(groupSize, rooms) > 0 && tour.vehiclePricing?.singleRoomPrice != null && <p className="text-xs text-ink-500">{t("singleSupplementNote", { count: singleRoomSupplements(groupSize, rooms) })}</p>}
                   <p className="text-xs text-ink-500">{t("perVehicleMultidayNote")}</p>
                 </>
               );

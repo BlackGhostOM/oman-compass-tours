@@ -5,7 +5,7 @@
  */
 import { expect, test } from "@playwright/test";
 import { slotCapacity, UNLIMITED_CAPACITY } from "../convex/lib/capacity";
-import { capacityUnits, computeQuote, groupsNeeded, isVehicleModel, multidayVehiclePrice, MULTIDAY_VEHICLE_SEATS, PARTY_MAX, priceFromOf, pricingProblem, roomsNeeded, vehiclesNeeded } from "../convex/lib/pricing";
+import { capacityUnits, computeQuote, groupsNeeded, isVehicleModel, multidayVehiclePrice, MULTIDAY_VEHICLE_SEATS, PARTY_MAX, priceFromOf, pricingProblem, roomsNeeded, singleRoomSupplements, vehiclesNeeded } from "../convex/lib/pricing";
 import { guestsLine } from "../convex/lib/guests";
 import { sanitizeSelection } from "../src/components/booking/selection";
 import type { BookingTour } from "../src/components/booking/types";
@@ -38,8 +38,8 @@ test.describe("private groups repeat instead of refusing", () => {
 });
 
 test.describe("multi-day 4WD: a price per seat, 4 seats per vehicle, shared and single rooms", () => {
-  // Owner rules (2026-10-08): 1st 100, 2nd 80, 3rd 60, 4th 50 OMR in each 4WD; shared room 120, single room 90 OMR
-  const cfg = { pricePerVehicle: 100_000, maxAdults: MULTIDAY_VEHICLE_SEATS, seats: MULTIDAY_VEHICLE_SEATS, seatPrices: [100_000, 80_000, 60_000, 50_000], sharedRoomPrice: 120_000, singleRoomPrice: 90_000 };
+  // Owner rules (2026-10-08): 1st 100, 2nd 80, 3rd 60, 4th 50 OMR in each 4WD; rooms included, single-room supplement 90 OMR
+  const cfg = { pricePerVehicle: 100_000, maxAdults: MULTIDAY_VEHICLE_SEATS, seats: MULTIDAY_VEHICLE_SEATS, seatPrices: [100_000, 80_000, 60_000, 50_000], singleRoomPrice: 90_000 };
   const tour = { pricingModel: "per_vehicle_multiday" as const, vehiclePricing: cfg, minGroup: 1, maxGroup: 4, depositPercent: 35 };
 
   test("each seat has its own price, and a 5th guest starts another 4WD priced the same way", () => {
@@ -63,29 +63,43 @@ test.describe("multi-day 4WD: a price per seat, 4 seats per vehicle, shared and 
     expect(roomsNeeded(2, 9)).toEqual({ shared: 0, single: 2, singleRequested: 2 });
   });
 
-  test("the quote adds seats and rooms; children count like adults, infants are free", () => {
-    const q = computeQuote({ tour, tourId: "t", adults: 3, children: 1, infants: 2, singleRooms: 1, addOns: [], date: DATE, now: NOW });
-    // Seats 100 + 80 + 60 + 50 = 290; rooms 1 shared (120) + 2 single (180) = 300
-    expect(q.subtotal).toBe(590_000);
-    expect(q.rooms).toEqual({ shared: 1, single: 2, singleRequested: 1 });
-    expect(q.items.filter((i) => i.label.en.includes("in a 4WD")).map((i) => i.total)).toEqual([100_000, 80_000, 60_000, 50_000]);
-    expect(q.items.find((i) => i.label.en.startsWith("Shared room"))).toMatchObject({ quantity: 1, total: 120_000 });
-    expect(q.items.find((i) => i.label.en === "Single room")).toMatchObject({ quantity: 2, total: 180_000 });
-    expect(capacityUnits(tour, 3, 2)).toBe(2);
-    expect(vehiclesNeeded(3, 2, cfg)).toBe(2);
-    // Without a request, 4 guests share 2 rooms
-    expect(computeQuote({ tour, tourId: "t", adults: 4, children: 0, infants: 0, addOns: [], date: DATE, now: NOW }).subtotal).toBe(290_000 + 240_000);
+  test("the supplement applies only where a shared room became single rooms; the odd last guest's room is free", () => {
+    const sup = (n: number, asked: number) => singleRoomSupplements(n, roomsNeeded(n, asked));
+    expect(sup(4, 1)).toBe(2); // the owner's example: 2 single rooms charged, 1 shared
+    expect(sup(4, 0)).toBe(0);
+    expect(sup(3, 0)).toBe(0); // odd last guest alone: free
+    expect(sup(3, 1)).toBe(0); // the requester takes the odd room
+    expect(sup(5, 2)).toBe(2);
+    expect(sup(1, 0)).toBe(0);
+    expect(sup(2, 1)).toBe(2);
   });
 
-  test("publishing needs the four seat prices and both room prices (0 allowed on purpose)", () => {
+  test("the quote adds seats and single-room supplements; children count like adults, infants are free", () => {
+    const q = computeQuote({ tour, tourId: "t", adults: 3, children: 1, infants: 2, singleRooms: 1, addOns: [], date: DATE, now: NOW });
+    // Seats 100 + 80 + 60 + 50 = 290; 2 single rooms replace a shared one = 2 x 90
+    expect(q.subtotal).toBe(470_000);
+    expect(q.rooms).toEqual({ shared: 1, single: 2, singleRequested: 1 });
+    expect(q.items.filter((i) => i.label.en.includes("in a 4WD")).map((i) => i.total)).toEqual([100_000, 80_000, 60_000, 50_000]);
+    expect(q.items.find((i) => i.label.en.startsWith("Single room supplement"))).toMatchObject({ quantity: 2, total: 180_000 });
+    // 3 guests, no request: 1 shared + the odd guest alone, no supplement
+    const odd = computeQuote({ tour, tourId: "t", adults: 3, children: 0, infants: 0, addOns: [], date: DATE, now: NOW });
+    expect(odd.subtotal).toBe(240_000);
+    expect(odd.rooms).toEqual({ shared: 1, single: 1, singleRequested: 0 });
+    expect(capacityUnits(tour, 3, 2)).toBe(2);
+    expect(vehiclesNeeded(3, 2, cfg)).toBe(2);
+    // Without a request, 4 guests share 2 rooms at no extra cost
+    expect(computeQuote({ tour, tourId: "t", adults: 4, children: 0, infants: 0, addOns: [], date: DATE, now: NOW }).subtotal).toBe(290_000);
+  });
+
+  test("publishing needs the four seat prices and the single-room supplement (0 allowed on purpose)", () => {
     expect(pricingProblem({ pricingModel: "per_vehicle_multiday", vehiclePricing: cfg })).toBeNull();
     expect(pricingProblem({ pricingModel: "per_vehicle_multiday", vehiclePricing: { ...cfg, seatPrices: undefined } })).toBe("vehiclePricing.seatPrices");
     expect(pricingProblem({ pricingModel: "per_vehicle_multiday", vehiclePricing: { ...cfg, seatPrices: [0, 80_000, 60_000, 50_000] } })).toBe("vehiclePricing.seatPrices");
     expect(pricingProblem({ pricingModel: "per_vehicle_multiday", vehiclePricing: { ...cfg, seatPrices: [100_000, 0, 0, 0] } })).toBeNull();
-    expect(pricingProblem({ pricingModel: "per_vehicle_multiday", vehiclePricing: { ...cfg, singleRoomPrice: undefined } })).toBe("vehiclePricing.rooms");
-    expect(pricingProblem({ pricingModel: "per_vehicle_multiday", vehiclePricing: { ...cfg, sharedRoomPrice: 0, singleRoomPrice: 0 } })).toBeNull();
-    // The card's "from": one traveller = the 1st seat and a single room
-    expect(priceFromOf({ pricingModel: "per_vehicle_multiday", vehiclePricing: cfg })).toBe(190_000);
+    expect(pricingProblem({ pricingModel: "per_vehicle_multiday", vehiclePricing: { ...cfg, singleRoomPrice: undefined } })).toBe("vehiclePricing.singleRoomPrice");
+    expect(pricingProblem({ pricingModel: "per_vehicle_multiday", vehiclePricing: { ...cfg, singleRoomPrice: 0 } })).toBeNull();
+    // The card's "from": one traveller = the 1st seat (a lone guest's room is included)
+    expect(priceFromOf({ pricingModel: "per_vehicle_multiday", vehiclePricing: cfg })).toBe(100_000);
   });
 
   test("emails and the voucher name the rooms", () => {
